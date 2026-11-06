@@ -85,10 +85,6 @@ function startGame(save) {
   setTheme(BIOME_LIST[G.biome]);
   hide('title');
   announce(BIOMES[BIOME_LIST[G.biome]].name, BIOMES[BIOME_LIST[G.biome]].sub, 3);
-  if (!save.autoHint) {
-    save.autoHint = 1;
-    setTimeout(() => { if (G.scene === 'play') toast('Tip: press V for auto-attack, or attack with J while moving.', 5000); }, 5000);
-  }
 }
 
 // ---------- Announcements ----------

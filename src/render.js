@@ -655,7 +655,7 @@ function drawHUD(ctx) {
   });
 
   // weapons
-  const by = H - 96;
+  const by = H - 74;
   WEAPONS.forEach((w, i) => {
     const x = 24 + i * 58, sel = save.weapon === i, own = ownsWeapon(i);
     ctx.fillStyle = sel ? 'rgba(255,225,74,.18)' : 'rgba(10,6,20,.6)';
@@ -677,15 +677,6 @@ function drawHUD(ctx) {
       ctx.fillRect(x + 2, by + 50 - 48 * k, 46, 48 * k);
     }
   });
-  // auto-attack badge
-  ctx.font = '900 12px Nunito, sans-serif';
-  ctx.textAlign = 'left';
-  const auto = save.autofire;
-  ctx.fillStyle = auto ? 'rgba(255,225,74,.9)' : 'rgba(10,6,20,.6)';
-  roundRect(ctx, 24, by + 58, 134, 22, 6);
-  ctx.fill();
-  ctx.fillStyle = auto ? '#1a1020' : 'rgba(255,255,255,.55)';
-  ctx.fillText(auto ? 'V  AUTO-ATTACK ON' : 'V  auto-attack: off', 32, by + 73);
   // bubble charge
   const bx = 24 + 4 * 58 + 30, byc = by + 25, k = clamp(p.charge / S.bubbleT, 0, 1);
   ctx.beginPath(); ctx.arc(bx, byc, 22, 0, TAU);

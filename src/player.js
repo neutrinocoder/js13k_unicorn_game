@@ -8,14 +8,13 @@ import { burst, part, ring, shake, floater } from './fx.js';
 import { sfx } from './audio.js';
 import { stats, ownsWeapon, WEAPONS } from './items.js';
 import { hurtPlayer, damageEnemy, shoot, breakTile } from './combat.js';
-import { toast } from './ui.js';
 
 export function makePlayer(x, y) {
   const p = {
     x, y, w: 30, h: 34, vx: 0, vy: 0, face: 1, ground: false, jumps: 0, coyote: 0, jbuf: 0, rising: false,
     dashT: 0, dashCd: 0, dashDir: 1, inv: 0, hp: 5, shield: 0, ctrlLock: 0, wallDir: 0, dropT: 0,
     whipT: 0, whipAng: 0, whipCd: 0, whipSide: 1, combo: 0, lastWhip: -9, blastCd: 0, starCd: 0, atkBuf: 0, altBuf: 0,
-    energy: 100, beaming: false, beamLen: 0, beamTick: 0, autoAim: false,
+    energy: 100, beaming: false, beamLen: 0, beamTick: 0,
     charge: 0, slow: 0, gliding: false, runPhase: 0, sx: 1, sy: 1, ax: 1, ay: 0, stepT: 0, dead: false, tail: [],
   };
   for (let i = 0; i < 12; i++) p.tail.push({ x: x, y: y + 10, px: x, py: y + 10 });
@@ -156,29 +155,12 @@ export function updatePlayer(dt) {
     selectWeapon(w);
   }
 
-  // Auto-attack toggle
-  if (tapped('KeyV')) {
-    G.save.autofire = G.save.autofire ? 0 : 1;
-    sfx('ui');
-    toast(G.save.autofire ? 'Auto-attack ON: you attack the nearest enemy by yourself (V to turn off)' : 'Auto-attack OFF', 2400);
-  }
-
   // Attacks. A press during a cooldown is remembered briefly, so no click is lost.
   const weapon = WEAPONS[G.save.weapon].id;
   if (mouse.pressed || tapped('KeyJ', 'KeyK', 'KeyZ')) p.atkBuf = 0.3; else p.atkBuf -= dt;
   if (mouse.rpressed || tapped('KeyX', 'KeyI')) p.altBuf = 0.3; else p.altBuf -= dt;
-  let atk = mouse.down || held('KeyJ', 'KeyK', 'KeyZ') || p.atkBuf > 0;
+  const atk = mouse.down || held('KeyJ', 'KeyK', 'KeyZ') || p.atkBuf > 0;
   const alt = mouse.rdown || held('KeyX', 'KeyI') || p.altBuf > 0;
-  p.autoAim = false;
-  if (G.save.autofire && !alt) {
-    const tgt = autoTarget(p, weapon, S);
-    if (tgt) {
-      const dx = tgt.x + tgt.w / 2 - cx, dy = tgt.y + tgt.h / 2 - cy, d = Math.hypot(dx, dy) || 1;
-      p.ax = dx / d; p.ay = dy / d;
-      atk = true;
-      p.autoAim = true;
-    }
-  }
   if ((atk || alt) && !dir && mouse.used && mouse.inside) p.face = p.ax < 0 ? -1 : 1;
   p.beaming = false;
   if (alt) { if (fireBlast(p, S)) p.altBuf = 0; }
@@ -222,24 +204,6 @@ function selectWeapon(i) {
 
 function targets() {
   return G.boss && !G.boss.dead ? [...G.enemies, G.boss] : G.enemies;
-}
-
-// Nearest enemy the selected weapon can reach, for auto-attack.
-function autoTarget(p, weapon, S) {
-  const cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 6;
-  const range = weapon === 'whip' ? S.reach + 20 : weapon === 'beam' ? 540 : 600;
-  let best = null, bd = range;
-  for (const e of targets()) {
-    if (e.dead || e.trap > 0 && weapon === 'blast') continue;
-    const ex = clamp(cx, e.x, e.x + e.w), ey = clamp(cy, e.y, e.y + e.h);
-    const d = Math.hypot(ex - cx, ey - cy);
-    if (d >= bd) continue;
-    const tx = e.x + e.w / 2 - cx, ty = e.y + e.h / 2 - cy, l = Math.hypot(tx, ty) || 1;
-    if (weapon !== 'whip' && rayLength(cx, cy, tx / l, ty / l, l) < l - 24) continue;
-    bd = d;
-    best = e;
-  }
-  return best;
 }
 
 function fireWhip(p, S, dir) {
@@ -775,15 +739,6 @@ export function drawUnicorn(ctx, p, t) {
     ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ex, ey); ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-  }
-  // Auto-aim marker on the current target
-  if (p.autoAim && G.scene === 'play') {
-    const cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 6;
-    ctx.strokeStyle = 'rgba(255,225,74,.7)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 6]);
-    ctx.beginPath(); ctx.moveTo(cx + p.ax * 24, cy + p.ay * 24); ctx.lineTo(cx + p.ax * 60, cy + p.ay * 60); ctx.stroke();
-    ctx.setLineDash([]);
   }
 }
 

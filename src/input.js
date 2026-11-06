@@ -25,16 +25,26 @@ export function initInput(canvas, onKey) {
   };
   canvas.addEventListener('pointermove', e => { pos(e); mouse.inside = true; mouse.used = true; });
   canvas.addEventListener('pointerleave', () => { mouse.inside = false; });
-  canvas.addEventListener('pointerdown', e => {
+  // Clicks are read from the whole window (not just the canvas), and from both pointer and
+  // mouse events, so a click counts whatever keys are held and whatever is drawn on top.
+  const onGame = t => t === canvas || t === document.body || t === document.documentElement || (t && t.id === 'ui');
+  const down = e => {
+    if (!onGame(e.target)) return;
     pos(e);
     mouse.inside = true;
-    if (e.button === 0) { mouse.down = true; mouse.pressed = true; mouse.used = true; }
-    if (e.button === 2) { mouse.rdown = true; mouse.rpressed = true; mouse.used = true; }
-  });
-  addEventListener('pointerup', e => {
+    mouse.used = true;
+    if (e.button === 0) { mouse.down = true; mouse.pressed = true; }
+    if (e.button === 2) { mouse.rdown = true; mouse.rpressed = true; }
+  };
+  const up = e => {
     if (e.button === 0) mouse.down = false;
     if (e.button === 2) mouse.rdown = false;
-  });
+  };
+  addEventListener('pointerdown', down);
+  addEventListener('mousedown', down);
+  addEventListener('pointerup', up);
+  addEventListener('mouseup', up);
+  addEventListener('pointercancel', () => { mouse.down = mouse.rdown = false; });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { mouse.wheel += Math.sign(e.deltaY); e.preventDefault(); }, { passive: false });
 }
