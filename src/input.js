@@ -7,6 +7,7 @@ const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRig
 
 export function initInput(canvas, onKey) {
   addEventListener('keydown', e => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     if (PREVENT.has(e.code) && e.target === document.body) e.preventDefault();
     if (e.repeat) return;
     keys[e.code] = true;

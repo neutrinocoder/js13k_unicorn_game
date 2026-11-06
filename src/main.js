@@ -11,6 +11,7 @@ import { updateFx, part, burst, ring, floater, shake } from './fx.js';
 import { render, drawMap, mapToScreen, shrinePos } from './render.js';
 import { stats } from './items.js';
 import { rand, clamp, mix, pick, RAINBOW } from './util.js';
+import { initDev, devOpen } from './dev.js';
 import { show, hide, isShown, toast as uiToast, openShop, closeShop, openDialog, advanceDialog } from './ui.js';
 
 const canvas = document.getElementById('game');
@@ -216,7 +217,7 @@ function interact(o) {
   }
 }
 
-function teleport(x, y) {
+export function teleport(x, y) {
   const p = G.player;
   burst(p.x + p.w / 2, p.y + p.h / 2, 30, RAINBOW, 300, { add: true });
   G.fade = 1.2;
@@ -458,6 +459,7 @@ function titleUpdate(dt) {
 // ---------- Input wiring ----------
 function onKey(code) {
   initAudio();
+  if (devOpen()) return;
   if (code === 'KeyN') { setMuted(!muted); $('btn-mute').textContent = 'Sound: ' + (muted ? 'Off' : 'On'); toast(muted ? 'Sound off' : 'Sound on', 1200); return; }
   switch (G.scene) {
     case 'play':
@@ -588,6 +590,7 @@ function refreshTitle() {
 }
 
 initInput(canvas, onKey);
+initDev();
 refreshTitle();
 document.addEventListener('pointerdown', () => initAudio(), { once: true });
 setTheme('title');

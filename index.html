@@ -52,6 +52,7 @@
         <kbd>M / Tab</kbd><span>World map and shrine travel</span>
         <kbd>Esc</kbd><span>Pause</span>
         <kbd>N</kbd><span>Mute</span>
+        <kbd>` (backtick)</kbd><span>Developer console: fly, god, gems, tp, give all, help</span>
       </div>
       <button class="btn" data-close>Back</button>
     </div>
@@ -103,6 +104,11 @@
       <button class="btn primary" id="btn-ending">Keep exploring</button>
     </div>
   </section>
+
+  <div id="devcon" class="hidden">
+    <div id="devlog"></div>
+    <div class="devrow"><span>&gt;</span><input id="devin" autocomplete="off" spellcheck="false" placeholder="type a command, e.g. fly, god, gems, help"></div>
+  </div>
 
   <div id="toast"></div>
 </div>

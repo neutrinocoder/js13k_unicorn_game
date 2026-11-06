@@ -53,97 +53,114 @@ export function updatePlayer(dt) {
   }
   if (dir) p.face = dir;
 
-  // Horizontal movement
-  const ice = B.ice && p.ground;
-  const top = p.slow > 0 ? 200 : 330;
-  if (p.dashT > 0) {
-    p.dashT -= dt;
-    p.vx = p.dashDir * 780;
-    p.vy = 0;
-    if (Math.random() < 0.9) part({ x: cx - p.dashDir * 10, y: cy + rand(-10, 10), vx: -p.dashDir * 60, life: 0.3, size: 5, color: pick(RAINBOW), add: true });
-  } else {
-    const acc = p.ground ? (ice ? 2.5 : 16) : 9;
-    const wind = B.wind ? G.windForce * 0.3 : 0;
-    p.vx += (dir * top + wind - p.vx) * Math.min(1, acc * dt);
-  }
-
-  // Gravity, walls and gliding
-  const wasGround = p.ground;
-  if (p.dashT <= 0) p.vy = Math.min(p.vy + 1900 * dt, 950);
-  p.wallDir = 0;
-  if (!p.ground && p.vy > 0 && dir && touchWall(p, dir)) {
-    p.wallDir = dir;
-    p.vy = Math.min(p.vy, 150);
-    if (Math.random() < 0.3) part({ x: dir > 0 ? p.x + p.w : p.x, y: p.y + p.h, vx: 0, vy: -30, life: 0.3, size: 2, color: '#d8d0ef' });
-  }
-  p.gliding = false;
-  if (S.glide && !p.ground && jumpH && p.vy > 60 && !p.wallDir) {
-    p.vy = Math.min(p.vy, 115);
+  // Developer flight: move freely in every direction and pass through walls.
+  const devF = G.save.dev || {};
+  if (devF.fly) {
+    const sp = (held('ShiftLeft', 'ShiftRight') ? 1500 : 650) * (devF.speed || 1);
+    const fy = (D ? 1 : 0) - (U || held('Space') ? 1 : 0), l = Math.hypot(dir, fy) || 1;
+    p.vx += ((dir / l) * sp - p.vx) * Math.min(1, 10 * dt);
+    p.vy += ((fy / l) * sp - p.vy) * Math.min(1, 10 * dt);
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.ground = false;
     p.gliding = true;
-  }
-
-  // Jumping
-  if (p.ground) { p.coyote = 0.1; p.jumps = S.jumps - 1; } else p.coyote -= dt;
-  p.jbuf = jumpP ? 0.13 : p.jbuf - dt;
-  if (tapped('KeyS', 'ArrowDown') && p.ground && onPlatform(p)) { p.dropT = 0.22; p.ground = false; }
-  if (p.jbuf > 0 && p.dropT <= 0) {
-    const wl = touchWall(p, -1), wr = touchWall(p, 1);
-    if (p.coyote > 0) {
-      p.vy = -700; p.coyote = 0; p.jbuf = 0; p.rising = true;
-      p.sx = 0.8; p.sy = 1.25;
-      sfx('jump');
-      for (let i = 0; i < 8; i++) part({ x: cx + rand(-12, 12), y: p.y + p.h, vx: rand(-80, 80), vy: rand(-60, -10), life: 0.4, size: 3, color: '#cfc4e6', drag: 3 });
-    } else if (!p.ground && (wl || wr)) {
-      const w = wl ? -1 : 1;
-      p.vy = -660; p.vx = -w * 430; p.ctrlLock = 0.14; p.face = -w; p.jbuf = 0; p.rising = true;
-      sfx('jump');
-      burst(w > 0 ? p.x + p.w : p.x, cy, 8, '#e6dcff', 140);
-    } else if (p.jumps > 0) {
-      p.jumps--; p.vy = -630; p.jbuf = 0; p.rising = true;
-      p.sx = 0.85; p.sy = 1.2;
-      sfx('djump');
-      ring(cx, p.y + p.h, 34, pick(RAINBOW), 0.35, 5);
-      for (let i = 0; i < 7; i++) part({ x: cx, y: p.y + p.h, vx: Math.cos(i) * 150, vy: 60 + Math.sin(i) * 40, life: 0.35, size: 3, color: RAINBOW[i], add: true });
+    p.dashT = 0;
+    p.wallDir = 0;
+    p.runPhase += dt * 6;
+    if (Math.random() < 0.5) part({ x: cx - p.face * 16, y: cy + 4, vx: -p.vx * 0.2, vy: -p.vy * 0.2, life: 0.5, size: 3, color: pick(RAINBOW), add: true });
+  } else {
+    // Horizontal movement
+    const ice = B.ice && p.ground;
+    const top = (p.slow > 0 ? 200 : 330) * ((G.save.dev && G.save.dev.speed) || 1);
+    if (p.dashT > 0) {
+      p.dashT -= dt;
+      p.vx = p.dashDir * 780;
+      p.vy = 0;
+      if (Math.random() < 0.9) part({ x: cx - p.dashDir * 10, y: cy + rand(-10, 10), vx: -p.dashDir * 60, life: 0.3, size: 5, color: pick(RAINBOW), add: true });
+    } else {
+      const acc = p.ground ? (ice ? 2.5 : 16) : 9;
+      const wind = B.wind ? G.windForce * 0.3 : 0;
+      p.vx += (dir * top + wind - p.vx) * Math.min(1, acc * dt);
     }
-  }
-  if (!jumpH && p.rising && p.vy < 0 && p.dashT <= 0) { p.vy *= 0.5; p.rising = false; }
-  if (p.vy >= 0) p.rising = false;
 
-  // Dash
-  if (tapped('KeyC', 'ShiftLeft', 'ShiftRight', 'KeyL') && p.dashCd <= 0) {
-    p.dashT = 0.16; p.dashCd = 0.55; p.dashDir = dir || p.face; p.inv = Math.max(p.inv, 0.25);
-    sfx('dash');
-    ring(cx, cy, 30, '#ffffff', 0.25, 4);
-  }
-
-  const vyBefore = p.vy;
-  moveBody(p, dt, p.dropT > 0);
-  if (p.ground && !wasGround && vyBefore > 300) {
-    sfx('land', Math.min(1, vyBefore / 900));
-    p.sx = 1.25; p.sy = 0.8;
-    for (let i = 0; i < 10; i++) part({ x: cx + rand(-14, 14), y: p.y + p.h, vx: rand(-140, 140), vy: rand(-80, -10), life: 0.45, size: rand(2, 4), color: '#cfc4e6', drag: 3 });
-  }
-  p.sx += (1 - p.sx) * Math.min(1, 12 * dt);
-  p.sy += (1 - p.sy) * Math.min(1, 12 * dt);
-  p.runPhase += dt * Math.abs(p.vx) * 0.045;
-  if (p.ground && Math.abs(p.vx) > 80) {
-    p.stepT -= dt;
-    if (p.stepT < 0) {
-      p.stepT = 0.2;
-      sfx('step');
-      if (Math.abs(p.vx) > 250) part({ x: cx - p.face * 12, y: p.y + p.h - 2, vx: -p.face * 40, vy: -30, life: 0.5, size: 2.5, color: pick(RAINBOW), add: true });
+    // Gravity, walls and gliding
+    const wasGround = p.ground;
+    if (p.dashT <= 0) p.vy = Math.min(p.vy + 2000 * dt, 1100);
+    p.wallDir = 0;
+    if (!p.ground && p.vy > 0 && dir && touchWall(p, dir)) {
+      p.wallDir = dir;
+      p.vy = Math.min(p.vy, 150);
+      if (Math.random() < 0.3) part({ x: dir > 0 ? p.x + p.w : p.x, y: p.y + p.h, vx: 0, vy: -30, life: 0.3, size: 2, color: '#d8d0ef' });
     }
-  }
-  if (Math.random() < 0.12) {
-    const h = hornTip(p);
-    part({ x: h.x + rand(-3, 3), y: h.y + rand(-3, 3), vx: rand(-15, 15), vy: rand(-30, -5), life: 0.7, size: rand(1.5, 2.6), color: pick(['#fff6c2', '#ffffff', '#ffd1f0']), add: true, shape: 'star', vr: 4 });
-  }
+    p.gliding = false;
+    if (S.glide && !p.ground && jumpH && p.vy > 60 && !p.wallDir) {
+      p.vy = Math.min(p.vy, 115);
+      p.gliding = true;
+    }
 
-  // Hazards
-  const hz = hazardTouch(p);
-  if (hz && p.inv <= 0) {
-    hurtPlayer(B.haz === 'lava' ? 2 : 1, cx + p.vx * 0.1);
-    p.vy = -620;
+    // Jumping
+    if (p.ground) { p.coyote = 0.1; p.jumps = S.jumps - 1; } else p.coyote -= dt;
+    p.jbuf = jumpP ? 0.13 : p.jbuf - dt;
+    if (tapped('KeyS', 'ArrowDown') && p.ground && onPlatform(p)) { p.dropT = 0.22; p.ground = false; }
+    if (p.jbuf > 0 && p.dropT <= 0) {
+      const wl = touchWall(p, -1), wr = touchWall(p, 1);
+      if (p.coyote > 0) {
+        p.vy = -900; p.coyote = 0; p.jbuf = 0; p.rising = true;
+        p.sx = 0.8; p.sy = 1.25;
+        sfx('jump');
+        for (let i = 0; i < 8; i++) part({ x: cx + rand(-12, 12), y: p.y + p.h, vx: rand(-80, 80), vy: rand(-60, -10), life: 0.4, size: 3, color: '#cfc4e6', drag: 3 });
+      } else if (!p.ground && (wl || wr)) {
+        const w = wl ? -1 : 1;
+        p.vy = -820; p.vx = -w * 470; p.ctrlLock = 0.14; p.face = -w; p.jbuf = 0; p.rising = true;
+        sfx('jump');
+        burst(w > 0 ? p.x + p.w : p.x, cy, 8, '#e6dcff', 140);
+      } else if (p.jumps > 0) {
+        p.jumps--; p.vy = -830; p.jbuf = 0; p.rising = true;
+        p.sx = 0.85; p.sy = 1.2;
+        sfx('djump');
+        ring(cx, p.y + p.h, 34, pick(RAINBOW), 0.35, 5);
+        for (let i = 0; i < 7; i++) part({ x: cx, y: p.y + p.h, vx: Math.cos(i) * 150, vy: 60 + Math.sin(i) * 40, life: 0.35, size: 3, color: RAINBOW[i], add: true });
+      }
+    }
+    if (!jumpH && p.rising && p.vy < 0 && p.dashT <= 0) { p.vy *= 0.5; p.rising = false; }
+    if (p.vy >= 0) p.rising = false;
+
+    // Dash
+    if (tapped('KeyC', 'ShiftLeft', 'ShiftRight', 'KeyL') && p.dashCd <= 0) {
+      p.dashT = 0.16; p.dashCd = 0.55; p.dashDir = dir || p.face; p.inv = Math.max(p.inv, 0.25);
+      sfx('dash');
+      ring(cx, cy, 30, '#ffffff', 0.25, 4);
+    }
+
+    const vyBefore = p.vy;
+    moveBody(p, dt, p.dropT > 0);
+    if (p.ground && !wasGround && vyBefore > 300) {
+      sfx('land', Math.min(1, vyBefore / 900));
+      p.sx = 1.25; p.sy = 0.8;
+      for (let i = 0; i < 10; i++) part({ x: cx + rand(-14, 14), y: p.y + p.h, vx: rand(-140, 140), vy: rand(-80, -10), life: 0.45, size: rand(2, 4), color: '#cfc4e6', drag: 3 });
+    }
+    p.sx += (1 - p.sx) * Math.min(1, 12 * dt);
+    p.sy += (1 - p.sy) * Math.min(1, 12 * dt);
+    p.runPhase += dt * Math.abs(p.vx) * 0.045;
+    if (p.ground && Math.abs(p.vx) > 80) {
+      p.stepT -= dt;
+      if (p.stepT < 0) {
+        p.stepT = 0.2;
+        sfx('step');
+        if (Math.abs(p.vx) > 250) part({ x: cx - p.face * 12, y: p.y + p.h - 2, vx: -p.face * 40, vy: -30, life: 0.5, size: 2.5, color: pick(RAINBOW), add: true });
+      }
+    }
+    if (Math.random() < 0.12) {
+      const h = hornTip(p);
+      part({ x: h.x + rand(-3, 3), y: h.y + rand(-3, 3), vx: rand(-15, 15), vy: rand(-30, -5), life: 0.7, size: rand(1.5, 2.6), color: pick(['#fff6c2', '#ffffff', '#ffd1f0']), add: true, shape: 'star', vr: 4 });
+    }
+
+    // Hazards
+    const hz = hazardTouch(p);
+    if (hz && p.inv <= 0) {
+      hurtPlayer(B.haz === 'lava' ? 2 : 1, cx + p.vx * 0.1);
+      p.vy = -620;
+    }
   }
 
   // Weapon selection
@@ -248,7 +265,7 @@ function fireWhip(p, S, dir) {
   if (hit) {
     G.hitstop = Math.max(G.hitstop, finisher ? 0.07 : 0.035);
     shake(finisher ? 6 : 3);
-    if (p.ay > 0.6 && !p.ground) { p.vy = -560; p.jumps = Math.max(p.jumps, 1); }
+    if (p.ay > 0.6 && !p.ground) { p.vy = -720; p.jumps = Math.max(p.jumps, 1); }
   }
   return true;
 }
@@ -323,7 +340,7 @@ export function updateBubbles(dt) {
     b.y -= 14 * dt;
     b.x += Math.sin(b.t * 2 + i) * 10 * dt;
     if (p.vy > 0 && Math.abs(p.x + p.w / 2 - b.x) < b.r + 10 && p.y + p.h > b.y - b.r && p.y + p.h < b.y + 6) {
-      p.vy = -760; p.jumps = Math.max(p.jumps, 1); b.pop = true;
+      p.vy = -950; p.jumps = Math.max(p.jumps, 1); b.pop = true;
       sfx('djump');
     }
     if (b.pop || b.t > b.life) {

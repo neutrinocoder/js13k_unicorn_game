@@ -51,11 +51,12 @@ function level(it) {
 }
 
 function renderShop() {
-  $('shop-gems').textContent = G.save.gems.toLocaleString();
+  const inf = G.save.dev && G.save.dev.infGems;
+  $('shop-gems').textContent = inf ? '∞' : G.save.gems.toLocaleString();
   const box = $('shop-items');
   box.innerHTML = '';
   for (const it of SHOP) {
-    const lv = level(it), max = it.consumable ? 3 : it.max, done = lv >= max, cost = it.cost(lv), afford = G.save.gems >= cost;
+    const lv = level(it), max = it.consumable ? 3 : it.max, done = lv >= max, cost = it.cost(lv), afford = inf || G.save.gems >= cost;
     const card = document.createElement('button');
     card.className = 'item' + (done ? ' done' : afford ? '' : ' poor');
     card.disabled = done;
@@ -69,8 +70,9 @@ function renderShop() {
 function buy(it) {
   const lv = level(it), max = it.consumable ? 3 : it.max, cost = it.cost(lv);
   if (lv >= max) return;
-  if (G.save.gems < cost) { sfx('deny'); toast('Not enough gems.'); return; }
-  G.save.gems -= cost;
+  const inf = G.save.dev && G.save.dev.infGems;
+  if (!inf && G.save.gems < cost) { sfx('deny'); toast('Not enough gems.'); return; }
+  if (!inf) G.save.gems -= cost;
   if (it.id === 'potion') G.save.potions++;
   else {
     G.save.up[it.id]++;

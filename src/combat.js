@@ -12,7 +12,7 @@ const fmt = n => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10).toString();
 
 export function hurtPlayer(n, sx, kb = 1) {
   const p = G.player;
-  if (!p || p.dead || p.inv > 0 || G.scene !== 'play') return false;
+  if (!p || p.dead || p.inv > 0 || G.scene !== 'play' || (G.save.dev && G.save.dev.god)) return false;
   const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
   if (p.shield > 0) {
     burst(cx, cy, 10, '#bff3ff', 200, { add: true });

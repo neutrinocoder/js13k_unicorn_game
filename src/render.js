@@ -21,6 +21,7 @@ import { drawUnicorn, drawBubbles, hornTip } from './player.js';
 import { drawEnemy } from './enemies.js';
 import { drawBoss, drawBossBar } from './bosses.js';
 import { stats, WEAPONS, ownsWeapon } from './items.js';
+import { devLabel } from './dev.js';
 import { objective, sealCount, interactLabel } from './main.js';
 
 let lightCv = null, lctx = null;
@@ -633,7 +634,9 @@ function drawHUD(ctx) {
   ctx.font = '800 20px Nunito, sans-serif';
   ctx.textAlign = 'left';
   gemIcon(ctx, 30, 66, 9);
-  hudText(ctx, save.gems.toLocaleString(), 46, 73);
+  hudText(ctx, save.dev && save.dev.infGems ? '∞' : save.gems.toLocaleString(), 46, 73);
+  const dl = devLabel();
+  if (dl) { ctx.font = '900 13px Nunito, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(10,6,20,.7)'; roundRect(ctx, 22, 146, ctx.measureText(dl).width + 16, 22, 6); ctx.fill(); ctx.fillStyle = '#7dffb0'; ctx.fillText(dl, 30, 161); ctx.font = '800 20px Nunito, sans-serif'; }
   ctx.save();
   ctx.translate(30, 98);
   ctx.fillStyle = '#e8b04a';

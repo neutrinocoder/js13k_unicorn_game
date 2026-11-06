@@ -75,6 +75,17 @@ h1 .t2 { display: block; font-size: clamp(56px, 12vw, 150px); background: var(--
 #toast { position: fixed; left: 50%; top: 22px; transform: translate(-50%, -20px); background: rgba(16, 9, 28, 0.92); border: 1px solid var(--line); padding: 10px 20px; border-radius: 999px; font-weight: 800; opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* Developer console */
+#devcon { position: fixed; left: 0; right: 0; top: 0; z-index: 50; background: rgba(4, 2, 10, 0.9); border-bottom: 1px solid rgba(125, 255, 176, 0.35); font: 14px/1.45 Consolas, 'Cascadia Mono', Menlo, monospace; color: #c9ffd9; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); }
+#devlog { max-height: 34vh; overflow-y: auto; padding: 10px 14px 4px; white-space: pre-wrap; }
+#devlog .cmd { color: #ffffff; }
+#devlog .ok { color: #7dffb0; }
+#devlog .err { color: #ff8a9a; }
+.devrow { display: flex; align-items: center; gap: 8px; padding: 6px 14px 10px; }
+.devrow span { color: #7dffb0; font-weight: 700; }
+#devin { flex: 1; background: transparent; border: 0; outline: 0; color: #ffffff; font: inherit; }
+#devin::placeholder { color: rgba(201, 255, 217, 0.4); }
+
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes pop { from { opacity: 0; transform: translate(-50%, -46%) scale(0.97); } to { opacity: 1; transform: translate(-50%, -50%); } }
 
