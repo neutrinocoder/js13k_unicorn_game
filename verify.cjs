@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
-const html=fs.readFileSync(process.argv[2]||'index.html','utf8'),script=html.split('<script>')[1].split('</script>')[0];
+const html=fs.readFileSync(process.argv[2]||'classic/index.html','utf8'),script=html.split('<script>')[1].split('</script>')[0];
 const noop=()=>{},gradient={addColorStop:noop},ctx=new Proxy({createLinearGradient:()=>gradient},{get:(o,k)=>o[k]??noop}),canvas={width:960,height:540,getContext:()=>ctx,getBoundingClientRect:()=>({width:960,height:540})};
 const env={document:{querySelector:()=>canvas},devicePixelRatio:1,requestAnimationFrame:noop};vm.createContext(env);vm.runInContext(script,env);
 function runInGame(code, context) { return vm.runInContext(script.includes('VIEW_WIDTH') ? require('./rename.cjs')(code, require('./source-names.json')) : code, context); }

@@ -1,0 +1,1738 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>UNICORN ASCENT</title><style>*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#000}body{display:grid;place-items:center}canvas{width:min(100vw,177.7778vh);height:min(100vh,56.25vw);display:block}</style><canvas width=960 height=540></canvas><script>
+// Runtime: Canvas graphics and Web Audio only; no downloaded assets.
+const canvas = document.querySelector("canvas"), context = canvas.getContext("2d"), VIEW_WIDTH = 960, VIEW_HEIGHT = 540, WORLD_HEIGHT = 11508, heldKeys = {}, pressedKeys = {}, particles = [], enemies = [], MAIN_PLATFORM_COUNT = 121, platforms = [];
+
+let scene = "title", cameraY = WORLD_HEIGHT - VIEW_HEIGHT, cameraX = 0, elapsedTime = 0, last = 0, muted = 0, shake = 0, flash = 0, checkpointIndex = 0, announcement = "", announcementTime = 0, step = 0, zone = 0, ac;
+
+const REGION_NAMES = [ "LIMBO", "LUST", "GLUTTONY", "HERESY", "TREACHERY" ];
+
+const routes = [], hazards = [];
+
+let discovered = 1, layerTime = 0, layer = 0, taunt = 0, flipped = 0, warned = 0, portalTime = 0;
+
+// Generate the main route, then reject overlapping optional side platforms.
+function generate() {
+    platforms.length = routes.length = hazards.length = 0;
+    let x = 160;
+    for (let i = 0; i < MAIN_PLATFORM_COUNT; i++) {
+        if (i) x = clamp(x + randomBetween(-110, 110), 100, 640);
+        let a = {
+            x: x,
+            ox: x,
+            y: 11308 - i * 92 + (i && i < MAIN_PLATFORM_COUNT - 1 ? randomBetween(-8, 8) : 0),
+            w: randomBetween(160, 220),
+            h: 18,
+            i: i
+        };
+        if (i > 7 && i % 6 !== 0 && i % 5 === 3) a.move = 24;
+        if (!flipped) {
+            let extra = Math.min(100, i);
+            a.x -= extra / 2;
+            a.ox = a.x;
+            a.w += extra;
+            if (i > 45) a.move = 0;
+        }
+        platforms.push(a);
+    }
+    for (let i = 3; i < MAIN_PLATFORM_COUNT - 2; i += Math.floor(randomBetween(2, 5))) {
+        let main = platforms[i];
+        for (let attempt = 0; attempt < 8; attempt++) {
+            let w = randomBetween(150, 210), x = clamp(main.x + (Math.random() < .5 ? -1 : 1) * randomBetween(180, 270), 45, VIEW_WIDTH - w - 45), y = main.y + randomBetween(-38, 38);
+            let a = {
+                x: x,
+                ox: x,
+                y: y,
+                w: w,
+                h: 18,
+                i: i,
+                side: 1
+            };
+            if (platforms.some(b => Math.abs(b.y - y) < 48 && x < b.x + b.w + (b.move || 0) + 35 && x + w > b.x - (b.move || 0) - 35)) continue;
+            platforms.push(a);
+            routes.push(a);
+            break;
+        }
+    }
+    for (let a of platforms) {
+        if (!a.move && a.side && a.i > 48 && a.i <= 72 && a.i % 11 === 3) hazards.push({
+            x: a.x + a.w - 24,
+            y: a.y - 9,
+            type: "spike",
+            phase: a.i
+        });
+        if (!a.move && a.i > 61 && a.i < 91 && a.i % 7 === 0) hazards.push({
+            x: a.x + a.w - 20,
+            y: a.y,
+            type: "vent",
+            phase: a.i
+        });
+    }
+    if (flipped) platforms.push({
+        x: 100,
+        ox: 100,
+        y: 220,
+        w: 760,
+        h: 18,
+        i: 121
+    });
+    if (!flipped) hazards.length = 0;
+}
+
+let hailClock = 0, eruption = 3;
+
+const hail = [];
+
+const lavaBalls = [];
+
+const player = {
+    w: 30,
+    h: 24
+};
+
+const randomBetween = (a, b) => a + Math.random() * (b - a), clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// Mode 0 is endless Limbo; mode 1 is the finite route to Hades.
+function reset(mode = 0) {
+    flipped = mode;
+    if (!mode) discovered = 1;
+    layer = mode ? 1 : 0;
+    discovered |= 1 << layer;
+    layerTime = 6;
+    warned = 0;
+    taunt = 0;
+    mouse.down = 0;
+    orbs.length = 0;
+    weapon = 0;
+    attack = 0;
+    generate();
+    lavaBalls.length = 0;
+    eruption = 3;
+    hail.length = 0;
+    hailClock = 0;
+    enemies.length = particles.length = 0;
+    for (let i = 4; i < MAIN_PLATFORM_COUNT; i += flipped ? 2 : 3) {
+        let a = platforms[i], y = a.y - 64;
+        enemies.push({
+            x: a.x + a.w / 2,
+            y: y,
+            home: a,
+            phase: i,
+            v: (i % 2 ? 1 : -1) * randomBetween(34, 55),
+            wind: flipped && i < 31,
+            red: flipped && i >= 61,
+            blue: flipped && i >= 92 && i % 4 === 0,
+            hp: flipped ? 2 + Math.floor(i / 30) : i > 40 ? 1 : 2,
+            max: flipped ? 2 + Math.floor(i / 30) : i > 40 ? 1 : 2,
+            cd: randomBetween(1, 3),
+            tongue: 0,
+            hit: 0
+        });
+    }
+    for (let a of routes) if (a.i % 9 === 4) {
+        let y = a.y - 64;
+        enemies.push({
+            x: a.x + a.w / 2,
+            y: y,
+            home: a,
+            wind: flipped && a.i < 31,
+            red: flipped && a.i >= 61,
+            blue: flipped && a.i >= 92 && a.i % 2 === 0,
+            phase: a.i,
+            v: 40,
+            hp: flipped && a.i >= 61 ? 4 : 2,
+            max: flipped && a.i >= 61 ? 4 : 2,
+            cd: 2,
+            tongue: 0,
+            hit: 0
+        });
+    }
+    Object.assign(player, {
+        x: 200,
+        y: 11248,
+        vx: 0,
+        vy: 0,
+        face: 1,
+        hp: 8,
+        inv: 0,
+        jump: 2,
+        dash: 0,
+        burst: 0,
+        ground: 0,
+        reload: 0,
+        charge: 0,
+        shield: 0,
+        freeze: 0,
+        push: 0,
+        whip: null,
+        strike: null
+    });
+    flash = shake = 0;
+    cameraY = WORLD_HEIGHT - VIEW_HEIGHT;
+    cameraX = 0;
+    checkpointIndex = zone = 0;
+    scene = "play";
+    announcement = REGION_NAMES[0];
+    announcementTime = 1.5;
+}
+
+onkeydown = e => {
+    unlockAudio();
+    let k = e.code && e.code.startsWith("Key") ? e.code.slice(3).toLowerCase() : e.key.toLowerCase();
+    if ([ "w", "a", "s", "d", "z", "j", "c", "b", "arrowup", "arrowdown", "arrowleft", "arrowright", " " ].includes(k)) e.preventDefault();
+    if (e.repeat) return;
+    if (!heldKeys[k]) pressedKeys[k] = 1;
+    heldKeys[k] = 1;
+    if (k === "m") muted = !muted;
+    if ((scene === "title" || scene === "prologue") && (k === "enter" || k === " ")) advanceIntro(); else if (scene === "win" && k === "enter") scene = "title";
+};
+
+onkeyup = e => heldKeys[e.code && e.code.startsWith("Key") ? e.code.slice(3).toLowerCase() : e.key.toLowerCase()] = 0;
+
+canvas.onclick = () => {
+    unlockAudio();
+    if (scene === "title" || scene === "prologue") advanceIntro();
+};
+
+const mouse = {
+    x: 0,
+    y: 0,
+    active: 0,
+    down: 0,
+    ax: 1,
+    ay: 0
+};
+
+canvas.onpointermove = e => {
+    if (document.pointerLockElement === canvas) {
+        let x = mouse.ax * 100 + e.movementX * .7, y = mouse.ay * 100 + e.movementY * .7, d = Math.hypot(x, y) || 1;
+        mouse.ax = x / d;
+        mouse.ay = y / d;
+        mouse.active = 1;
+        return;
+    }
+    let r = canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - r.left) * VIEW_WIDTH / r.width;
+    mouse.y = (e.clientY - r.top) * VIEW_HEIGHT / r.height;
+    mouse.active = 1;
+};
+
+canvas.onpointerdown = e => {
+    unlockAudio();
+    if (e.button === 0 && scene === "play") {
+        canvas.onpointermove(e);
+        if (document.pointerLockElement !== canvas && mouse.x > 760 && mouse.y > 420) {
+            bubblePower();
+            mouse.down = 0;
+        } else {
+            mouse.down = 1;
+            if (typeof location !== "undefined" && location.protocol !== "file:" && document.pointerLockElement !== canvas && canvas.requestPointerLock) {
+                [mouse.ax, mouse.ay] = aimVector();
+                try {
+                    let lock = canvas.requestPointerLock();
+                    if (lock && lock.catch) lock.catch(() => {});
+                } catch (e) {}
+            }
+        }
+    }
+};
+
+onpointerup = () => mouse.down = 0;
+
+onblur = () => {
+    mouse.down = 0;
+    for (let k in heldKeys) heldKeys[k] = 0;
+    for (let k in pressedKeys) pressedKeys[k] = 0;
+};
+
+document.onpointerlockchange = () => {
+    if (document.pointerLockElement !== canvas) mouse.down = 0;
+};
+document.onpointerlockerror = () => mouse.down = 0;
+
+function aimVector() {
+    if (document.pointerLockElement === canvas) return [ mouse.ax, mouse.ay ];
+    if (mouse.active) {
+        let x = mouse.x + cameraX - player.x - 15, y = mouse.y + cameraY - player.y - 10, d = Math.hypot(x, y);
+        if (d > .01) return [ x / d, y / d ];
+    }
+    return heldKeys.arrowup ? [ 0, -1 ] : heldKeys.arrowdown ? [ 0, 1 ] : [ player.face, 0 ];
+}
+
+function crosshair() {
+    if (!mouse.active) return;
+    let [dx, dy] = aimVector(), x = player.x + 15 - cameraX + dx * 100, y = player.y + 10 - cameraY + dy * 100;
+    context.save();
+    context.strokeStyle = "#111";
+    context.lineWidth = 4;
+    for (let i = 0; i < 2; i++) {
+        context.beginPath();
+        context.arc(x, y, 6, 0, 7);
+        context.moveTo(x - 12, y);
+        context.lineTo(x - 8, y);
+        context.moveTo(x + 8, y);
+        context.lineTo(x + 12, y);
+        context.moveTo(x, y - 12);
+        context.lineTo(x, y - 8);
+        context.moveTo(x, y + 8);
+        context.lineTo(x, y + 12);
+        context.stroke();
+        context.strokeStyle = "#fff";
+        context.lineWidth = 1.5;
+    }
+    context.restore();
+}
+
+let musicBus, musicAt = 0, musicStep = 0;
+
+function unlockAudio() {
+    if (typeof navigator !== "undefined" && navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    try {
+        ac ||= new AudioContext;
+        if (ac.state === "suspended") ac.resume().catch(() => {});
+    } catch (e) {}
+}
+
+function note(n, at, d, v, type = "sine") {
+    let o = ac.createOscillator(), a = ac.createGain();
+    o.type = type;
+    o.frequency.value = 440 * 2 ** ((n - 69) / 12);
+    a.gain.setValueAtTime(0, at);
+    a.gain.linearRampToValueAtTime(v, at + .025);
+    a.gain.exponentialRampToValueAtTime(1e-4, at + d);
+    o.connect(a).connect(musicBus);
+    o.start(at);
+    o.stop(at + d + .03);
+    o.onended = () => {
+        o.disconnect();
+        a.disconnect();
+    };
+}
+
+function soundtrack() {
+    if (!ac || ac.state !== "running") return;
+    if (!musicBus) {
+        musicBus = ac.createGain();
+        musicBus.connect(ac.destination);
+    }
+    let active = !muted && (scene === "play" || scene === "portal");
+    musicBus.gain.setTargetAtTime(active ? 1.3 : 0, ac.currentTime, .04);
+    if (!active) {
+        musicAt = 0;
+        return;
+    }
+    if (musicAt < ac.currentTime) musicAt = ac.currentTime + .03;
+    let beat = zone === 0 ? .48 : zone === 3 ? .21 : .32, root = [ 38, 50, 43, 45, 40 ][zone], scale = [ 0, 2, 3, 7, 10 ], melody = [ 0, 2, 4, 2, 1, 3, 2, 1, 0, 2, 3, 4, 2, 1, 3, 1 ];
+    while (musicAt < ac.currentTime + .12) {
+        let k = musicStep++ % 32, chord = [ 0, 5, 3, 7 ][k >> 3];
+        note(root + 12 + scale[melody[k % 16]], musicAt, beat * 1.8, .028);
+        if (k % 4 === 0) {
+            note(root + chord - 12, musicAt, beat * 3.7, .04, "triangle");
+            note(root + chord + 7, musicAt, beat * 3.7, .012);
+        }
+        if (zone === 3 && k % 2 === 0) note(30, musicAt, .1, .025);
+        musicAt += beat;
+    }
+}
+
+function sound(f, d = .07, type = "square") {
+    if (muted || !ac) return;
+    try {
+        let o = ac.createOscillator(), a = ac.createGain();
+        o.type = type;
+        o.frequency.value = f;
+        a.gain.setValueAtTime(.035, ac.currentTime);
+        a.gain.exponentialRampToValueAtTime(.001, ac.currentTime + d);
+        o.connect(a).connect(ac.destination);
+        o.start();
+        o.stop(ac.currentTime + d);
+    } catch (e) {}
+}
+
+function damage(n = 1, fall = 0) {
+    if (!fall && (player.inv > 0 || player.shield > 0)) return;
+    player.hp -= n;
+    flash = .12;
+    shake = 10;
+    sound(70, .18, "sawtooth");
+    if (player.hp < 1) {
+        player.hp = 8;
+        respawn();
+        announcement = "RESPAWN";
+        announcementTime = 2;
+    } else if (fall) respawn(); else player.inv = 1;
+}
+
+function respawn() {
+    let a = platforms[checkpointIndex];
+    player.x = a.x + (a.w - player.w) / 2;
+    player.y = a.y - player.h;
+    player.vx = player.vy = player.burst = player.freeze = player.push = 0;
+    player.ground = 1;
+    player.jump = 2;
+    player.inv = 2;
+    player.whip = null;
+    player.strike = null;
+    cameraY = Math.min(player.y - 290, WORLD_HEIGHT - VIEW_HEIGHT);
+    cameraX = 0;
+    scene = "play";
+}
+
+function hurt(e, n) {
+    e.hp -= n;
+    e.flash = .16;
+    if (e.hp < 1) {
+        e.dead = 1;
+        if (e.boss) scene = "win";
+        explode(e.x, e.y, 10);
+        sound(95, .1);
+    }
+}
+
+function explode(x, y, n) {
+    for (let i = 0; i < n; i++) particles.push({
+        x: x,
+        y: y,
+        vx: randomBetween(-180, 180),
+        vy: randomBetween(-190, 80),
+        life: randomBetween(.3, .8),
+        s: 2 + Math.random() * 5
+    });
+}
+
+let weapon = 0, attack = 0;
+
+const orbs = [], rainbow = [ "#ff679e", "#ffc567", "#f8ed91", "#7df0b2", "#72d5ff", "#bd9dff" ];
+
+function fireWeapon() {
+    if (attack || player.reload > 0) return;
+    let [dx, dy] = aimVector(), x = player.x + 15 + dx * 18, y = player.y + 10 + dy * 18;
+    attack = player.reload = 1;
+    player.strike = {
+        x: x,
+        y: y,
+        dx: dx,
+        dy: dy,
+        time: elapsedTime
+    };
+    for (let e of enemies) if (!e.dead) {
+        let ex = e.x - x, ey = e.y + 13 - y, d = Math.hypot(ex, ey), along = ex * dx + ey * dy, side = Math.abs(ex * dy - ey * dx);
+        if (d < 280 && along > -15 && side < 45 + Math.max(0, along) * .4) {
+            hurt(e, 4);
+            e.x = clamp(e.x + dx * 45, 28, VIEW_WIDTH - 28);
+            e.y = clamp(e.y + dy * 35, 40, WORLD_HEIGHT - 100);
+        }
+    }
+    player.vy = clamp(player.vy - dy * 520, -700, 700);
+    sound(160, .13, "sine");
+}
+
+function bubblePower() {
+    if (player.charge < 10) return;
+    player.charge = 0;
+    player.shield = 6;
+    for (let i = 0; i < 24; i++) {
+        let a = i * Math.PI / 12;
+        orbs.push({
+            x: player.x + 15,
+            y: player.y + 10,
+            vx: Math.cos(a) * 330,
+            vy: Math.sin(a) * 330,
+            life: 6
+        });
+    }
+    for (let e of enemies) if (!e.dead && !e.boss && !e.trapped && e.x > cameraX && e.x < cameraX + VIEW_WIDTH && e.y + 35 > cameraY && e.y < cameraY + VIEW_HEIGHT) {
+        e.trapped = 1;
+        e.tongue = 0;
+        orbs.push({
+            x: player.x + 15,
+            y: player.y + 10,
+            vx: 0,
+            vy: 0,
+            life: 4,
+            e: e,
+            seek: .35
+        });
+    }
+    sound(760, .4, "sine");
+}
+
+function updateOrbs(dt) {
+    for (let q of orbs) {
+        q.life -= dt;
+        if (q.seek > 0) {
+            let f = Math.min(1, dt / q.seek);
+            q.x += (q.e.x - q.x) * f;
+            q.y += (q.e.y + 13 - q.y) * f;
+            q.seek -= dt;
+            continue;
+        }
+        if (q.e && q.e.dead) {
+            q.life = 0;
+            q.e.trapped = 0;
+        }
+        q.x += q.vx * dt;
+        q.y += q.vy * dt;
+        q.vx *= Math.exp(-dt * 1.5);
+        q.vy += (-35 - q.vy) * dt;
+        if (q.e) {
+            q.e.x = q.x;
+            q.e.y = q.y - 13;
+        }
+        if (player.vy > 0 && Math.abs(player.x + 15 - q.x) < 35 && Math.abs(player.y + player.h - q.y + 24) < 18) {
+            player.vy = -620;
+            player.jump = 2;
+            q.life = 0;
+        }
+        if (q.life <= 0) {
+            if (q.e && !q.e.dead) {
+                q.e.trapped = 0;
+                hurt(q.e, 3);
+            }
+            explode(q.x, q.y, 5);
+        }
+    }
+    for (let i = orbs.length - 1; i >= 0; i--) if (orbs[i].life <= 0) orbs.splice(i, 1);
+}
+
+function drawWeapons() {
+    context.save();
+    context.lineCap = "round";
+    if (player.shield > 0) {
+        context.fillStyle = "#91dfff22";
+        context.strokeStyle = "#c3f4ff";
+        context.lineWidth = 3;
+        context.beginPath();
+        context.arc(player.x + 15, player.y + 10, 36, 0, 7);
+        context.fill();
+        context.stroke();
+    }
+    for (let q of orbs) {
+        for (let i = 0; i < 6; i++) {
+            context.strokeStyle = rainbow[i];
+            context.lineWidth = 2;
+            context.beginPath();
+            context.arc(q.x, q.y, 25, i * Math.PI / 3, (i + 1) * Math.PI / 3);
+            context.stroke();
+        }
+        context.strokeStyle = "#ffffffaa";
+        context.beginPath();
+        context.arc(q.x - 3, q.y - 3, 17, 3.4, 4.5);
+        context.stroke();
+    }
+    let a = player.strike;
+    if (a && elapsedTime - a.time < .23) {
+        let f = (elapsedTime - a.time) / .23;
+        context.translate(a.x, a.y);
+        context.rotate(Math.atan2(a.dy, a.dx));
+        context.globalAlpha = 1 - f;
+        for (let i = 0; i < 6; i++) {
+            context.strokeStyle = rainbow[i];
+            context.lineWidth = 3;
+            context.beginPath();
+            context.moveTo(0, i - 3);
+            context.lineTo(270 * f + 40, (i - 2.5) * (6 + f * 12));
+            context.stroke();
+        }
+    }
+    context.restore();
+}
+
+function whip() {
+    if (attack) return;
+    let [x, y] = aimVector();
+    attack = .6;
+    player.whip = {
+        angle: Math.atan2(y, x),
+        time: elapsedTime,
+        hit: []
+    };
+    sound(350, .12, "sawtooth");
+}
+
+function tail(a) {
+    let w = a.whip, u = w ? (elapsedTime - w.time) / .45 : 2, f = a.face || 1, out = [ [ 6, 11 ] ];
+    for (let j = 1; j <= 12; j++) {
+        let v = j / 12, active = u < 1, angle = active ? w.angle + (1 - u * 2) * 1.4 * v : Math.PI, len = active ? 42 + 180 * Math.sin(Math.PI * u) : 42;
+        out.push([ 6 + Math.cos(angle) * len * v * (active ? f : 1), 11 + Math.sin(angle) * len * v + Math.sin(elapsedTime * 4 - v * 3) * 5 * v ]);
+    }
+    return out;
+}
+
+// Hit detection uses the rendered tail polyline, once per enemy per swing.
+function whipHits() {
+    if (!player.whip || elapsedTime - player.whip.time > .45) return;
+    let points = tail(player), f = player.face, ox = player.x + (f < 0 ? 30 : 0);
+    for (let e of enemies) if (!e.dead && !player.whip.hit.includes(e)) for (let j = 1; j < points.length; j++) {
+        let a = points[j - 1], b = points[j], x = ox + a[0] * f, y = player.y + a[1], dx = (b[0] - a[0]) * f, dy = b[1] - a[1], u = clamp(((e.x - x) * dx + (e.y + 13 - y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+        if (Math.hypot(e.x - x - dx * u, e.y + 13 - y - dy * u) < 30) {
+            player.whip.hit.push(e);
+            hurt(e, 3);
+            break;
+        }
+    }
+}
+
+// Physics use seconds and world pixels. Smaller Y is higher on screen.
+function update(dt) {
+    if (scene === "prologue") {
+        inkTime = Math.min(12, inkTime + dt);
+        return;
+    }
+    if (scene === "portal") {
+        portalTime += dt;
+        if (portalTime >= 3) finishPortal();
+        return;
+    }
+    if (scene !== "play") return;
+    elapsedTime += dt;
+    layerTime = Math.max(0, layerTime - dt);
+    player.freeze = Math.max(0, player.freeze - dt);
+    player.push *= Math.exp(-dt * 5);
+    taunt = Math.max(0, taunt - dt);
+    for (let i of [ 1, 4 ]) if (pressedKeys[i]) {
+        weapon = i - 1;
+        pressedKeys[i] = 0;
+    }
+    player.reload = Math.max(0, player.reload - dt);
+    player.shield = Math.max(0, player.shield - dt);
+    player.charge = Math.min(10, player.charge + dt);
+    if (pressedKeys[2] || pressedKeys.b) {
+        bubblePower();
+        pressedKeys[2] = pressedKeys.b = 0;
+    }
+    attack = Math.max(0, attack - dt);
+    platformMotion();
+    flash = Math.max(0, flash - dt);
+    announcementTime -= dt;
+    player.inv -= dt;
+    player.dash -= dt;
+    step -= dt;
+    let d = (heldKeys.d || heldKeys.arrowright ? 1 : 0) - (heldKeys.a || heldKeys.arrowleft ? 1 : 0);
+    if (d) player.face = d;
+    if ((pressedKeys.c || pressedKeys.shift) && player.dash <= 0 && !player.freeze) {
+        player.burst = .17;
+        player.dash = 1;
+        player.inv = .25;
+        sound(180, .12, "sawtooth");
+    }
+    if (player.burst > 0) {
+        player.burst -= dt;
+        player.vx = player.face * 650;
+    } else player.vx += (d * (player.freeze ? 0 : zone === 2 && player.ground ? 130 : 260) - player.vx) * Math.min(1, dt * (zone === 4 && player.ground ? 3 : 14));
+    if ((pressedKeys.w || pressedKeys.arrowup || pressedKeys[" "]) && player.jump && !player.freeze) {
+        player.vy = zone === 2 ? -490 : -600;
+        player.jump--;
+        sound(260, .06);
+    }
+    pressedKeys.w = pressedKeys.arrowup = pressedKeys[" "] = pressedKeys.c = pressedKeys.shift = 0;
+    player.ground = 0;
+    let oy = player.y;
+    let wind = zone === 1 ? Math.sin(elapsedTime * .7) * 95 : 0;
+    player.x = clamp(player.x + (player.vx + wind + player.push) * dt, 8, VIEW_WIDTH - player.w - 8);
+    player.y += player.vy * dt;
+    player.vy += 1450 * dt;
+    for (const a of platforms) if (player.x + player.w > a.x && player.x < a.x + a.w && player.y + player.h >= a.y && oy + player.h <= a.y + 7 && player.vy >= 0) {
+        player.y = a.y - player.h;
+        player.vy = 0;
+        player.ground = 1;
+        player.jump = 2;
+    }
+    endless();
+    let nextZone = flipped ? player.y > 8500 ? 1 : player.y > 5700 ? 2 : player.y > 2900 ? 3 : 4 : 0;
+    if (nextZone !== zone) {
+        zone = nextZone;
+        if (!(discovered & 1 << zone)) {
+            discovered |= 1 << zone;
+            layer = zone;
+            layerTime = 6;
+        }
+        if (flipped) {
+            let save = [ 0, 0, 31, 61, 92 ][zone];
+            if (save > checkpointIndex) {
+                checkpointIndex = save;
+                platforms[checkpointIndex].move = 0;
+            }
+        }
+        announcement = REGION_NAMES[zone];
+        announcementTime = 3;
+    }
+    if (flipped) regionHazards(dt);
+    if (player.ground && Math.abs(player.vx) > 70 && step < 0) {
+        sound(85, .035);
+        step = .18;
+    }
+    if (!flipped && player.y > 11420) {
+        reverseWorld();
+        return;
+    }
+    if (flipped && (player.y > cameraY + VIEW_HEIGHT + 70 || player.y > platforms[checkpointIndex].y + VIEW_HEIGHT)) damage(1, 1);
+    if (mouse.down || heldKeys.z || heldKeys.j) {
+        if (!weapon) whip(); else fireWeapon();
+    }
+    whipHits();
+    updateOrbs(dt);
+    for (const e of enemies) {
+        if (e.dead) continue;
+        e.flash -= dt;
+        if (e.trapped) {
+            e.tongue = 0;
+            continue;
+        }
+        let chase = Math.hypot(player.x + 15 - e.x, player.y - e.y) < 430;
+        e.x = clamp(e.x + (chase ? Math.sign(player.x + 15 - e.x) * (e.boss ? e.tongue > 0 ? 0 : e.hp < 30 ? 190 : 140 : 65) : e.v) * dt, 28, VIEW_WIDTH - 28);
+        if (e.x <= 28 || e.x >= VIEW_WIDTH - 28) e.v *= -1;
+        e.y = clamp(e.y + (chase ? clamp(player.y - 15 - e.y, e.boss ? -100 : -48, e.boss ? 100 : 48) : Math.sin(elapsedTime * 2 + e.phase) * 18) * dt, 40, WORLD_HEIGHT - 100);
+        e.cd -= dt;
+        let dx = player.x + 15 - e.x, dy = player.y + 12 - e.y - (e.boss ? -25 : 10), D = Math.hypot(dx, dy);
+        if (D < (e.boss ? 650 : 350) && e.cd < 0) {
+            if (e.boss) e.power = (e.power || 0) % 3 + 1;
+            e.tongue = e.boss ? 1.45 : .5;
+            e.ax = dx / D;
+            e.ay = dy / D;
+            e.hit = 0;
+            e.cd = e.boss ? e.hp < 30 ? 2 : 2.7 : e.red ? 2 : randomBetween(2.3, 3.6);
+        }
+        if (e.tongue > 0) {
+            e.tongue -= dt;
+            if (e.boss && e.power === 2 && e.tongue <= .8) {
+                let a = Math.atan2(e.ay, e.ax) + dt * (e.hp < 30 ? 3 : 2.2);
+                e.ax = Math.cos(a);
+                e.ay = Math.sin(a);
+            }
+            for (let angle of rays(e)) {
+                let L = reach(e), a = Math.cos(angle) * L, b = Math.sin(angle) * L, u = clamp((dx * a + dy * b) / (L * L || 1), 0, 1);
+                if (L && !e.hit && Math.hypot(dx - a * u, dy - b * u) < (e.boss && e.power === 3 ? 34 : 22)) {
+                    e.hit = 1;
+                    if (e.boss) {
+                        if (e.power === 3) {
+                            if (player.inv <= 0 && player.shield <= 0) {
+                                damage(2);
+                                player.push = Math.sign(dx) * 1e3;
+                                player.vy = -320;
+                            }
+                        } else damage(3);
+                    } else {
+                        if (e.wind) player.push = Math.sign(dx) * 650;
+                        if (e.blue && player.inv <= 0 && player.shield <= 0) player.freeze = 2;
+                        if (!e.wind && !e.blue) damage(e.red ? 2 : 1);
+                    }
+                }
+            }
+        }
+    }
+    for (const q of particles) {
+        q.x += q.vx * dt;
+        q.y += q.vy * dt;
+        q.vy += 500 * dt;
+        q.life -= dt;
+    }
+    particles.splice(0, particles.length, ...particles.filter(q => q.life > 0));
+    let aim = Math.min(player.y - 270, WORLD_HEIGHT - VIEW_HEIGHT);
+    cameraY += (aim - cameraY) * Math.min(1, dt * 5);
+    if (flipped && player.y < 300 && !enemies.some(e => e.boss)) {
+        enemies.length = orbs.length = hail.length = 0;
+        player.hp = 8;
+        player.freeze = player.push = 0;
+        player.inv = 2;
+        enemies.push({
+            boss: 1,
+            red: 1,
+            x: 700,
+            y: 100,
+            phase: 0,
+            v: 80,
+            hp: 60,
+            max: 60,
+            cd: 2,
+            tongue: 0
+        });
+        announcement = "HADES";
+        announcementTime = 4;
+    }
+    for (const k in pressedKeys) pressedKeys[k] = 0;
+}
+
+function platformMotion() {
+    for (let a of platforms) if (a.move) {
+        let old = a.x;
+        a.x = a.ox + Math.sin(elapsedTime * .9 + a.i) * a.move;
+        let dx = a.x - old;
+        if (player.ground && Math.abs(player.y + player.h - a.y) < 2 && player.x + player.w > old && player.x < old + a.w) player.x += dx;
+        for (let e of enemies) if (!e.dead && e.home === a) {
+            e.x += dx;
+        }
+    }
+}
+
+function reverseWorld() {
+    scene = "portal";
+    portalTime = 0;
+    mouse.down = 0;
+    player.whip = null;
+}
+
+function finishPortal() {
+    reset(1);
+    respawn();
+    announcement = "LUST";
+    announcementTime = 4;
+}
+
+function endless() {
+    if (flipped) return;
+    if (!warned && player.y < 9e3) {
+        warned = 1;
+        taunt = 8;
+        sound(65, .5, "sawtooth");
+    }
+    if (warned === 1 && player.y < 6308) {
+        warned = 2;
+        taunt = 8;
+    }
+    let top = platforms.reduce((a, b) => a.y < b.y ? a : b);
+    while (top.y > player.y - 900) {
+        let x = clamp(top.x + randomBetween(-80, 80), 80, 540), a = {
+            x: x,
+            ox: x,
+            y: top.y - 70,
+            w: 300,
+            h: 18,
+            i: top.i + 1
+        };
+        platforms.push(a);
+        top = a;
+    }
+    if (platforms.length > 350) {
+        let saved = platforms[checkpointIndex];
+        platforms.splice(0, platforms.length, ...platforms.filter(a => a === saved || Math.abs(a.y - player.y) < 16e3));
+        checkpointIndex = platforms.indexOf(saved);
+    }
+}
+
+function regionHazards(dt) {
+    volcano(dt);
+    if (zone === 4 && !enemies.some(e => e.boss)) {
+        hailClock -= dt;
+        if (hailClock <= 0) {
+            hailClock = .65;
+            hail.push({
+                x: randomBetween(25, VIEW_WIDTH - 25),
+                y: cameraY - 30,
+                v: 260,
+                warn: .7
+            });
+        }
+        for (let h of hail) {
+            if (h.warn > 0) {
+                h.warn -= dt;
+                continue;
+            }
+            let y = h.y;
+            h.y += h.v * dt;
+            h.v += 200 * dt;
+            if (Math.abs(h.x - player.x - 15) < 20 && h.y > player.y && y < player.y + player.h) {
+                player.hp = 8;
+                respawn();
+                hail.length = 0;
+                announcement = "FROZEN";
+                announcementTime = 2;
+                break;
+            }
+            if (platforms.some(a => h.x > a.x && h.x < a.x + a.w && y < a.y && h.y >= a.y)) h.y = cameraY + VIEW_HEIGHT + 100;
+        }
+        for (let i = hail.length - 1; i >= 0; i--) if (hail[i].y > cameraY + VIEW_HEIGHT + 60) hail.splice(i, 1);
+    } else {
+        hail.length = 0;
+        hailClock = 0;
+    }
+    for (let h of hazards) {
+        let dx = player.x + 15 - h.x, dy = player.y + 12 - h.y;
+        if (h.type === "spike" && Math.abs(dx) < 21 && Math.abs(dy) < 22) damage();
+        if (h.type === "vent" && (elapsedTime + h.phase) % 5 > 3.8 && Math.abs(dx) < 23 && player.y + player.h > h.y - 120 && player.y < h.y) damage();
+    }
+}
+
+function drawHazards() {
+    context.save();
+    drawLava();
+    for (let h of hazards) {
+        if (h.y < cameraY - 150 || h.y > cameraY + VIEW_HEIGHT + 150) continue;
+        if (h.type === "vent") {
+            let phase = (elapsedTime + h.phase) % 5;
+            rect(h.x - 14, h.y - 5, 28, 5, "#ffab69");
+            if (phase > 3) {
+                context.globalAlpha = phase > 3.8 ? .85 : .35;
+                context.fillStyle = "#ff7d36";
+                context.beginPath();
+                context.moveTo(h.x - 18, h.y);
+                context.quadraticCurveTo(h.x - 25, h.y - 65, h.x + Math.sin(elapsedTime * 15) * 7, h.y - (phase > 3.8 ? 120 : 25));
+                context.quadraticCurveTo(h.x + 25, h.y - 45, h.x + 18, h.y);
+                context.fill();
+                context.globalAlpha = 1;
+            }
+        } else if (h.type === "spike") {
+            context.fillStyle = "#e7efdc";
+            context.strokeStyle = "#223128";
+            context.lineWidth = 1.5;
+            context.beginPath();
+            for (let i = -1; i <= 1; i++) {
+                context.moveTo(h.x + i * 12 - 6, h.y + 9);
+                context.lineTo(h.x + i * 12, h.y - 9);
+                context.lineTo(h.x + i * 12 + 6, h.y + 9);
+            }
+            context.fill();
+            context.stroke();
+        }
+    }
+    context.restore();
+}
+
+function volcano(dt) {
+    if (zone !== 3) {
+        lavaBalls.length = 0;
+        eruption = 3;
+        return;
+    }
+    let before = eruption;
+    eruption -= dt;
+    if (before > 1.1 && eruption <= 1.1) {
+        announcement = "ERUPTION";
+        announcementTime = 1.1;
+        sound(65, .25, "sawtooth");
+    }
+    if (eruption <= 0) {
+        eruption = 5;
+        for (let i = -2; i <= 2; i++) lavaBalls.push({
+            x: 455,
+            y: 4550,
+            vx: (player.x + 15 - 455) / 2.4 + i * 68,
+            vy: -690 - Math.abs(i) * 24,
+            life: 7
+        });
+        sound(55, .4, "sawtooth");
+        shake = 7;
+    }
+    for (let q of lavaBalls) {
+        q.x += q.vx * dt;
+        q.y += q.vy * dt;
+        q.vy += 390 * dt;
+        q.life -= dt;
+        if (Math.hypot(q.x - player.x - 15, q.y - player.y - 12) < 24) {
+            damage();
+            q.life = 0;
+        }
+        if (q.y > 5800 || q.x < -60 || q.x > VIEW_WIDTH + 60) q.life = 0;
+    }
+    for (let i = lavaBalls.length - 1; i >= 0; i--) if (lavaBalls[i].life <= 0) lavaBalls.splice(i, 1);
+}
+
+function drawLava() {
+    if (zone !== 3) return;
+    if (eruption < 1.1) {
+        context.fillStyle = "#ffcf69";
+        context.globalAlpha = .5 + .3 * Math.sin(elapsedTime * 30);
+        context.beginPath();
+        context.ellipse(455, 4550, 32, 10, 0, 0, 7);
+        context.fill();
+        context.globalAlpha = 1;
+    }
+    for (let q of lavaBalls) {
+        let v = Math.hypot(q.vx, q.vy) || 1;
+        context.strokeStyle = "rgba(255,91,28,.55)";
+        context.lineWidth = 10;
+        context.lineCap = "round";
+        context.beginPath();
+        context.moveTo(q.x, q.y);
+        context.lineTo(q.x - q.vx / v * 28, q.y - q.vy / v * 28);
+        context.stroke();
+        context.fillStyle = "#ff5826";
+        context.beginPath();
+        context.arc(q.x, q.y, 11, 0, 7);
+        context.fill();
+        context.fillStyle = "#ffe18c";
+        context.beginPath();
+        context.arc(q.x - 2, q.y - 2, 6, 0, 7);
+        context.fill();
+        if (q.y < cameraY + 80) {
+            let x = clamp(q.x, cameraX + 25, cameraX + VIEW_WIDTH - 25);
+            context.fillStyle = "#ffb756";
+            context.beginPath();
+            context.moveTo(x, cameraY + 88);
+            context.lineTo(x - 6, cameraY + 78);
+            context.lineTo(x + 6, cameraY + 78);
+            context.fill();
+        }
+    }
+}
+
+function rect(x, y, w, h, col = "#000") {
+    context.fillStyle = col;
+    context.fillRect(x, y, w, h);
+}
+
+function unicorn(a = player, s = 1) {
+    let f = a.face || 1, speed = Math.min(1, Math.abs(a.vx || 0) / 180), stride = a.ground ? Math.sin(elapsedTime * 19) * speed : 0, cs = [ "#ff334b", "#ff941f", "#ffe83b", "#39e66b", "#32baff", "#514bff", "#c44dff" ];
+    context.save();
+    context.translate(a.x + (f < 0 ? 30 * s : 0), a.y);
+    context.scale(f * s, s);
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    if (a.burst > 0) {
+        context.globalAlpha = .12;
+        for (let i = 1; i < 5; i++) {
+            context.fillStyle = cs[i];
+            context.beginPath();
+            context.ellipse(-i * 11, 13, 18, 8, 0, 0, 7);
+            context.fill();
+        }
+    }
+    context.globalAlpha = a.inv > 0 && elapsedTime * 12 % 2 > 1 ? .4 : 1;
+    let points = tail(a);
+    for (let j = 0; j < 13; j++) {
+        let b = points[Math.max(0, j - 1)], n = points[Math.min(12, j + 1)], dx = n[0] - b[0], dy = n[1] - b[1], d = Math.hypot(dx, dy) || 1;
+        points[j][2] = dy / d;
+        points[j][3] = dx / d;
+    }
+    for (let i = 6; i >= 0; i--) {
+        context.strokeStyle = cs[i];
+        let px, py;
+        for (let j = 0; j < 13; j++) {
+            let v = points[j], u = j / 12, o = (i - 3) * 1.12 * (1 - .7 * u) + Math.sin(elapsedTime * 7 + u * 5 + i) * u * u * .65, x = v[0] - v[2] * o, y = v[1] + v[3] * o;
+            if (j) {
+                context.lineWidth = 1.26 * (1 - .8 * u);
+                context.beginPath();
+                context.moveTo(px, py);
+                context.lineTo(x, y);
+                context.stroke();
+            }
+            px = x;
+            py = y;
+        }
+    }
+    for (let i = 0; i < 4; i++) {
+        let front = i > 1, x = front ? 23 : 9, phase = stride * (i % 2 ? 1 : -1), toe = x + phase * 4 + (a.ground ? 0 : front ? 4 : -3), y = 24 - Math.max(0, phase) * 3;
+        context.strokeStyle = i % 2 ? "#f6eefa" : "#ab9fbd";
+        context.lineWidth = 3.4;
+        context.beginPath();
+        context.moveTo(x + (i % 2 ? 1 : -2), 16);
+        context.lineTo(x - phase * 2, 21);
+        context.lineTo(toe, y);
+        context.stroke();
+        context.strokeStyle = "#645471";
+        context.lineWidth = 2.8;
+        context.beginPath();
+        context.moveTo(toe - 1, y);
+        context.lineTo(toe + 1.5, y);
+        context.stroke();
+    }
+    let coat = context.createLinearGradient(4, 2, 23, 23);
+    coat.addColorStop(0, "#fff");
+    coat.addColorStop(.55, "#f7faff");
+    coat.addColorStop(1, "#d9c7ef");
+    context.fillStyle = coat;
+    context.strokeStyle = "#54445f";
+    context.lineWidth = 1.2;
+    context.beginPath();
+    context.moveTo(5, 9);
+    context.bezierCurveTo(8, 5, 16, 8, 19, 7);
+    context.bezierCurveTo(20, 3, 20, -1, 24, -2);
+    context.quadraticCurveTo(30, -4, 32, 2);
+    context.lineTo(34, 6);
+    context.quadraticCurveTo(35, 10, 30, 11);
+    context.lineTo(26, 9);
+    context.quadraticCurveTo(25, 19, 19, 20);
+    context.bezierCurveTo(10, 22, 1, 19, 4, 12);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.strokeStyle = "rgba(255,255,255,.9)";
+    context.lineWidth = 1.5;
+    context.beginPath();
+    context.moveTo(7, 10);
+    context.quadraticCurveTo(13, 8, 18, 10);
+    context.stroke();
+    context.fillStyle = "#fff3fb";
+    context.strokeStyle = "#54445f";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(23, 0);
+    context.quadraticCurveTo(20, -9, 23, -8);
+    context.lineTo(27, -1);
+    context.fill();
+    context.stroke();
+    context.strokeStyle = "#eaa7ce";
+    context.beginPath();
+    context.moveTo(23, -5);
+    context.lineTo(24, -2);
+    context.stroke();
+    context.fillStyle = "#ffe59a";
+    context.beginPath();
+    context.moveTo(28, -2);
+    context.lineTo(33, -14);
+    context.lineTo(32, 0);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = "#aa804c";
+    context.lineWidth = .7;
+    context.stroke();
+    context.strokeStyle = "#fff9da";
+    context.beginPath();
+    context.moveTo(30, -4);
+    context.lineTo(31.5, -9);
+    context.stroke();
+    for (let i = 4; i >= 0; i--) {
+        context.strokeStyle = cs[i];
+        context.lineWidth = 2;
+        context.beginPath();
+        context.moveTo(25 - i * .65, -1);
+        context.bezierCurveTo(18 - i * .45, -3, 19 - i * .5, 5, 17 - i * .45, 9 + Math.sin(elapsedTime * 5 + i * .3));
+        context.stroke();
+    }
+    context.fillStyle = "#342b45";
+    context.beginPath();
+    context.ellipse(29, 3, 1.9, 2.4, -.12, 0, 7);
+    context.fill();
+    context.fillStyle = "#fff";
+    context.beginPath();
+    context.arc(29.5, 2.3, .7, 0, 7);
+    context.fill();
+    context.fillStyle = "#efb2d0";
+    context.beginPath();
+    context.ellipse(28, 7, 2, 1.1, 0, 0, 7);
+    context.fill();
+    context.strokeStyle = "#765973";
+    context.lineWidth = .8;
+    context.beginPath();
+    context.moveTo(32, 8.5);
+    context.lineTo(33.4, 8);
+    context.stroke();
+    context.restore();
+}
+
+const beamColors = [ "#ff3658", "#ff3658", "#080612", "#fff" ];
+
+function rays(e) {
+    let a = Math.atan2(e.ay, e.ax);
+    return !e.boss ? [ a ] : e.power === 2 ? [ a - .22, a + .22 ] : e.power === 3 ? [ a - .16, a, a + .16 ] : [ a - .28, a, a + .28 ];
+}
+
+function reach(e) {
+    return e.boss ? e.tongue > .8 ? 0 : 900 : e.red ? e.tongue > .35 ? 0 : 350 : Math.sin((.5 - e.tongue) * Math.PI / .5) * 350;
+}
+
+function blob(e) {
+    context.save();
+    context.translate(e.x, e.y);
+    if (e.boss) context.scale(2, 2);
+    let q = elapsedTime * 2.8 + e.phase;
+    if (e.boss) {
+        context.strokeStyle = beamColors[e.power || 0];
+        context.lineWidth = 1.5;
+        context.globalAlpha = .6;
+        for (let i = 0; i < 8; i++) {
+            let a = elapsedTime * (e.hp < 30 ? -2 : 1) + i * Math.PI / 4;
+            context.beginPath();
+            context.arc(0, 0, 48 + Math.sin(elapsedTime * 4) * 3, a, a + .35);
+            context.stroke();
+        }
+        context.globalAlpha = 1;
+        context.scale(player.x < e.x ? -1 : 1, 1);
+        let cloak = context.createLinearGradient(-30, 0, 25, 0);
+        cloak.addColorStop(0, "#080612");
+        cloak.addColorStop(.6, "#473853");
+        cloak.addColorStop(1, "#151020");
+        context.fillStyle = e.flash > 0 ? "#aaa" : cloak;
+        context.beginPath();
+        context.moveTo(0, -38);
+        context.quadraticCurveTo(-25, -22, -17, 3);
+        context.lineTo(-35, 45);
+        for (let i = 0; i < 7; i++) context.lineTo(-35 + i * 10, 43 + Math.sin(elapsedTime * 3 + i) * 6);
+        context.lineTo(17, 3);
+        context.quadraticCurveTo(25, -22, 0, -38);
+        context.fill();
+        context.fillStyle = "#030207";
+        context.beginPath();
+        context.ellipse(8, -13, 9, 15, -.2, 0, 7);
+        context.fill();
+        context.shadowColor = beamColors[e.power || 0];
+        context.shadowBlur = 12;
+        rect(10, -19, 9, 2, beamColors[e.power || 0]);
+        context.shadowBlur = 0;
+        context.strokeStyle = "#494155";
+        context.lineWidth = 3;
+        context.beginPath();
+        context.moveTo(-7, 8);
+        context.lineTo(-15, 39);
+        context.moveTo(7, 8);
+        context.lineTo(15, 39);
+        context.stroke();
+    } else if (e.wind) {
+        cloud(0, 15, .48, "#879eaf");
+        cloud(0, 9, .44, e.flash > 0 ? "#fff" : "#e5f2f4");
+        context.strokeStyle = "#adcdd9";
+        context.lineWidth = 2;
+        context.beginPath();
+        context.arc(0, 14, 9, 0, Math.PI);
+        context.stroke();
+        rect(-10, 4, 4, 6);
+        rect(7, 4, 4, 6);
+    } else if (e.red) {
+        context.translate(0, 14);
+        context.rotate(q * .45);
+        context.shadowColor = e.blue ? "#5cf" : "#f23";
+        context.shadowBlur = 12;
+        rect(-21, -21, 42, 42, e.flash > 0 ? "#fff" : e.blue ? "#164874" : "#8e122b");
+        context.shadowBlur = 0;
+        context.strokeStyle = e.blue ? "#80e4ff" : "#ff4963";
+        context.lineWidth = 2;
+        context.strokeRect(-21, -21, 42, 42);
+        rect(-9, -9, 18, 18, e.blue ? "#62dfff" : "#ff2548");
+        context.strokeStyle = "#ffe8c9";
+        context.lineWidth = 3;
+        context.beginPath();
+        context.moveTo(-15, -7);
+        context.lineTo(-4, -2);
+        context.moveTo(15, -7);
+        context.lineTo(4, -2);
+        context.stroke();
+    } else {
+        context.fillStyle = e.flash > 0 ? "#777" : "#050505";
+        context.beginPath();
+        context.ellipse(0, 14, 22 + Math.sin(q) * 4, 18 + Math.cos(q * 1.3) * 3, 0, 0, 7);
+        context.fill();
+        for (let i = 0; i < 6; i++) {
+            let a = i * Math.PI / 3 + q * .12, r = 18 + Math.sin(q * 1.7 + i) * 5;
+            context.beginPath();
+            context.arc(Math.cos(a) * r, 14 + Math.sin(a) * r * .65, 9 + Math.sin(q + i) * 2, 0, 7);
+            context.fill();
+        }
+        context.fillStyle = "#fff";
+        context.beginPath();
+        context.ellipse(-8, 8, 6, 8, -.2, 0, 7);
+        context.ellipse(9, 8, 6, 8, .2, 0, 7);
+        context.fill();
+        context.fillStyle = "#000";
+        context.beginPath();
+        context.arc(-7 + Math.sin(q) * 2, 10, 2.4, 0, 7);
+        context.arc(8 + Math.sin(q) * 2, 10, 2.4, 0, 7);
+        context.fill();
+    }
+    context.restore();
+    if (e.tongue > 0) {
+        let warning = e.boss && e.tongue > .8, L = warning ? 900 : reach(e);
+        context.save();
+        context.globalAlpha = warning ? .25 : 1;
+        for (let angle of rays(e)) {
+            let col = e.boss ? beamColors[e.power || 0] : e.wind ? "#c8e5ee" : e.blue ? "#5ecaff" : e.red ? "#85192f" : "#000";
+            let w = warning ? 2 : e.boss ? e.power === 3 ? 40 : 18 : 7;
+            let x2 = e.x + Math.cos(angle) * L, y2 = e.y + (e.boss ? -25 : 10) + Math.sin(angle) * L;
+            let line = (width, color) => {
+                context.strokeStyle = color;
+                context.lineWidth = width;
+                context.beginPath();
+                context.moveTo(e.x, e.y + (e.boss ? -25 : 18));
+                context.lineTo(x2, y2);
+                context.stroke();
+            };
+            if (e.boss && !warning) {
+                context.save();
+                context.globalAlpha *= .35;
+                line(w + 16, e.power === 2 ? "#9461dd" : col);
+                context.restore();
+            }
+            line(w, col);
+            line(1.5, e.boss ? e.power === 2 ? "#65577c" : col : e.red ? "#ff697c" : "#fff");
+        }
+        context.restore();
+    }
+}
+
+function cloud(x, y, s, col) {
+    context.fillStyle = col;
+    context.beginPath();
+    context.ellipse(x, y, 55 * s, 20 * s, 0, 0, 7);
+    context.ellipse(x - 38 * s, y + 4 * s, 30 * s, 17 * s, 0, 0, 7);
+    context.ellipse(x + 38 * s, y + 5 * s, 34 * s, 16 * s, 0, 0, 7);
+    context.fill();
+}
+
+function ridge(points, bottom, col) {
+    context.fillStyle = col;
+    context.beginPath();
+    context.moveTo(0, bottom);
+    for (let a of points) context.lineTo(a[0], a[1]);
+    context.lineTo(VIEW_WIDTH, bottom);
+    context.closePath();
+    context.fill();
+}
+
+function scenery() {
+    let sky = context.createLinearGradient(0, cameraY, 0, cameraY + VIEW_HEIGHT);
+    sky.addColorStop(0, [ "#171a23", "#8d4568", "#423329", "#321821", "#779ab6" ][zone]);
+    sky.addColorStop(1, [ "#454952", "#d99cac", "#88705a", "#873933", "#dfedf2" ][zone]);
+    rect(0, cameraY, VIEW_WIDTH, VIEW_HEIGHT, sky);
+    cloud(180 + Math.sin(elapsedTime * .1) * 45, cameraY + 130, 2, "#ffffff18");
+    cloud(690, cameraY + 260, 3, "#ffffff13");
+    if (zone === 3) {
+        ridge([ [ 0, 5100 ], [ 180, 4900 ], [ 425, 4550 ], [ 490, 4550 ], [ 760, 5e3 ], [ 960, 4800 ] ], 5700, "#42232b");
+        context.strokeStyle = "#ee8250";
+        context.lineWidth = 5;
+        context.beginPath();
+        context.moveTo(455, 4550);
+        context.lineTo(490, 4710);
+        context.lineTo(440, 4830);
+        context.stroke();
+    }
+    if (zone === 4) ridge([ [ 0, cameraY + VIEW_HEIGHT ], [ 220, cameraY + 250 ], [ 480, cameraY + VIEW_HEIGHT ], [ 730, cameraY + 210 ], [ 960, cameraY + VIEW_HEIGHT ] ], cameraY + VIEW_HEIGHT, "#b4cbd8");
+}
+
+function weather() {
+    context.save();
+    context.strokeStyle = [ "#ffffff18", "#ffe0ec88", "#b9c2d077", "#ffb578aa", "#ffffff88" ][zone];
+    context.lineWidth = 1.5;
+    for (let i = 0; i < 70; i++) {
+        let x = (i * 173 + elapsedTime * (zone === 1 ? Math.sin(elapsedTime * .7) * 100 : 20) + 1e5) % VIEW_WIDTH, y = ((i * 137 + elapsedTime * (zone === 2 ? 300 : 25)) % VIEW_HEIGHT + VIEW_HEIGHT) % VIEW_HEIGHT;
+        context.beginPath();
+        context.moveTo(x, y);
+        context.lineTo(x + (zone === 1 ? 35 : zone === 0 ? 70 : 3), y + (zone === 2 ? 18 : 2));
+        context.stroke();
+    }
+    for (let h of hail) {
+        if (h.warn > 0) {
+            context.fillStyle = "#fff";
+            context.fillText("!", h.x, 95);
+        } else rect(h.x - 4, h.y - cameraY - 5, 8, 10, "#fff");
+    }
+    context.restore();
+}
+
+function drawPlatform(a, z, edge) {
+    let x = a.x, y = a.y, w = a.w, shade = context.createLinearGradient(x, y, x, y + 30);
+    shade.addColorStop(0, [ "#a7dce9", "#523039", "#4d623b", "#423956" ][z]);
+    shade.addColorStop(1, [ "#467b99", "#21151e", "#1c3026", "#171525" ][z]);
+    context.save();
+    context.fillStyle = shade;
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(x + w, y);
+    context.lineTo(x + w - 4, y + 18);
+    for (let k = w - 12; k > 4; k -= 23) context.lineTo(x + k, y + 22 + Math.sin(k + a.i) * 5);
+    context.lineTo(x + 3, y + 18);
+    context.closePath();
+    context.fill();
+    context.fillStyle = edge;
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(x + w, y);
+    context.lineTo(x + w - 3, y + 4);
+    for (let k = w - 8; k > 0; k -= 18) context.lineTo(x + k, y + 4 + Math.sin(k + a.i) * 1.5);
+    context.lineTo(x, y + 3);
+    context.fill();
+    for (let k = 15; k < w - 12; k += 37) {
+        let xx = x + k, h = 7 + (Math.sin(k + a.i) + 1) * 5;
+        if (z === 0) {
+            context.fillStyle = "#b8e8f2";
+            context.beginPath();
+            context.moveTo(xx, y + 16);
+            context.lineTo(xx + 4, y + 23 + h);
+            context.lineTo(xx + 10, y + 17);
+            context.fill();
+            context.strokeStyle = "#ffffff70";
+            context.beginPath();
+            context.moveTo(xx - 5, y + 6);
+            context.lineTo(xx + 6, y + 12);
+            context.stroke();
+        }
+        if (z === 1) {
+            context.strokeStyle = "#ff9555";
+            context.shadowColor = "#ff642e";
+            context.shadowBlur = 5;
+            context.lineWidth = 1.5;
+            context.beginPath();
+            context.moveTo(xx, y + 6);
+            context.lineTo(xx - 4, y + 11);
+            context.lineTo(xx + 5, y + 15);
+            context.lineTo(xx + 2, y + 21);
+            context.stroke();
+            context.shadowBlur = 0;
+        }
+        if (z === 2) {
+            context.fillStyle = "#8e7153";
+            context.beginPath();
+            context.ellipse(xx, y + 5, 5, 2, 0, 0, 7);
+            context.fill();
+            let drip = (elapsedTime * .3 + k) % 1;
+            context.globalAlpha = 1 - drip;
+            context.beginPath();
+            context.ellipse(xx + 3, y + 20 + drip * 18, 1.6, 3, 0, 0, 7);
+            context.fill();
+            context.globalAlpha = 1;
+        }
+    }
+    context.restore();
+}
+
+function drawWorld() {
+    context.save();
+    context.translate(-cameraX, -cameraY);
+    scenery();
+    if (flipped) drawHazards();
+    for (let i = 0; i < platforms.length; i++) {
+        let a = platforms[i];
+        if (a.y < cameraY - 60 || a.y > cameraY + VIEW_HEIGHT + 40) continue;
+        let z = flipped ? a.y > 8500 ? 1 : a.y > 5700 ? 2 : a.y > 2900 ? 3 : 4 : 0, edge = [ "#7b8190", "#f4bfd8", "#a58b6e", "#ffc17a", "#e6faff" ][z];
+        drawPlatform(a, [ 3, 3, 2, 1, 0 ][z], edge);
+        if (a.move) {
+            context.strokeStyle = "#bbc4d8";
+            context.lineWidth = 1;
+            context.beginPath();
+            context.moveTo(a.ox - 32, a.y + 25);
+            context.lineTo(a.ox + a.w + 32, a.y + 25);
+            context.stroke();
+        }
+        if (flipped && [ 0, 31, 61, 92 ].includes(i)) {
+            context.fillStyle = i === checkpointIndex ? "#83e9be" : "#fff";
+            context.font = "24px monospace";
+            context.textAlign = "center";
+            context.fillText(i === checkpointIndex ? "◆" : "◇", a.x - 12, a.y + 4);
+        }
+    }
+    for (const e of enemies) if (!e.dead) {
+        blob(e);
+        for (let i = 0; i < (e.boss ? 0 : e.max); i++) rect(e.x - e.max * 4 + i * 8, e.y - 18, 5, 3, i < e.hp ? "#fff" : "#555");
+    }
+    for (const q of particles) {
+        context.globalAlpha = q.life;
+        context.fillStyle = zone > 2 ? "#fff" : "#000";
+        context.beginPath();
+        context.arc(q.x, q.y, q.s, 0, 7);
+        context.fill();
+        context.globalAlpha = 1;
+    }
+    drawWeapons();
+    unicorn();
+    if (flipped && !enemies.some(e => e.boss)) {
+        context.shadowColor = "#fff";
+        context.shadowBlur = 24;
+        rect(370, 70, 220, 124);
+        context.shadowBlur = 0;
+        rect(382, 82, 196, 100, "#fff");
+        rect(390, 90, 180, 84);
+        for (let i = 0; i < 7; i++) {
+            let h = 22 + Math.sin(elapsedTime * 2 + i) * 12;
+            rect(402 + i * 24, 102 + h, 12, 60 - h, "#fff");
+        }
+        context.fillStyle = "#fff";
+        context.font = "900 14px monospace";
+        context.textAlign = "center";
+        context.fillText("THE WAY OUT", 480, 58);
+    } else if (!flipped) {
+        context.strokeStyle = "#b5a2ff";
+        context.lineWidth = 8;
+        context.beginPath();
+        context.ellipse(480, 11448, 460, 24, 0, 0, 7);
+        context.stroke();
+    }
+    context.restore();
+}
+
+function hud() {
+    context.save();
+    for (let i = 0; i < 5; i++) {
+        rect(804, 124 + i * 23, 138, 21, [ "#41454f", "#bc7193", "#70553c", "#ad4932", "#8cbaca" ][i]);
+        context.fillStyle = "#fff";
+        context.font = "bold 12px monospace";
+        context.textAlign = "center";
+        context.fillText(discovered & 1 << i ? REGION_NAMES[i] : "?", 873, 139 + i * 23);
+        if (i === zone) {
+            context.strokeStyle = "#fff";
+            context.lineWidth = 2;
+            context.strokeRect(804, 124 + i * 23, 138, 21);
+        }
+    }
+    if (layerTime > 0) {
+        context.save();
+        context.globalAlpha = Math.min(1, layerTime, 6 - layerTime);
+        context.textAlign = "center";
+        context.font = "italic bold 52px Georgia";
+        context.strokeStyle = "#17202c";
+        context.lineWidth = 6;
+        context.strokeText(REGION_NAMES[layer], 480, 210);
+        context.fillStyle = "#fff";
+        context.fillText(REGION_NAMES[layer], 480, 210);
+        context.font = 'italic 23px "Segoe Script", cursive';
+        context.lineWidth = 4;
+        let quote = [ "That without hope we live on in desire.", "The infernal hurricane that never rests", "Eternal, maledict, and cold, and heavy;", "For flames between the sepulchres were scattered,", "The semblance had of glass, and not of water." ][layer];
+        context.strokeText(quote, 480, 260, 740);
+        context.fillText(quote, 480, 260, 740);
+        context.font = "13px Georgia";
+        context.fillText("Dante", 480, 290);
+        context.restore();
+    }
+    if (player.freeze) {
+        rect(400, 80, 160, 30, "#153d65");
+        context.fillStyle = "#b5f1ff";
+        context.textAlign = "center";
+        context.font = "14px monospace";
+        context.fillText("FROZEN", 480, 100);
+    }
+    if (taunt > 0 && !flipped) {
+        context.save();
+        let age = 8 - taunt;
+        context.globalAlpha = Math.min(1, taunt);
+        if (warned !== 2) blob({ boss: 1, x: VIEW_WIDTH + 90 - 240 * Math.min(1, age / 1.2, taunt), y: 230, phase: 0 });
+        context.textAlign = "center";
+        context.font = "bold 26px Georgia";
+        context.lineWidth = 5;
+        context.strokeStyle = "#160e24";
+        context.fillStyle = "#ecd4ff";
+        if (warned === 2) {
+            context.fillStyle = context.shadowColor = "#fff2bd";
+            context.shadowBlur = 18;
+        }
+        let msgs = warned === 2 ? [
+            [ "The path to paradise begins in hell.", 480, 100 ],
+            [ "You have to fall down to reach heaven.", 480, 145 ],
+            [ "From Zeus", 480, 190 ]
+        ] : [
+            [ "You will never escape!", 380, 150 ],
+            [ "Ha ha ha!", 210, 290 ],
+            [ "HA HA HA!", 520, 410 ]
+        ];
+        [ 1, 2.5, 4 ].forEach((delay, i) => {
+            if (age > delay) {
+                let [text, x, y] = msgs[i];
+                context.globalAlpha = Math.min(1, age - delay, taunt);
+                context.strokeText(text, x, y);
+                context.fillText(text, x, y);
+            }
+        });
+        context.restore();
+    }
+    let boss = enemies.find(e => e.boss && !e.dead);
+    if (boss) {
+        rect(320, 86, 320, 30, "#201829");
+        rect(325, 110, 310 * boss.hp / boss.max, 4, "#e56985");
+        context.fillStyle = "#fff";
+        context.textAlign = "center";
+        context.font = "14px Georgia";
+        context.fillText(boss.hp < 30 ? "HADES · ENRAGED" : "HADES", 480, 103);
+    }
+    rect(14, 480, 735, 50, "#172939");
+    context.font = "13px monospace";
+    context.textAlign = "left";
+    context.fillStyle = "#fff";
+    context.fillText("1 TAIL · 4 BLAST", 22, 500);
+    context.fillText("CLICK/Z: " + [ "TAIL", "", "", "BLAST" ][weapon], 22, 522);
+    rect(18, 16, 360, 58, "rgba(255,255,255,.94)");
+    context.strokeStyle = "#000";
+    context.lineWidth = 3;
+    context.strokeRect(18, 16, 360, 58);
+    context.fillStyle = "#000";
+    context.font = "700 13px monospace";
+    context.textAlign = "left";
+    context.fillText("UNICORN", 34, 39);
+    for (let i = 0; i < player.hp; i++) {
+        context.beginPath();
+        context.arc(112 + i * 18, 34, 5, 0, 7);
+        context.fill();
+    }
+    context.fillText("TAIL", 34, 61);
+    rect(94, 51, 250, 9, "#ccc");
+    rect(94, 51, 250 * (1 - Math.min(1, attack / .6)), 9);
+    if (announcementTime > 0) {
+        rect(390, 18, 180, 34, "#fff");
+        context.strokeRect(390, 18, 180, 34);
+        context.textAlign = "center";
+        context.fillStyle = "#101820";
+        context.fillText(announcement, 480, 40);
+    }
+    context.textAlign = "center";
+    rect(770, 430, 172, 92, "#172939");
+    rect(775, 511, 162 * player.charge / 10, 6, "#94eaff");
+    context.fillStyle = "#d1f6ff";
+    context.font = "bold 17px monospace";
+    context.fillText("BUBBLE SHIELD", 856, 457);
+    context.font = "13px monospace";
+    context.fillText(player.charge >= 10 ? "B / CLICK: READY" : Math.ceil(10 - player.charge) + "s", 856, 482);
+    context.textAlign = "right";
+    context.font = "bold 14px monospace";
+    context.fillStyle = "#fff";
+    context.fillText(weapon === 3 ? "AMMO ∞" : "TAIL WHIP", 730, 500);
+    context.font = "12px monospace";
+    context.fillStyle = "#bfe4ed";
+    context.fillText(weapon === 3 ? player.reload > 0 ? "WAIT " + player.reload.toFixed(1) + "s" : "READY" : attack > 0 ? "RECOVERING" : "READY", 730, 521);
+    context.restore();
+}
+
+let inkTime = 0;
+
+function advanceIntro() {
+    if (scene === "title") {
+        scene = "prologue";
+        inkTime = 0;
+        shake = flash = 0;
+    } else if (inkTime < 12) inkTime = 12; else {
+        reset();
+        for (let k in heldKeys) heldKeys[k] = 0;
+        for (let k in pressedKeys) pressedKeys[k] = 0;
+    }
+}
+
+function prologue() {
+    rect(0, 0, VIEW_WIDTH, VIEW_HEIGHT, "#000");
+    context.textAlign = "left";
+    context.fillStyle = "#f3f3f3";
+    context.font = '29px Georgia, "Times New Roman", serif';
+    context.fillText("The age of Olympus", 78, 85);
+    let lines = [ "You are one of Zeus's divine soldiers.", "Hades has trapped you in the depths of Hell.", "Alone, you must find a way to escape.", "Nobody has ever accomplished this before." ];
+    let left = Math.floor(inkTime * 20);
+    for (let i = 0; i < lines.length; i++) {
+        context.fillText(lines[i].slice(0, Math.max(0, left)), 78, 175 + i * 70);
+        left -= lines[i].length + 8;
+    }
+    context.fillStyle = "#888";
+    context.font = "14px Georgia";
+    context.fillText(inkTime < 12 ? "Enter / click to reveal" : "Enter / click to begin", 78, 495);
+}
+
+function title() {
+    context.save();
+    let bg = context.createLinearGradient(0, 0, 0, VIEW_HEIGHT);
+    bg.addColorStop(0, "#090e20");
+    bg.addColorStop(1, "#28394b");
+    rect(0, 0, VIEW_WIDTH, VIEW_HEIGHT, bg);
+    for (let i = 0; i < 55; i++) rect(i * 173 % VIEW_WIDTH, i * 97 % VIEW_HEIGHT, 1, 2, "#9cafc866");
+    context.textAlign = "center";
+    let ink = context.createLinearGradient(230, 0, 730, 0);
+    rainbow.forEach((canvas, i) => ink.addColorStop(i / 5, canvas));
+    context.font = "italic bold 64px Georgia";
+    context.fillStyle = "#050a16";
+    context.fillText("UNICORN", 483, 137);
+    context.fillStyle = "#eef5ff";
+    context.fillText("UNICORN", 480, 133);
+    context.font = "900 82px Impact, fantasy";
+    context.fillStyle = ink;
+    context.fillText("ASCENT", 480, 214);
+    context.strokeStyle = ink;
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(315, 233);
+    context.lineTo(645, 233);
+    context.stroke();
+    unicorn({
+        x: 455,
+        y: 265,
+        face: 1,
+        ground: 1
+    }, 2.1);
+    context.fillStyle = "#dce9f4";
+    context.font = "13px monospace";
+    context.fillText("A / D MOVE · W DOUBLE JUMP · C DASH", 480, 356);
+    context.fillText("CLICK AIM / FIRE · 1/4 WEAPONS · B BUBBLES", 480, 382);
+    rect(355, 414, 250, 46, "#dce9f4");
+    context.fillStyle = "#101a2a";
+    context.font = "bold 17px Georgia";
+    context.fillText("BEGIN", 480, 443);
+    context.restore();
+}
+
+function end() {
+    context.save();
+    let sky = context.createLinearGradient(0, 0, 0, VIEW_HEIGHT);
+    sky.addColorStop(0, "#12142c");
+    sky.addColorStop(1, "#64788c");
+    rect(0, 0, VIEW_WIDTH, VIEW_HEIGHT, sky);
+    cloud(170, 370, 3, "#ffffff18");
+    cloud(790, 320, 3, "#ffffff18");
+    context.textAlign = "center";
+    context.fillStyle = "#ffe7ad";
+    context.font = "italic 24px Georgia";
+    context.fillText("Hades has fallen.", 480, 105);
+    context.font = "bold 58px Georgia";
+    context.fillText("YOU ESCAPED HELL", 480, 180);
+    unicorn({
+        x: 440,
+        y: 240,
+        face: 1
+    }, 2.5);
+    context.fillStyle = "#fff";
+    context.font = "20px Georgia";
+    context.fillText("The first soul to find the other way.", 480, 365);
+    context.font = "14px monospace";
+    context.fillText("PRESS ENTER TO TRY AGAIN", 480, 450);
+    context.restore();
+}
+
+function fit() {
+    let r = canvas.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = Math.round(r.width * d);
+    canvas.height = Math.round(r.height * d);
+}
+
+onresize = fit;
+
+fit();
+
+function drawPortal() {
+    let f = clamp(portalTime / 3, 0, 1), ease = f * f * (3 - 2 * f);
+    rect(0, 0, VIEW_WIDTH, VIEW_HEIGHT, "#291624");
+    context.save();
+    context.translate(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
+    context.rotate(Math.PI * (1 - ease));
+    let sky = context.createLinearGradient(0, -VIEW_HEIGHT, 0, VIEW_HEIGHT);
+    sky.addColorStop(0, "#8eb7d0");
+    sky.addColorStop(1, "#a13f29");
+    rect(-VIEW_WIDTH, -VIEW_HEIGHT, VIEW_WIDTH * 2, VIEW_HEIGHT * 2, sky);
+    for (let i = 0; i < 24; i++) {
+        let x = i * 173 % 1400 - 700, y = ((i * 97 - portalTime * 330) % 1e3 + 1e3) % 1e3 - 500;
+        rect(x, y, 3, 30, i % 2 ? "#ffd38b" : "#e2faff");
+    }
+    context.strokeStyle = "#baa6ff";
+    context.lineWidth = 7;
+    context.beginPath();
+    context.ellipse(0, -180 - ease * 500, 160, 35, 0, 0, 7);
+    context.stroke();
+    unicorn({
+        x: -15,
+        y: -60 + ease * 130,
+        face: 1,
+        vx: 0,
+        ground: 0
+    }, 1.8);
+    context.restore();
+    context.fillStyle = "#fff";
+    context.textAlign = "center";
+    context.font = "bold 20px monospace";
+    context.fillText("THE WINDS OF LUST", VIEW_WIDTH / 2, 65);
+}
+
+function draw() {
+    context.setTransform(canvas.width / VIEW_WIDTH, 0, 0, canvas.height / VIEW_HEIGHT, 0, 0);
+    rect(0, 0, VIEW_WIDTH, VIEW_HEIGHT, "#dfedf2");
+    context.save();
+    if (shake) context.translate(randomBetween(-shake, shake), randomBetween(-shake, shake)),
+    shake *= .85;
+    scene === "prologue" ? prologue() : scene === "portal" ? drawPortal() : scene === "title" ? title() : scene === "play" ? (drawWorld(),
+    weather(), hud(), crosshair()) : end();
+    context.restore();
+    if (flash > 0) {
+        context.strokeStyle = "#000";
+        context.lineWidth = 22;
+        context.globalAlpha = flash * 6;
+        context.strokeRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+        context.globalAlpha = 1;
+    }
+}
+
+function loop(n) {
+    let dt = Math.min(.033, (n - last) / 1e3 || 0);
+    last = n;
+    update(dt);
+    soundtrack();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>

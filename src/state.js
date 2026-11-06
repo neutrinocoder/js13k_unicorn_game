@@ -1,0 +1,53 @@
+// One shared game-state object, imported by every module.
+export const G = {
+  t: 0,
+  scene: 'title',
+  W: 960,
+  H: 540,
+  scale: 1,
+  cam: { x: 0, y: 0, shake: 0 },
+  player: null,
+  enemies: [],
+  projs: [],
+  parts: [],
+  pickups: [],
+  floaters: [],
+  effects: [],
+  bubbles: [],
+  boss: null,
+  chunks: new Map(),
+  save: null,
+  biome: 0,
+  bg: null,
+  announce: { title: '', sub: '', t: 0 },
+  hitstop: 0,
+  flash: 0,
+  fade: 0,
+  windForce: 0,
+  near: null,
+  map: { x: 0, y: 0, zoom: 2, drag: null },
+};
+
+export const SAVE_KEY = 'unicornAscent.adventure.v1';
+
+export function newSave() {
+  return {
+    v: 1,
+    gems: 0,
+    up: { heart: 0, tail: 0, reach: 0, blast: 0, triple: 0, wings: 0, stars: 0, beam: 0, magnet: 0, bubble: 0, lantern: 0, hooves: 0 },
+    potions: 1,
+    hp: 5,
+    x: 18 * 32,
+    y: -40,
+    spawn: { x: 18 * 32, y: -40, id: 'town' },
+    shrines: { town: 1 },
+    chests: {},
+    bosses: {},
+    explored: {},
+    mods: {},
+    weapon: 0,
+    talked: 0,
+    won: 0,
+    stats: { kills: 0, time: 0, deaths: 0, gemsEarned: 0 },
+  };
+}

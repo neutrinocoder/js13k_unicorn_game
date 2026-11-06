@@ -1,6 +1,6 @@
 const fs=require('fs'),zlib=require('zlib'),{minify}=require('terser');
 async function build(){
- const source=fs.readFileSync('index.html','utf8');
+ const source=fs.readFileSync('classic/index.html','utf8');
  const js=source.split('<script>')[1].split('</script>')[0];
  const names=require('./source-names.json');
  const compactNames=Object.fromEntries(Object.entries(names).map(([short,long])=>[long,short]));
