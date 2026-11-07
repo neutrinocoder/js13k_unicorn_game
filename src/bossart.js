@@ -163,95 +163,230 @@ export function cerberus(ctx, b, t, fl) {
   if (b.st === 'spit') glow(ctx, 120, -88, 70, '#b6ff6b', 0.3);
 }
 
-// ---------- Semiramis: a storm-queen of light wings and thunderclouds ----------
+// ---------- Semiramis: Queen of the Endless Storm ----------
+// Blade-feathered wings, a storm vortex for a body, a halo of thorns and black horns.
+function stormWing(ctx, s, upper, t, flap, enr, fl) {
+  const N = upper ? 10 : 7, L0 = upper ? 128 : 82;
+  const base = upper ? -0.3 + flap * 0.14 : 0.42 + flap * 0.08, fan = upper ? 1.15 : 0.85;
+  const edge = enr ? '#ff3a6a' : '#ff6fd8';
+  for (let i = N - 1; i >= 0; i--) {
+    const k = i / (N - 1), a = base + (upper ? -k : k) * fan * (upper ? 0.85 : 0.9) + (upper ? 0 : -0.2);
+    const len = L0 * (upper ? 1 - 0.4 * k : 0.95 - 0.35 * k) * (1 + Math.sin(t * 3 + i) * 0.02);
+    const dx = Math.cos(a) * s, dy = Math.sin(a), nx = -dy, ny = dx * s;
+    const rx = s * 6, ry = -36 + (upper ? 0 : 10);
+    const tx = rx + dx * len, ty = ry + dy * len, w = 6.5 - k * 1.5;
+    const g = ctx.createLinearGradient(rx, ry, tx, ty);
+    g.addColorStop(0, fl ? '#fff' : '#1c0626');
+    g.addColorStop(0.65, fl ? '#fff' : '#4a1260');
+    g.addColorStop(1, fl ? '#fff' : edge);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(rx + nx * w * 0.4 * s, ry + ny * w * 0.4);
+    ctx.quadraticCurveTo(rx + dx * len * 0.55 + nx * w * s, ry + dy * len * 0.55 + ny * w, tx, ty);
+    ctx.quadraticCurveTo(rx + dx * len * 0.6 - nx * w * 0.5 * s, ry + dy * len * 0.6 - ny * w * 0.5, rx - nx * w * 0.3 * s, ry - ny * w * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = rgba(edge, 0.55);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(rx + dx * len * 0.45, ry + dy * len * 0.45);
+    ctx.quadraticCurveTo(rx + dx * len * 0.75 + nx * w * 0.6 * s, ry + dy * len * 0.75 + ny * w * 0.6, tx, ty);
+    ctx.stroke();
+    ctx.restore();
+    if (upper && i % 3 === 0) glow(ctx, tx, ty, 10, edge, 0.5);
+  }
+  if (Math.random() < 0.12) {
+    const a = base + (upper ? -0.3 : 0.3), len = L0 * 0.8;
+    lightning(ctx, s * 6, -36, s * 6 + Math.cos(a) * s * len, -36 + Math.sin(a) * len, '#ffb0f0', 1.2, 6, 10);
+  }
+}
+
 export function storm(ctx, b, t, fl) {
   ctx.translate(0, -b.h / 2);
-  const cast = b.st === 'bolts' || b.st === 'orbs' || b.st === 'summon' || b.st === 'gust';
-  const flap = Math.sin(t * 2.6);
-  glow(ctx, 0, -10, 150, '#ff4fd8', 0.22);
-  // wings of light
+  const enr = b.phase > 1, cast = b.st === 'bolts' || b.st === 'orbs' || b.st === 'summon' || b.st === 'gust', gust = b.st === 'gust';
+  const PINK = enr ? '#ff3a6a' : '#ff4fd8', EYE = enr ? '#ff2a3a' : '#ffd6ff';
+  const flap = Math.sin(t * 2.2);
+  glow(ctx, 0, -14, 200, PINK, enr ? 0.32 : 0.24);
+
+  // Storm vortex for a lower body
+  const spread = gust ? 1.5 : 1;
+  const funnel = new Path2D();
+  funnel.moveTo(-16, -6);
+  for (let k = 0; k <= 10; k++) { const u = k / 10; funnel.lineTo(-(16 + u * 54 * spread) + Math.sin(t * 3 + u * 6) * 6 * u, -6 + u * 104); }
+  for (let k = 10; k >= 0; k--) { const u = k / 10; funnel.lineTo(16 + u * 54 * spread + Math.sin(t * 3.4 + u * 6 + 2) * 6 * u, -6 + u * 104); }
+  funnel.closePath();
+  const fg = ctx.createLinearGradient(0, -6, 0, 100);
+  fg.addColorStop(0, fl ? '#fff' : '#3a0c4a');
+  fg.addColorStop(0.6, fl ? '#fff' : 'rgba(40,8,52,.75)');
+  fg.addColorStop(1, 'rgba(40,8,52,0)');
+  ctx.fillStyle = fg;
+  ctx.fill(funnel);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (const s of [-1, 1]) for (let k = 0; k < 2; k++) {
-    const tipX = s * (96 - k * 26), tipY = -86 + k * 92 + flap * (8 - k * 4);
-    const g = ctx.createRadialGradient(0, -30, 4, tipX * 0.6, tipY * 0.6 - 10, 90);
-    g.addColorStop(0, 'rgba(255,220,250,.55)');
-    g.addColorStop(0.6, k ? 'rgba(160,110,255,.25)' : 'rgba(255,110,220,.28)');
-    g.addColorStop(1, 'rgba(255,110,220,0)');
-    ctx.fillStyle = g;
-    ctx.strokeStyle = 'rgba(255,220,250,.55)';
-    ctx.lineWidth = 1.5;
+  for (let k = 0; k < 9; k++) {
+    const u = k / 8, y = 2 + u * 92, rx = (20 + u * 54) * spread, a0 = t * (3 + u * 2) + k * 1.3;
+    ctx.strokeStyle = rgba(k % 3 ? '#c45cff' : PINK, 0.35 * (1 - u * 0.6));
+    ctx.lineWidth = 2.5 - u;
     ctx.beginPath();
-    ctx.moveTo(s * 4, -32);
-    ctx.bezierCurveTo(s * 40, -60 + k * 50, tipX * 0.8, tipY - 20, tipX, tipY);
-    ctx.bezierCurveTo(tipX * 0.75, tipY + 24, s * 30, -14 + k * 30, s * 4, -22 + k * 10);
+    ctx.ellipse(Math.sin(t * 2 + k) * 4 * u, y, rx, 6 + u * 5, 0, a0 % TAU, (a0 % TAU) + 2.2);
+    ctx.stroke();
+  }
+  ctx.restore();
+  if (Math.random() < (enr ? 0.5 : 0.3)) lightning(ctx, (Math.random() - 0.5) * 50, 10 + Math.random() * 20, (Math.random() - 0.5) * 110, 70 + Math.random() * 30, '#ff9ae8', 1.2, 6, 12);
+
+  // Wings: two pairs, back pair first
+  for (const s of [-1, 1]) stormWing(ctx, s, false, t, flap, enr, fl);
+  for (const s of [-1, 1]) stormWing(ctx, s, true, t, flap, enr, fl);
+
+  // Halo of thorns
+  ctx.save();
+  ctx.translate(0, -64);
+  ctx.rotate(t * 0.4);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = rgba('#ffd34a', 0.8);
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, 26, 0, TAU); ctx.stroke();
+  ctx.fillStyle = rgba(PINK, 0.85);
+  for (let k = 0; k < 14; k++) {
+    const a = (k * TAU) / 14, r1 = 26, r2 = 26 + (k % 2 ? 9 : 15);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a - 0.08) * r1, Math.sin(a - 0.08) * r1);
+    ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+    ctx.lineTo(Math.cos(a + 0.08) * r1, Math.sin(a + 0.08) * r1);
+    ctx.fill();
+  }
+  ctx.restore();
+  glow(ctx, 0, -64, 46, '#ffd34a', 0.25);
+
+  // Long hair streaming in the storm wind
+  for (let i = 0; i < 11; i++) {
+    const pts = [];
+    for (let s = 0; s <= 8; s++) {
+      const u = s / 8;
+      pts.push([-1 - u * (34 + i * 5) + Math.sin(t * 2.2 + i) * 3, -64 + u * (22 + i * 6) + Math.sin(t * 3.6 + i * 0.8 - u * 5) * u * 11]);
+    }
+    strand(ctx, pts, 5.5, 1.4, fl ? '#fff' : i % 4 === 0 ? '#c42a8a' : i % 2 ? '#2a0832' : '#4a0e50');
+  }
+
+  // Gown and veils flowing into the vortex
+  const skirt = new Path2D();
+  skirt.moveTo(-10, -14);
+  skirt.lineTo(10, -14);
+  for (let k = 0; k <= 6; k++) skirt.lineTo(30 - k * 10, 40 + Math.sin(t * 4 + k) * 6 + (k % 2) * 8);
+  skirt.closePath();
+  const sg = ctx.createLinearGradient(0, -14, 0, 50);
+  sg.addColorStop(0, fl ? '#fff' : '#5a0a5a');
+  sg.addColorStop(1, 'rgba(90,10,90,0)');
+  ctx.fillStyle = sg;
+  ctx.fill(skirt);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = rgba(PINK, 0.12);
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(s * 8, -30);
+    ctx.quadraticCurveTo(s * 40 + Math.sin(t * 2) * 8, 0, s * 26 + Math.sin(t * 2.5) * 12, 50);
+    ctx.lineTo(s * 4, 20);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Corset armour with gold filigree and a heart gem
+  ctx.fillStyle = fl ? '#fff' : '#1c0420';
+  ctx.strokeStyle = '#f2c14e';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-12, -42); ctx.quadraticCurveTo(0, -47, 12, -42); ctx.lineTo(9, -14); ctx.quadraticCurveTo(0, -10, -9, -14); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-8, -38); ctx.quadraticCurveTo(-2, -30, -6, -18); ctx.moveTo(8, -38); ctx.quadraticCurveTo(2, -30, 6, -18);
+  ctx.stroke();
+  ctx.fillStyle = fl ? '#fff' : PINK;
+  ctx.beginPath(); ctx.moveTo(0, -24); ctx.bezierCurveTo(-6, -29, -4, -35, 0, -31); ctx.bezierCurveTo(4, -35, 6, -29, 0, -24); ctx.fill();
+  glow(ctx, 0, -29, 14, PINK, 0.8);
+  ctx.fillStyle = '#f2c14e';
+  for (const s of [-1, 1]) {
+    ctx.beginPath(); ctx.moveTo(s * 9, -43); ctx.quadraticCurveTo(s * 18, -48, s * 19, -40); ctx.lineTo(s * 24, -46); ctx.lineTo(s * 17, -36); ctx.closePath(); ctx.fill();
+  }
+  ctx.strokeStyle = '#f2c14e';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(0, -46, 6, 0.3, Math.PI - 0.3); ctx.stroke();
+  eye(ctx, 0, -40.5, 1.4, PINK, '#fff', 3);
+
+  // Arms: raised in a storm of lightning when casting
+  const skin = fl ? '#fff' : '#f4d8e8';
+  const ra = cast ? 1 : 0;
+  const lh = cast ? [-30, -62 - ra * 24] : [-22, -22], rh = cast ? [34, -56 - ra * 26] : [30, -34];
+  limb(ctx, [[-11, -40], [-22, -44 - ra * 14], lh], 4.2, skin, 'rgba(60,20,60,.6)');
+  limb(ctx, [[11, -40], [24, -40 - ra * 16], rh], 4.2, skin, 'rgba(60,20,60,.6)');
+  ctx.fillStyle = '#f2c14e';
+  for (const [hx, hy] of [lh, rh]) ctx.fillRect(hx - 3, hy + 4, 6, 3);
+  for (const [hx, hy] of [lh, rh]) {
+    glow(ctx, hx, hy, cast ? 34 : 18, '#ffb0f0', cast ? 0.75 : 0.5);
+    eye(ctx, hx, hy, cast ? 4.5 + Math.sin(t * 30) : 2.6, '#ffd6ff', '#ffffff', 2);
+  }
+  if (cast) {
+    lightning(ctx, lh[0], lh[1], rh[0], rh[1], '#ffd6ff', 1.6, 9, 16);
+    if (Math.random() < 0.6) lightning(ctx, rh[0], rh[1], rh[0] + (Math.random() - 0.5) * 50, rh[1] - 70 - Math.random() * 50, '#ffd6ff', 1.4, 6, 12);
+    if (Math.random() < 0.6) lightning(ctx, lh[0], lh[1], lh[0] + (Math.random() - 0.5) * 50, lh[1] - 70 - Math.random() * 50, '#ffd6ff', 1.4, 6, 12);
+  } else if (Math.random() < 0.3) lightning(ctx, rh[0], rh[1], rh[0] + 14, rh[1] + 18, '#ffd6ff', 1, 4, 6);
+
+  // Face
+  ctx.fillStyle = skin;
+  ctx.strokeStyle = 'rgba(60,20,60,.65)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-8, -56); ctx.quadraticCurveTo(-9, -69, 1, -70); ctx.quadraticCurveTo(11, -69, 9.5, -57); ctx.quadraticCurveTo(6, -46, 1, -45.5); ctx.quadraticCurveTo(-5, -47, -8, -56); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#2a0a2a';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(-5, -62); ctx.lineTo(-0.5, -60.5); ctx.moveTo(8, -62.5); ctx.lineTo(3, -60.5); ctx.stroke();
+  eye(ctx, 5, -59, 1.6, EYE, '#ffffff', 4);
+  eye(ctx, -2.5, -59, 1.4, EYE, '#ffffff', 4);
+  ctx.fillStyle = '#6a0a3a';
+  ctx.beginPath(); ctx.moveTo(-0.5, -51.5); ctx.quadraticCurveTo(3, -50, 6.5, -52); ctx.quadraticCurveTo(3, -49, -0.5, -51.5); ctx.fill();
+  ctx.fillStyle = 'rgba(255,120,190,.3)';
+  ctx.beginPath(); ctx.arc(6.5, -55, 2.2, 0, TAU); ctx.fill();
+  eye(ctx, -6.5, -52, 1.2, PINK, '#fff', 3);
+
+  // Horns of black glass with glowing tips, and a gold circlet
+  for (const s of [-1, 1]) {
+    const bx = s * 6 + 1, tipX = s * 26 + 1, tipY = -96;
+    const hg = ctx.createLinearGradient(bx, -68, tipX, tipY);
+    hg.addColorStop(0, fl ? '#fff' : '#0e0412');
+    hg.addColorStop(1, fl ? '#fff' : '#4a1250');
+    ctx.fillStyle = hg;
+    ctx.strokeStyle = 'rgba(255,110,210,.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx - s * 3, -67);
+    ctx.bezierCurveTo(bx + s * 2, -84, tipX - s * 14, -86, tipX, tipY);
+    ctx.bezierCurveTo(tipX - s * 10, -82, bx + s * 8, -78, bx + s * 4, -66);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,240,255,.35)';
-    ctx.beginPath(); ctx.moveTo(s * 6, -30); ctx.quadraticCurveTo(tipX * 0.5, (tipY - 30) * 0.6, tipX * 0.92, tipY * 0.95); ctx.stroke();
+    eye(ctx, tipX, tipY, 2, PINK, '#ffffff', 4);
   }
-  ctx.restore();
-  // hair streaming behind
-  for (let i = 0; i < 9; i++) {
-    const pts = [];
-    for (let s = 0; s <= 7; s++) {
-      const u = s / 7;
-      pts.push([-2 - u * (40 + i * 5) + Math.sin(t * 2 + i) * 3, -58 + u * (26 + i * 5) + Math.sin(t * 3.4 + i * 0.8 - u * 4) * u * 10]);
-    }
-    strand(ctx, pts, 5, 1.5, fl ? '#fff' : i % 3 ? '#2a0a32' : '#6a1a6a');
-  }
-  // storm-cloud gown
-  for (let k = 0; k < 16; k++) {
-    const u = k / 15, x = Math.sin(k * 2.1 + t * 0.8) * 34 * (u + 0.25), y = -8 + u * 62, r = 10 + u * 14;
-    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, 1, x, y, r);
-    g.addColorStop(0, fl ? '#fff' : '#8a4aa8');
-    g.addColorStop(1, fl ? '#fff' : '#240a30');
-    ctx.fillStyle = g;
-    ell(ctx, x, y + Math.sin(t * 2 + k) * 2, r, r * 0.8); ctx.fill();
-  }
-  if (Math.random() < 0.35) lightning(ctx, Math.random() * 50 - 25, 6, Math.random() * 70 - 35, 54, '#ff9ae8', 1.2, 5, 10);
-  // torso
-  ctx.fillStyle = fl ? '#fff' : '#1e0824';
-  ctx.strokeStyle = '#f2c14e';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(-11, -40); ctx.quadraticCurveTo(0, -44, 11, -40); ctx.lineTo(8, -10); ctx.lineTo(-8, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#f2c14e';
-  ctx.beginPath(); ctx.moveTo(0, -36); ctx.lineTo(4, -26); ctx.lineTo(0, -18); ctx.lineTo(-4, -26); ctx.closePath(); ctx.fill();
-  glow(ctx, 0, -26, 10, '#ff6fd8', 0.6);
-  // arms
-  const skin = fl ? '#fff' : '#f2d4e4';
-  const ra = cast ? 1 : 0;
-  limb(ctx, [[-10, -38], [-24, -42 - ra * 16], [-30, -58 - ra * 22]], 4.2, skin, 'rgba(60,20,60,.6)');
-  limb(ctx, [[10, -38], [26, -36 - ra * 18], [34, -50 - ra * 24]], 4.2, skin, 'rgba(60,20,60,.6)');
-  if (cast) {
-    for (const [hx, hy] of [[-30, -60 - ra * 22], [34, -52 - ra * 24]]) {
-      glow(ctx, hx, hy, 26, '#ffb0f0', 0.7);
-      eye(ctx, hx, hy, 4 + Math.sin(t * 30) * 1, '#ffd6ff', '#ffffff', 2);
-      if (Math.random() < 0.5) lightning(ctx, hx, hy, hx + (Math.random() - 0.5) * 60, hy - 50 - Math.random() * 40, '#ffd6ff', 1.2, 5, 12);
-    }
-  }
-  // head
-  ctx.fillStyle = skin;
-  ctx.strokeStyle = 'rgba(60,20,60,.6)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(-8, -54); ctx.quadraticCurveTo(-9, -66, 1, -67); ctx.quadraticCurveTo(10, -66, 9, -55); ctx.quadraticCurveTo(5, -45, 1, -45); ctx.quadraticCurveTo(-5, -46, -8, -54); ctx.fill(); ctx.stroke();
-  eye(ctx, 4, -57, 1.6, '#ff6fd8', '#ffffff', 3.5);
-  eye(ctx, -2.5, -57, 1.4, '#ff6fd8', '#ffffff', 3.5);
-  ctx.fillStyle = '#8a1a4a';
-  ctx.fillRect(0, -50.5, 5, 1.6);
-  // crown
   ctx.fillStyle = fl ? '#fff' : '#f2c14e';
   ctx.strokeStyle = '#8a5a10';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(-9, -64); ctx.lineTo(-10, -78); ctx.lineTo(-5, -68); ctx.lineTo(-1, -84); ctx.lineTo(3, -68); ctx.lineTo(8, -79); ctx.lineTo(10, -63); ctx.closePath();
+  ctx.moveTo(-8, -66); ctx.lineTo(-6, -73); ctx.lineTo(-2.5, -68); ctx.lineTo(1, -78); ctx.lineTo(4.5, -68); ctx.lineTo(8, -73); ctx.lineTo(10, -66); ctx.closePath();
   ctx.fill(); ctx.stroke();
-  eye(ctx, -1, -71, 1.8, '#ff4fd8', '#fff', 3);
-  // orbiting petals
-  for (let i = 0; i < 12; i++) {
-    const a = t * 1.6 + (i * TAU) / 12, x = Math.cos(a) * 78, y = Math.sin(a) * 30 - 6;
-    ctx.fillStyle = i % 3 ? '#ff8ad8' : '#ffd1f0';
-    ell(ctx, x, y, 6, 2.6, a + t); ctx.fill();
+  eye(ctx, 1, -71, 1.8, PINK, '#fff', 3.5);
+
+  // Orbiting petals and sparks
+  for (let i = 0; i < 14; i++) {
+    const a = t * (1.4 + (i % 3) * 0.3) + (i * TAU) / 14, rr = 86 + (i % 3) * 14, x = Math.cos(a) * rr, y = Math.sin(a) * rr * 0.36 - 10;
+    if (i % 4 === 0) glow(ctx, x, y, 8, PINK, 0.7);
+    else {
+      ctx.fillStyle = i % 3 ? '#ff8ad8' : '#ffd1f0';
+      ell(ctx, x, y, 6, 2.4, a + t); ctx.fill();
+    }
   }
 }
 

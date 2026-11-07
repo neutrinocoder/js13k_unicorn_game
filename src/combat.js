@@ -20,9 +20,9 @@ export function hurtPlayer(n, sx, kb = 1) {
     return false;
   }
   p.hp -= n;
-  p.inv = 1.1;
-  p.vy = -420 * kb;
-  p.vx = (cx < sx ? -1 : 1) * 340 * kb;
+  p.inv = 1.5;
+  p.vy = -380 * kb;
+  p.vx = (cx < sx ? -1 : 1) * 300 * kb;
   p.ctrlLock = 0.18;
   p.dashT = 0;
   shake(12);
@@ -61,8 +61,8 @@ export function killEnemy(e) {
   ring(cx, cy, 60, e.accent || '#fff');
   shake(4);
   sfx('kill');
-  dropGems(cx, cy, Math.round(e.gem * (0.6 + e.level * 0.5) * rand(0.8, 1.3)));
-  if (Math.random() < 0.08) G.pickups.push({ kind: 'heart', x: cx, y: cy, vx: rand(-80, 80), vy: -300, t: 0 });
+  dropGems(cx, cy, Math.round(e.gem * (0.6 + e.level * 0.5) * rand(1, 1.5)));
+  if (Math.random() < 0.16) G.pickups.push({ kind: 'heart', x: cx, y: cy, vx: rand(-80, 80), vy: -300, t: 0 });
   if (e.spawn) { e.spawn.deadAt = G.t; e.spawn.ent = null; }
   G.save.stats.kills++;
 }

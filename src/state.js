@@ -36,7 +36,7 @@ export function newSave() {
     gems: 0,
     up: { heart: 0, tail: 0, reach: 0, blast: 0, triple: 0, wings: 0, stars: 0, beam: 0, magnet: 0, bubble: 0, lantern: 0, hooves: 0 },
     potions: 1,
-    hp: 5,
+    hp: 6,
     x: 18 * 32,
     y: -40,
     spawn: { x: 18 * 32, y: -40, id: 'town' },

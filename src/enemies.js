@@ -20,10 +20,10 @@ export const ETYPES = {
 };
 
 export function makeEnemy(type, x, y, level, biome, hang = false) {
-  const d = ETYPES[type], B = BIOMES[BIOME_LIST[biome]], m = 1 + 0.45 * (level - 1);
+  const d = ETYPES[type], B = BIOMES[BIOME_LIST[biome]], m = 1 + 0.3 * (level - 1);
   const e = {
     type, x: x - d.w / 2, y: y - d.h, w: d.w, h: d.h, vx: 0, vy: 0, hp: d.hp * m, max: d.hp * m,
-    dmg: d.dmg + Math.floor((level - 1) / 4), level, gem: d.gem, fly: d.fly, ghost: d.ghost,
+    dmg: d.dmg + Math.floor((level - 1) / 7), level, gem: d.gem, fly: d.fly, ghost: d.ghost,
     tint: B.tint, accent: B.accent, face: 1, t: rand(0, 10), cd: rand(0.5, 2), t2: 0, flash: 0, trap: 0, state: 'idle', ground: false, biome,
   };
   if (type === 'spider') {
@@ -47,7 +47,7 @@ export function updateEnemy(e, dt) {
     e.x += e.vx * dt;
     return;
   }
-  const aware = d < 680 && !p.dead;
+  const aware = d < 540 && !p.dead;
   const wander = speed => {
     if (e.hitWall || (e.ground && !groundAhead(e, e.face))) e.face *= -1;
     e.vx = e.face * speed;
@@ -56,8 +56,8 @@ export function updateEnemy(e, dt) {
     case 'imp': {
       if (aware) {
         e.face = dx < 0 ? -1 : 1;
-        e.vx += (e.face * (165 + e.level * 5) - e.vx) * Math.min(1, 6 * dt);
-        if (e.ground && e.cd < 0 && (e.hitWall || (dy < -50 && Math.abs(dx) < 260) || !groundAhead(e, e.face))) { e.vy = -680; e.cd = 0.9; }
+        e.vx += (e.face * (135 + e.level * 4) - e.vx) * Math.min(1, 6 * dt);
+        if (e.ground && e.cd < 0 && (e.hitWall || (dy < -50 && Math.abs(dx) < 260) || !groundAhead(e, e.face))) { e.vy = -680; e.cd = 1.2; }
       } else wander(60);
       e.vy = Math.min(e.vy + 1800 * dt, 900);
       moveBody(e, dt);
@@ -68,7 +68,7 @@ export function updateEnemy(e, dt) {
         e.vx = e.vy = 0;
         e.x = e.homeX - e.w / 2 + Math.sin(e.t * 0.9) * 3;
         e.y = e.anchorY + 22 + Math.sin(e.t * 1.6) * 4;
-        if (e.flash > 0 || (aware && dy > -20 && Math.abs(dx) < 210)) { e.state = 'drop'; e.vy = 120; }
+        if (e.flash > 0 || (aware && dy > -20 && Math.abs(dx) < 160)) { e.state = 'drop'; e.vy = 120; }
       } else if (e.state === 'drop') {
         e.vy = Math.min(e.vy + 1700 * dt, 800);
         e.vx *= 0.9;
@@ -77,8 +77,8 @@ export function updateEnemy(e, dt) {
       } else {
         if (aware) {
           e.face = dx < 0 ? -1 : 1;
-          e.vx += (e.face * (190 + e.level * 5) - e.vx) * Math.min(1, 7 * dt);
-          if (e.ground && e.cd < 0 && Math.abs(dx) < 280 && Math.abs(dy) < 170) { e.vy = -560; e.vx = e.face * 480; e.cd = 1.4; }
+          e.vx += (e.face * (150 + e.level * 4) - e.vx) * Math.min(1, 7 * dt);
+          if (e.ground && e.cd < 0 && Math.abs(dx) < 280 && Math.abs(dy) < 170) { e.vy = -520; e.vx = e.face * 400; e.cd = 2.1; }
           else if (e.ground && e.hitWall && e.cd < 0) { e.vy = -640; e.cd = 0.6; }
         } else wander(70);
         e.vy = Math.min(e.vy + 1800 * dt, 900);
@@ -90,17 +90,17 @@ export function updateEnemy(e, dt) {
       if (e.state === 'wind') {
         e.vx *= 0.85;
         if (Math.random() < 0.5) part({ x: cx + rand(-20, 20), y: e.y + e.h, vy: -40, life: 0.4, size: 3, color: '#ccc' });
-        if (e.t2 <= 0) { e.state = 'charge'; e.t2 = 0.85; }
+        if (e.t2 <= 0) { e.state = 'charge'; e.t2 = 0.75; }
       } else if (e.state === 'charge') {
-        e.vx = e.face * 520;
+        e.vx = e.face * 420;
         if (Math.random() < 0.6) part({ x: cx - e.face * 20, y: e.y + e.h - 4, vx: -e.face * 80, vy: -30, life: 0.4, size: 4, color: e.accent, add: true });
-        if (e.hitWall) { e.state = 'idle'; e.cd = 1.3; shake(6); sfx('land'); }
-        else if (e.t2 <= 0) { e.state = 'idle'; e.cd = 1.4; }
+        if (e.hitWall) { e.state = 'idle'; e.cd = 1.9; shake(6); sfx('land'); }
+        else if (e.t2 <= 0) { e.state = 'idle'; e.cd = 2; }
       } else {
         if (aware) {
           e.face = dx < 0 ? -1 : 1;
           e.vx += (e.face * 100 - e.vx) * Math.min(1, 4 * dt);
-          if (e.cd < 0 && Math.abs(dy) < 80 && Math.abs(dx) < 420) { e.state = 'wind'; e.t2 = 0.5; }
+          if (e.cd < 0 && Math.abs(dy) < 80 && Math.abs(dx) < 420) { e.state = 'wind'; e.t2 = 0.8; }
           if (e.ground && e.hitWall && e.cd < 0) { e.vy = -600; e.cd = 0.6; }
         } else wander(45);
       }
@@ -114,7 +114,7 @@ export function updateEnemy(e, dt) {
       moveBody(e, dt);
       if (aware) e.face = dx < 0 ? -1 : 1;
       if (aware && e.cd < 0 && d < 600) {
-        e.cd = Math.max(1.3, 2.6 - e.level * 0.06);
+        e.cd = Math.max(2.2, 3.4 - e.level * 0.05);
         e.t2 = 0.25;
         const tt = clamp(d / 430, 0.6, 1.3), g = 900;
         shoot({ x: cx + e.face * 10, y: e.y + 6, vx: dx / tt, vy: (dy - 0.5 * g * tt * tt) / tt, g, r: 7, dmg: e.dmg, color: e.accent, kind: 'glob', trail: e.tint });
@@ -124,7 +124,7 @@ export function updateEnemy(e, dt) {
     }
     case 'bat': {
       if (aware) {
-        const s = 230 + e.level * 6;
+        const s = 175 + e.level * 4;
         const tx = dx + Math.sin(e.t * 2.6) * 70, ty = dy - 30 + Math.cos(e.t * 3.4) * 60, l = Math.hypot(tx, ty) || 1;
         e.vx += ((tx / l) * s - e.vx) * 2.6 * dt;
         e.vy += ((ty / l) * s - e.vy) * 2.6 * dt;
@@ -138,12 +138,12 @@ export function updateEnemy(e, dt) {
     }
     case 'wisp': {
       if (aware) {
-        const s = 95 + e.level * 3;
+        const s = 80 + e.level * 2;
         e.vx += ((dx / d) * s - e.vx) * 1.4 * dt;
         e.vy += ((dy / d) * s - e.vy) * 1.4 * dt;
-        if (e.level >= 3 && e.cd < 0 && d < 460) {
-          e.cd = 3.2;
-          shoot({ x: cx, y: cy, vx: (dx / d) * 230, vy: (dy / d) * 230, r: 6, dmg: 1, color: e.accent, kind: 'orb', ghost: true, life: 3 });
+        if (e.level >= 5 && e.cd < 0 && d < 420) {
+          e.cd = 4.2;
+          shoot({ x: cx, y: cy, vx: (dx / d) * 180, vy: (dy / d) * 180, r: 6, dmg: 1, color: e.accent, kind: 'orb', ghost: true, life: 3 });
         }
       } else {
         e.vx *= 0.95;

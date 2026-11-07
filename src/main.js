@@ -244,7 +244,7 @@ export function onPlayerDeath() {
   shake(20);
   sfx('roar');
   G.windForce = 0;
-  const toll = Math.floor(G.save.gems * 0.2);
+  const toll = Math.floor(G.save.gems * 0.1);
   G.save.gems -= toll;
   setTimeout(() => {
     $('death-text').textContent = toll ? `Charon takes his toll: ${toll} gems. You wake at your shrine.` : 'You wake at your shrine.';

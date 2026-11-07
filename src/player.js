@@ -158,7 +158,7 @@ export function updatePlayer(dt) {
     // Hazards
     const hz = hazardTouch(p);
     if (hz && p.inv <= 0) {
-      hurtPlayer(B.haz === 'lava' ? 2 : 1, cx + p.vx * 0.1);
+      hurtPlayer(1, cx + p.vx * 0.1);
       p.vy = -620;
     }
   }

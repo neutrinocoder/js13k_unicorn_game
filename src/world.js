@@ -277,7 +277,7 @@ function genChunk(cx, cy, k) {
     if (rng() < 0.035) { const s = take(floor); if (s) place(s, { type: 'shrine', id: k + ':s', name: B.name + ' Shrine' }); }
     if (rng() < 0.4) { const s = take(floor); if (s) place(s, { type: 'torch', id: k + ':t' }); }
     if (dist > 60) {
-      const n = rng() < 0.8 ? 1 + Math.floor(rng() * 2.4) : 0;
+      const n = rng() < 0.65 ? 1 + Math.floor(rng() * 1.7) : 0;
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
         const fly = type === 'bat' || type === 'wisp';

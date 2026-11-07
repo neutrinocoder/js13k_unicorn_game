@@ -29,7 +29,7 @@ export const ownsWeapon = i => !WEAPONS[i].need || G.save.up[WEAPONS[i].need] > 
 export function stats() {
   const u = G.save.up;
   return {
-    maxHp: 5 + u.heart,
+    maxHp: 6 + u.heart,
     whipDmg: 2 + u.tail * 1.5,
     reach: 125 * (1 + 0.15 * u.reach),
     blastCd: 1.1 * Math.pow(0.8, u.blast),

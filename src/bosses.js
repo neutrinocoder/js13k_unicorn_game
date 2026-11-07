@@ -9,6 +9,7 @@ import { hurtPlayer, shoot, dropGems } from './combat.js';
 import { makeEnemy } from './enemies.js';
 import { announce, onBossDefeated } from './main.js';
 import * as ART from './bossart.js';
+import { lightning } from './art.js';
 
 const SIZES = { cerberus: [170, 104], storm: [80, 120], heretic: [110, 92], titan: [150, 220], hades: [110, 160] };
 const FLYING = { storm: 1, heretic: 1, hades: 1 };
@@ -25,6 +26,16 @@ export function spawnBoss(site) {
     flash: 0, dead: false, ground: false, tint: B.tint, accent: B.accent, ax0, ax1, ay0, ay1, level: 10, n: 0, out: 0,
   };
   G.boss = boss;
+  if (site.id === 'storm') {
+    // Her entrance: a storm of lightning around her for a moment (no damage).
+    G.effects.push({
+      t: 0, dur: 1.4,
+      draw(ctx) {
+        if (Math.random() < 0.55) lightning(ctx, cxOf(boss) + rand(-260, 260), boss.ay0, cxOf(boss) + rand(-50, 50), cyOf(boss), '#ffb0f0', 3, 12, 34);
+      },
+    });
+    sfx('bolt');
+  }
   sfx('roar');
   shake(14);
   setTheme('boss');
@@ -78,13 +89,14 @@ function column(x, w, delay, kind, top, bottom) {
         ctx.fillStyle = g;
         ctx.fillRect(x - w / 2 - 10, top, w + 20, bottom - top);
         if (kind === 'bolt') {
-          ctx.strokeStyle = `rgba(255,255,255,${k})`;
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          let yy = top, xx = x;
-          ctx.moveTo(xx, yy);
-          while (yy < bottom) { yy += 30; xx = x + rand(-w / 3, w / 3); ctx.lineTo(xx, yy); }
-          ctx.stroke();
+          // A forked bolt with branches, fading out after the strike.
+          ctx.globalAlpha = k;
+          lightning(ctx, x, top, x + rand(-10, 10), bottom, '#ffb0f0', 4, Math.max(6, Math.round((bottom - top) / 40)), w * 0.7);
+          for (let i = 0; i < 3; i++) {
+            const by = top + (bottom - top) * rand(0.2, 0.7);
+            lightning(ctx, x + rand(-8, 8), by, x + rand(-90, 90), by + rand(60, 140), '#ffb0f0', 1.5, 5, 18);
+          }
+          ctx.globalAlpha = 1;
         }
         ctx.globalCompositeOperation = 'source-over';
       }
