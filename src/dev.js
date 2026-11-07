@@ -88,9 +88,10 @@ const COMMANDS = {
     run() { const p = G.player; return `x ${Math.round((p.x + p.w / 2) / T)}  y ${Math.round((p.y + p.h) / T)}`; },
   },
   give: {
-    args: 'all', desc: 'every upgrade and weapon at full level, plus 3 Ambrosia',
+    args: 'all', desc: 'every upgrade, weapon and boss power at full level, plus 3 Ambrosia',
     run() {
       for (const it of SHOP) if (!it.consumable) G.save.up[it.id] = it.max;
+      Object.assign(G.save.up, { stars: 1, beam: 1, bombs: 2, fly: 2, might: 2, swift: 2 });
       G.save.potions = 3;
       G.player.hp = stats().maxHp;
       return 'all upgrades given';

@@ -66,7 +66,7 @@ export function render(ctx) {
   for (const e of G.enemies) {
     if (e.dead || e.x > v.x1 + 60 || e.x + e.w < v.x0 - 60 || e.y > v.y1 + 60 || e.y + e.h < v.y0 - 60) continue;
     drawEnemy(ctx, e, G.t);
-    if (e.type === 'wisp') lights.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, r: 110, c: e.accent, a: 0.5 });
+    if (e.type === 'wisp' || e.type === 'seraph' || e.type === 'ophan') lights.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, r: 110, c: e.type === 'seraph' ? '#ffb347' : e.accent, a: 0.5 });
   }
   drawBoss(ctx, G.t);
   if (G.boss && !G.boss.dead) lights.push({ x: G.boss.x + G.boss.w / 2, y: G.boss.y + G.boss.h / 2, r: 420, c: G.boss.accent, a: 0.6 });
@@ -891,14 +891,15 @@ function drawHUD(ctx) {
     ctx.fillStyle = 'rgba(255,255,255,.7)';
     ctx.textAlign = 'left';
     ctx.fillText(own ? w.key : '🔒', x + 5, by + 14);
-    if (w.id === 'blast' && p.blastCd > 0) {
+    const cd = w.id === 'blast' ? p.blastCd / S.blastCd : w.id === 'bomb' && own ? p.bombCd / S.bombCd : 0;
+    if (cd > 0) {
       ctx.fillStyle = 'rgba(0,0,0,.55)';
-      const k = clamp(p.blastCd / S.blastCd, 0, 1);
+      const k = clamp(cd, 0, 1);
       ctx.fillRect(x + 2, by + 50 - 48 * k, 46, 48 * k);
     }
   });
   // bubble charge
-  const bx = 24 + 4 * 58 + 30, byc = by + 25, k = clamp(p.charge / S.bubbleT, 0, 1);
+  const bx = 24 + WEAPONS.length * 58 + 30, byc = by + 25, k = clamp(p.charge / S.bubbleT, 0, 1);
   ctx.beginPath(); ctx.arc(bx, byc, 22, 0, TAU);
   ctx.fillStyle = 'rgba(10,6,20,.6)';
   ctx.fill();
@@ -917,6 +918,20 @@ function drawHUD(ctx) {
     RAINBOW.forEach((c, i) => g.addColorStop(i / 6, c));
     ctx.fillStyle = g;
     ctx.fillRect(24, by - 16, 222 * (p.energy / 100), 8);
+  }
+  if (S.fly) {
+    // wing energy for flight
+    const fy = by - (save.up.beam ? 30 : 16), k = clamp(p.wing / S.flyMax, 0, 1);
+    ctx.fillStyle = 'rgba(10,6,20,.6)';
+    ctx.fillRect(24, fy, 222, 8);
+    const g = ctx.createLinearGradient(24, 0, 246, 0);
+    g.addColorStop(0, '#fff6c4');
+    g.addColorStop(1, '#ffc23a');
+    ctx.fillStyle = k < 0.2 && Math.floor(G.t * 6) % 2 ? '#ff6a4a' : g;
+    ctx.fillRect(24, fy, 222 * k, 8);
+    ctx.font = '800 11px Nunito, sans-serif';
+    ctx.textAlign = 'left';
+    hudText(ctx, '🪽', 250, fy + 9);
   }
 
   drawMinimap(ctx);
@@ -977,6 +992,15 @@ export function weaponIcon(ctx, id, x, y) {
     ctx.translate(9, 9);
     starPath(ctx, 6, 2.5);
     ctx.fill();
+  } else if (id === 'bomb') {
+    ctx.fillStyle = '#4a3a5e';
+    ctx.strokeStyle = '#ffb347';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(-2, 3, 11, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#c9a070';
+    ctx.beginPath(); ctx.moveTo(4, -6); ctx.quadraticCurveTo(10, -12, 8, -15); ctx.stroke();
+    ctx.fillStyle = '#ffe36b';
+    ctx.beginPath(); ctx.arc(8, -15, 3.5, 0, TAU); ctx.fill();
   } else if (id === 'beam') {
     RAINBOW.forEach((c, i) => { ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-14, 10 - i * 1.6 + 5); ctx.lineTo(14, -10 - i * 1.6 + 5); ctx.stroke(); });
   }

@@ -14,7 +14,7 @@ export function makePlayer(x, y) {
     x, y, w: 30, h: 34, vx: 0, vy: 0, face: 1, ground: false, jumps: 0, coyote: 0, jbuf: 0, rising: false,
     dashT: 0, dashCd: 0, dashDir: 1, inv: 0, hp: 5, shield: 0, ctrlLock: 0, wallDir: 0, dropT: 0,
     whipT: 0, whipAng: 0, whipCd: 0, whipSide: 1, combo: 0, lastWhip: -9, blastCd: 0, starCd: 0, atkBuf: 0, altBuf: 0,
-    energy: 100, beaming: false, beamLen: 0, beamTick: 0,
+    energy: 100, beaming: false, beamLen: 0, beamTick: 0, wing: 200, flying: false, flapT: 0, bombCd: 0,
     charge: 0, slow: 0, gliding: false, runPhase: 0, sx: 1, sy: 1, ax: 1, ay: 0, stepT: 0, dead: false, tail: [],
   };
   for (let i = 0; i < 12; i++) p.tail.push({ x: x, y: y + 10, px: x, py: y + 10 });
@@ -31,7 +31,7 @@ export function hornTip(p) {
 export function updatePlayer(dt) {
   const p = G.player, S = stats(), B = BIOMES[BIOME_LIST[G.biome]];
   if (p.dead) return;
-  p.inv -= dt; p.dashCd -= dt; p.ctrlLock -= dt; p.whipCd -= dt; p.blastCd -= dt; p.starCd -= dt;
+  p.inv -= dt; p.dashCd -= dt; p.ctrlLock -= dt; p.whipCd -= dt; p.blastCd -= dt; p.starCd -= dt; p.bombCd -= dt;
   p.shield -= dt; p.slow -= dt; p.dropT -= dt; p.whipT -= dt;
   if (p.hp > S.maxHp) p.hp = S.maxHp;
 
@@ -71,7 +71,7 @@ export function updatePlayer(dt) {
   } else {
     // Horizontal movement
     const ice = B.ice && p.ground;
-    const top = (p.slow > 0 ? 300 : 540) * ((G.save.dev && G.save.dev.speed) || 1);
+    const top = (p.slow > 0 ? 300 : 540) * S.speed * ((G.save.dev && G.save.dev.speed) || 1);
     if (p.dashT > 0) {
       p.dashT -= dt;
       p.vx = p.dashDir * 1100;
@@ -93,7 +93,19 @@ export function updatePlayer(dt) {
       if (Math.random() < 0.3) part({ x: dir > 0 ? p.x + p.w : p.x, y: p.y + p.h, vx: 0, vy: -30, life: 0.3, size: 2, color: '#d8d0ef' });
     }
     p.gliding = false;
-    if (S.glide && !p.ground && jumpH && p.vy > 60 && !p.wallDir) {
+    // Flight: hold Jump in the air to beat your wings and climb. It burns wing energy, which
+    // refills on the ground, and walls still stop you (normal collisions below).
+    p.flying = false;
+    if (p.wing > S.flyMax) p.wing = S.flyMax;
+    if (S.fly && !p.ground && jumpH && !p.wallDir && p.vy > -300 && p.wing > 0 && p.dashT <= 0) {
+      p.flying = true;
+      p.vy = Math.max(p.vy - 3400 * dt, -440);
+      p.wing = Math.max(0, p.wing - 34 * dt);
+      p.flapT -= dt;
+      if (p.flapT <= 0) { p.flapT = 0.24; sfx('dash', 0.25); }
+      if (Math.random() < 0.6) part({ x: cx - p.face * 10 + rand(-8, 8), y: p.y + p.h - 6, vx: rand(-40, 40), vy: rand(60, 160), life: 0.5, size: rand(2, 3.5), color: pick(['#ffffff', '#ffe9a8', ...RAINBOW]), add: true });
+    } else if (p.ground) p.wing = Math.min(S.flyMax, p.wing + S.flyRegen * dt);
+    if (!p.flying && S.glide && !p.ground && jumpH && p.vy > 60 && !p.wallDir) {
       p.vy = Math.min(p.vy, 115);
       p.gliding = true;
     }
@@ -164,13 +176,15 @@ export function updatePlayer(dt) {
   }
 
   // Weapon selection
-  for (let i = 0; i < 4; i++) if (tapped('Digit' + (i + 1)) && ownsWeapon(i)) selectWeapon(i);
+  const NW = WEAPONS.length;
+  for (let i = 0; i < NW; i++) if (tapped('Digit' + (i + 1)) && ownsWeapon(i)) selectWeapon(i);
   if (tapped('KeyQ') || mouse.wheel) {
     const step = mouse.wheel < 0 ? -1 : 1;
     let w = G.save.weapon;
-    for (let k = 0; k < 4; k++) { w = (w + step + 4) % 4; if (ownsWeapon(w)) break; }
+    for (let k = 0; k < NW; k++) { w = (w + step + NW) % NW; if (ownsWeapon(w)) break; }
     selectWeapon(w);
   }
+  if (tapped('KeyG') && ownsWeapon(4)) fireBomb(p, S);
 
   // Attacks. A press during a cooldown is remembered briefly, so no click is lost.
   const weapon = WEAPONS[G.save.weapon].id;
@@ -187,13 +201,14 @@ export function updatePlayer(dt) {
     else if (weapon === 'blast') fired = fireBlast(p, S);
     else if (weapon === 'stars') fired = fireStar(p, S);
     else if (weapon === 'beam') fired = fireBeam(p, S, dt);
+    else if (weapon === 'bomb') fired = fireBomb(p, S);
     if (fired) p.atkBuf = 0;
   }
   if (!p.beaming) p.energy = Math.min(100, p.energy + 28 * dt);
 
   // Bubbles and potions
   p.charge = Math.min(S.bubbleT, p.charge + dt);
-  if (tapped('KeyB', 'KeyF', 'Digit5') && p.charge >= S.bubbleT) bubblePower(p);
+  if (tapped('KeyB', 'KeyF') && p.charge >= S.bubbleT) bubblePower(p);
   if (tapped('KeyH')) {
     if (G.save.potions > 0 && p.hp < S.maxHp) {
       G.save.potions--;
@@ -317,6 +332,16 @@ function fireBeam(p, S, dt) {
     if (t === ORE || t === CRYSTAL) breakTile(tx, ty);
   }
   if (Math.random() < 0.6) part({ x: ox + p.ax * len, y: oy + p.ay * len, vx: rand(-120, 120), vy: rand(-120, 120), life: 0.25, size: 3, color: pick(RAINBOW), add: true });
+  return true;
+}
+
+// A bomb lobbed toward your aim; it bursts on whatever it touches, or when its fuse runs out.
+function fireBomb(p, S) {
+  if (p.bombCd > 0) return false;
+  p.bombCd = S.bombCd;
+  const h = hornTip(p), sp = 660;
+  shoot({ x: h.x, y: h.y, vx: p.ax * sp + p.vx * 0.3, vy: p.ay * sp - 240, g: 1300, r: 9, dmg: S.bombDmg, team: 'player', kind: 'bomb', color: '#ffb347', life: 1.3, radius: S.bombR, trail: ['#ffb347', '#ffe36b'] });
+  sfx('whip');
   return true;
 }
 
@@ -549,7 +574,7 @@ export function drawUnicorn(ctx, p, t) {
   leg(14, ph + Math.PI + 0.55, true, false);
 
   // Far wing
-  if (up.wings) wing(ctx, p, t, false);
+  if (up.wings || up.fly) wing(ctx, p, t, false);
 
   // Body, neck and head share one outline so the joins are seamless.
   const body = new Path2D();
@@ -719,7 +744,7 @@ export function drawUnicorn(ctx, p, t) {
   sparkle(ctx, 32, -80, 4 + pulse * 2.5, t * 1.5);
 
   // Near wing
-  if (up.wings) wing(ctx, p, t, true);
+  if (up.wings || up.fly) wing(ctx, p, t, true);
   ctx.restore();
   ctx.globalAlpha = 1;
 
@@ -761,8 +786,8 @@ export function drawUnicorn(ctx, p, t) {
 
 function wing(ctx, p, t, near) {
   if (!near) return;
-  const spread = p.gliding ? 1 : !p.ground ? 0.6 : 0;
-  const flap = p.gliding ? Math.sin(t * 9) * 0.18 : !p.ground ? Math.sin(t * 14) * 0.25 : Math.sin(t * 2) * 0.03;
+  const spread = p.flying ? 1.05 : p.gliding ? 1 : !p.ground ? 0.6 : 0;
+  const flap = p.flying ? Math.sin(t * 24) * 0.6 : p.gliding ? Math.sin(t * 9) * 0.18 : !p.ground ? Math.sin(t * 14) * 0.25 : Math.sin(t * 2) * 0.03;
   ctx.save();
   ctx.translate(4, -31);
   ctx.rotate(-0.12 - spread * 1.1 + flap);

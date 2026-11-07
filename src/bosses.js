@@ -25,13 +25,13 @@ const PAL = {
   cerberus: { main: '#b6ff6b', trail: '#6fae3a', rock: '#9a8f6a', proj: 'glob', mouths: [[100, -140], [134, -98], [114, -54]] },
   ares: { main: '#ff5a3a', trail: '#ff9a3a', rock: '#c9b48a', proj: 'spear', mouths: [[40, -150], [40, -150], [40, -150]] },
   storm: { main: '#ff8ad8', alt: '#c45cff', col: 'bolt', streak: 'rgba(255,200,240,.6)', minion: 'bat' },
-  apollo: { main: '#ffd34a', alt: '#ff9a1a', col: 'sun', streak: 'rgba(255,230,150,.65)', minion: 'wisp' },
+  apollo: { main: '#ffd34a', alt: '#ff9a1a', col: 'sun', streak: 'rgba(255,230,150,.65)', minion: 'cherub' },
   heretic: { main: '#ff8a1a', trail: '#ff5a1f', met: '#ff6a1a', metTrail: ['#ffe36b', '#ff6a1a'], col: 'fire', fx: ['#ffe36b', '#ff8a1a', '#ff4a1a'], spear: 0 },
   athena: { main: '#9fd0ff', trail: '#5a8aff', met: '#dfefff', metTrail: ['#ffffff', '#9fd0ff'], col: 'holy', fx: ['#ffffff', '#9fd0ff', '#5a8aff'], spear: 1 },
   titan: { main: '#a8ecff', shard: '#e8fbff', breath: '#bff3ff', col: 'ice', freeze: true },
   poseidon: { main: '#3ad8ff', shard: '#b8f6ff', breath: '#6fe0ff', col: 'water', freeze: false },
   hades: { main: '#5fd8ff', alt: '#ff4a5a', trail: '#3a7bff', fx: ['#5fd8ff', '#3a7bff', '#ffffff'], met: '#5fd8ff', metTrail: ['#ffffff', '#5fd8ff'], laser: ['255,50,70', '255,220,220'], minions: ['imp', 'wisp'] },
-  zeus: { main: '#fff27a', alt: '#8ad8ff', trail: '#ffe14a', fx: ['#fff27a', '#8ad8ff', '#ffffff'], met: '#fff27a', metTrail: ['#ffffff', '#8ad8ff'], laser: ['255,230,90', '255,255,230'], minions: ['bat', 'wisp'] },
+  zeus: { main: '#fff27a', alt: '#8ad8ff', trail: '#ffe14a', fx: ['#fff27a', '#8ad8ff', '#ffffff'], met: '#fff27a', metTrail: ['#ffffff', '#8ad8ff'], laser: ['255,230,90', '255,255,230'], minions: ['cherub', 'seraph', 'angel'] },
 };
 // Telegraph and strike colours for each kind of column attack.
 const COLK = {

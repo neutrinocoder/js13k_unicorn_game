@@ -66,10 +66,12 @@ h1 .t2 { display: block; font-size: clamp(56px, 12vw, 150px); background: var(--
 .item.done .price { color: #7fe0a0; }
 
 /* Dialogue */
-#dialog { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); width: min(760px, calc(100vw - 32px)); display: flex; gap: 16px; align-items: flex-start; background: var(--panel); border: 1px solid rgba(180, 160, 255, 0.35); border-radius: 18px; padding: 18px 22px; cursor: pointer; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); animation: rise 0.25s ease-out both; }
+#dialog { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); width: min(760px, calc(100vw - 32px)); display: flex; gap: 16px; align-items: flex-start; background: var(--panel); border: 1px solid rgba(180, 160, 255, 0.35); border-radius: 18px; padding: 18px 22px; cursor: pointer; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); animation: riseC 0.25s ease-out both; }
 #dialog .portrait { font-size: 40px; width: 64px; height: 64px; flex: none; display: grid; place-items: center; background: radial-gradient(circle, #3a2a5a, #1a1028); border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2); }
 #dialog h3 { margin: 0 0 6px; font-family: Cinzel, serif; color: #ffe9b0; }
 #dialog p { margin: 0; font-size: 17px; line-height: 1.55; }
+#dialog.reward { border: 2px solid #ffe14a; box-shadow: 0 0 40px rgba(255, 225, 74, 0.35), 0 20px 60px rgba(0, 0, 0, 0.6); }
+#dialog.reward .portrait { background: radial-gradient(circle, #fff3b0, #c98a1a); border-color: #fff6c4; }
 #dialog .hint { display: block; margin-top: 10px; font-size: 12px; color: rgba(255, 255, 255, 0.45); }
 
 #toast { position: fixed; left: 50%; top: 22px; transform: translate(-50%, -20px); background: rgba(16, 9, 28, 0.92); border: 1px solid var(--line); padding: 10px 20px; border-radius: 999px; font-weight: 800; opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
@@ -86,6 +88,7 @@ h1 .t2 { display: block; font-size: clamp(56px, 12vw, 150px); background: var(--
 #devin { flex: 1; background: transparent; border: 0; outline: 0; color: #ffffff; font: inherit; }
 #devin::placeholder { color: rgba(201, 255, 217, 0.4); }
 
+@keyframes riseC { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes pop { from { opacity: 0; transform: translate(-50%, -46%) scale(0.97); } to { opacity: 1; transform: translate(-50%, -50%); } }
 

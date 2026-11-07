@@ -1,4 +1,5 @@
-// Regular enemies: demons, spiders, hell bats, flaming skulls, bile maws and hell knights.
+// Regular enemies: demons, spiders, hell bats, flaming skulls, bile maws and hell knights in the
+// underworld; angels, cherubs, seraphim and ophanim guarding the heavens.
 import { G } from './state.js';
 import { BIOMES, BIOME_LIST } from './world.js';
 import { moveBody, groundAhead } from './physics.js';
@@ -7,6 +8,7 @@ import { part, shake } from './fx.js';
 import { sfx } from './audio.js';
 import { hurtPlayer, shoot } from './combat.js';
 import { flame, eye, glow, limb, horn, teeth } from './art.js';
+import * as HEAVEN from './heaven_enemies.js';
 
 // Internal ids stay the same so old saves and spawn tables keep working.
 // imp = demon, bat = hell bat, wisp = flaming skull, spitter = bile maw, brute = hell knight.
@@ -17,6 +19,11 @@ export const ETYPES = {
   wisp: { hp: 5, w: 26, h: 26, dmg: 1, gem: 3, fly: 1, ghost: 1 },
   spitter: { hp: 9, w: 34, h: 26, dmg: 1, gem: 4, fly: 0 },
   brute: { hp: 15, w: 46, h: 52, dmg: 2, gem: 8, fly: 0 },
+  // the heavens
+  angel: { hp: 13, w: 36, h: 56, dmg: 1, gem: 6, fly: 0 },
+  cherub: { hp: 4, w: 28, h: 24, dmg: 1, gem: 3, fly: 1 },
+  seraph: { hp: 8, w: 34, h: 34, dmg: 1, gem: 5, fly: 1, ghost: 1 },
+  ophan: { hp: 9, w: 36, h: 36, dmg: 1, gem: 5, fly: 1 },
 };
 
 export function makeEnemy(type, x, y, level, biome, hang = false) {
@@ -26,6 +33,7 @@ export function makeEnemy(type, x, y, level, biome, hang = false) {
     dmg: d.dmg + Math.floor((level - 1) / (type === 'spider' ? 4 : 7)), level, gem: d.gem, fly: d.fly, ghost: d.ghost,
     tint: B.tint, accent: B.accent, face: 1, t: rand(0, 10), cd: rand(0.5, 2), t2: 0, flash: 0, trap: 0, state: 'idle', ground: false, biome,
   };
+  if (type === 'ophan') { e.homeY = e.y - 40; e.y = e.homeY; }
   if (type === 'spider') {
     e.state = hang ? 'hang' : 'hunt';
     e.anchorY = y;
@@ -94,11 +102,12 @@ export function updateEnemy(e, dt) {
       }
       break;
     }
-    case 'brute': {
+    case 'brute':
+    case 'angel': {
       if (e.state === 'wind') {
         e.vx *= 0.85;
         chase(e, dx, 0);
-        if (Math.random() < 0.5) part({ x: cx + rand(-20, 20), y: e.y + e.h, vy: -40, life: 0.4, size: 3, color: '#ccc' });
+        if (Math.random() < 0.5) part({ x: cx + rand(-20, 20), y: e.y + e.h, vy: -40, life: 0.4, size: 3, color: e.type === 'angel' ? '#fff6c4' : '#ccc', add: e.type === 'angel' });
         if (e.t2 <= 0) { e.state = 'charge'; e.t2 = 1; }
       } else if (e.state === 'charge') {
         e.vx = e.face * 640;
@@ -130,7 +139,14 @@ export function updateEnemy(e, dt) {
       }
       break;
     }
-    case 'bat': {
+    case 'bat':
+    case 'cherub': {
+      if (e.type === 'cherub' && aware && e.cd < 0 && d < 520) {
+        e.cd = rand(2.2, 3.2);
+        e.t2 = 0.3;
+        shoot({ x: cx + e.face * 8, y: cy, vx: (dx / d) * 420, vy: (dy / d) * 420, r: 5, dmg: 1, color: '#ff8ad8', kind: 'shard', tip: '#ffe9f6', life: 2.5 });
+        sfx('shoot');
+      }
       if (aware) {
         const s = 175 + e.level * 4;
         const tx = dx + Math.sin(e.t * 2.6) * 70, ty = dy - 30 + Math.cos(e.t * 3.4) * 60, l = Math.hypot(tx, ty) || 1;
@@ -144,12 +160,22 @@ export function updateEnemy(e, dt) {
       moveBody(e, dt);
       break;
     }
-    case 'wisp': {
+    case 'wisp':
+    case 'seraph': {
+      if (e.type === 'seraph' && aware && e.cd < 0 && d < 460) {
+        e.cd = rand(3.2, 4.2);
+        e.t2 = 0.3;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + e.t;
+          shoot({ x: cx, y: cy, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, r: 6, dmg: 1, color: '#ffb347', kind: 'orb', ghost: true, life: 2.6, trail: '#ff7a2a' });
+        }
+        sfx('fire');
+      }
       if (aware) {
         const s = 80 + e.level * 2;
         e.vx += ((dx / d) * s - e.vx) * 1.4 * dt;
         e.vy += ((dy / d) * s - e.vy) * 1.4 * dt;
-        if (e.level >= 5 && e.cd < 0 && d < 420) {
+        if (e.type === 'wisp' && e.level >= 5 && e.cd < 0 && d < 420) {
           e.cd = 4.2;
           shoot({ x: cx, y: cy, vx: (dx / d) * 180, vy: (dy / d) * 180, r: 6, dmg: 1, color: e.accent, kind: 'orb', ghost: true, life: 3 });
         }
@@ -160,7 +186,21 @@ export function updateEnemy(e, dt) {
       e.face = e.vx < 0 ? -1 : 1;
       e.x += e.vx * dt;
       e.y += e.vy * dt;
-      if (Math.random() < 0.6) part({ x: cx + rand(-7, 7), y: cy - 6 + rand(-5, 5), vx: -e.vx * 0.4, vy: -e.vy * 0.3 - 40, life: 0.5, size: rand(3, 5), color: Math.random() < 0.5 ? e.accent : '#ffffff', add: true });
+      if (e.type === 'wisp' && Math.random() < 0.6) part({ x: cx + rand(-7, 7), y: cy - 6 + rand(-5, 5), vx: -e.vx * 0.4, vy: -e.vy * 0.3 - 40, life: 0.5, size: rand(3, 5), color: Math.random() < 0.5 ? e.accent : '#ffffff', add: true });
+      if (e.type === 'seraph' && Math.random() < 0.35) part({ x: cx + rand(-14, 14), y: cy + rand(-10, 10), vx: rand(-20, 20), vy: rand(-80, -30), life: 0.6, size: rand(2, 4), color: Math.random() < 0.5 ? '#ffb347' : '#fff6c4', add: true });
+      break;
+    }
+    case 'ophan': {
+      // a wheel of eyes hanging in the air, firing bolts of light at whoever comes near
+      e.vx *= 0.9;
+      e.y = e.homeY + Math.sin(e.t * 1.6) * 6;
+      if (aware) chase(e, dx, 0);
+      if (aware && e.cd < 0 && d < 620) {
+        e.cd = rand(2.1, 2.7);
+        e.t2 = 0.25;
+        shoot({ x: cx + e.face * 10, y: cy, vx: (dx / d) * 380, vy: (dy / d) * 380, r: 7, dmg: 1, color: '#fff2a8', kind: 'orb', life: 3, trail: '#ffe28a' });
+        sfx('shoot');
+      }
       break;
     }
   }
@@ -192,14 +232,6 @@ export function drawEnemy(ctx, e, t) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   DRAW[e.type](ctx, e, t);
-  if (BIOMES[BIOME_LIST[e.biome]].heaven) {
-    // Zeus's guardians in Olympus wear golden halos
-    const hy = -e.h - 10 + Math.sin(t * 3 + e.x) * 2;
-    ctx.strokeStyle = 'rgba(255,230,140,.9)';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.ellipse(0, hy, e.w * 0.32, 4, 0, 0, Math.PI * 2); ctx.stroke();
-    glow(ctx, 0, hy, 18, '#ffe28a', 0.35);
-  }
   ctx.restore();
   if (e.trap > 0) {
     const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
@@ -549,3 +581,4 @@ const DRAW = {
     if (heat > 0.6 && Math.random() < 0.4) part({ x: e.x + e.w / 2 + e.face * 16, y: e.y + e.h - 58, vx: e.face * 20, vy: -60, life: 0.6, size: 4, grow: 1.5, color: 'rgba(200,200,200,.25)' });
   },
 };
+Object.assign(DRAW, HEAVEN);

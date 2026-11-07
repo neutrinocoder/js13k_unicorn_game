@@ -43,7 +43,7 @@ export const BIOMES = {
   olympus: {
     name: 'Olympus', sub: 'The Halls of the Gods', rock: ['#c3cde6', '#f4f7ff', '#97a5ca'], top: '#ffe9a8',
     sky: ['#4f86d8', '#ffd9a8'], far: '#cfdcf5', mid: '#e6ecf9', fog: '#fff2d0', dark: 0.05, accent: '#ffe28a',
-    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, enemies: { bat: 3, wisp: 3, imp: 2, brute: 2 },
+    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, enemies: { angel: 3, cherub: 3, seraph: 2, ophan: 2 },
   },
   zeus: {
     name: 'The Summit of Olympus', sub: 'Throne of the Thunderer', rock: ['#9aa4c8', '#d2d9f0', '#5e668e'], top: '#fff27a',
@@ -374,7 +374,7 @@ function genChunk(cx, cy, k) {
       const n = rng() < 0.65 ? 1 + Math.floor(rng() * 1.7) : 0;
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
-        const fly = type === 'bat' || type === 'wisp';
+        const fly = type === 'bat' || type === 'wisp' || type === 'cherub' || type === 'seraph' || type === 'ophan';
         const hang = type === 'spider' && ceil.length && rng() < 0.75;
         const s = take(hang ? ceil : fly ? (air.length ? air : floor) : floor);
         if (!s) continue;

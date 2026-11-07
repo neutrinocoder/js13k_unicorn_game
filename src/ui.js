@@ -87,9 +87,11 @@ function buy(it) {
 
 // ---------- Dialogue ----------
 let dlg = null;
-export function openDialog(name, lines, onDone) {
+export function openDialog(name, lines, onDone, portrait = '🌿') {
   dlg = { lines, i: 0, onDone };
   G.scene = 'dialog';
+  document.querySelector('#dialog .portrait').textContent = portrait;
+  $('dialog').classList.toggle('reward', portrait !== '🌿');
   $('dlg-name').textContent = name;
   $('dlg-text').textContent = lines[0];
   show('dialog');

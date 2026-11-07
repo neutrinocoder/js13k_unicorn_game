@@ -34,7 +34,8 @@ export function newSave() {
   return {
     v: 1,
     gems: 0,
-    up: { heart: 0, tail: 0, reach: 0, blast: 0, triple: 0, wings: 0, stars: 0, beam: 0, magnet: 0, bubble: 0, lantern: 0, hooves: 0 },
+    up: { heart: 0, tail: 0, reach: 0, blast: 0, triple: 0, wings: 0, stars: 0, beam: 0, magnet: 0, bubble: 0, lantern: 0, hooves: 0, bombs: 0, fly: 0, might: 0, swift: 0 },
+    rewards: {},
     potions: 1,
     hp: 6,
     x: 18 * 32,

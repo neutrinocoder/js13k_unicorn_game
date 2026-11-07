@@ -10,7 +10,7 @@ import { spawnBoss, updateBoss } from './bosses.js';
 import { updateProjs, updatePickups, dropGems } from './combat.js';
 import { updateFx, part, burst, ring, floater, shake } from './fx.js';
 import { render, drawMap, mapToScreen, shrinePos } from './render.js';
-import { stats } from './items.js';
+import { stats, grantReward } from './items.js';
 import { rand, clamp, mix, pick, RAINBOW } from './util.js';
 import { initDev, devOpen } from './dev.js';
 import { show, hide, isShown, toast as uiToast, openShop, closeShop, openDialog, advanceDialog } from './ui.js';
@@ -75,6 +75,7 @@ function resetWorld() {
 function startGame(save) {
   resetWorld();
   G.save = save;
+  for (const id in save.bosses) if (save.bosses[id]) grantReward(id);
   const sp = save.spawn;
   G.player = makePlayer(sp.x - 15, sp.y - 40);
   G.player.hp = clamp(save.hp || 5, 1, stats().maxHp);
@@ -334,6 +335,25 @@ function respawn() {
 }
 
 // ---------- Bosses ----------
+// Every boss leaves a powerup. It is shown on a card once play is calm again (no map or pause open).
+const WEAPON_OF = { stars: 2, beam: 3, bombs: 4 };
+function rewardCard(id, then) {
+  const r = grantReward(id);
+  if (!r) { then && then(); return; }
+  if (WEAPON_OF[r.up] != null && G.save.up[r.up] === 1) G.save.weapon = WEAPON_OF[r.up];
+  if (r.up === 'fly' && G.player) G.player.wing = stats().flyMax;
+  saveGame();
+  const show = () => {
+    if (G.scene !== 'play') { setTimeout(show, 400); return; }
+    sfx('chest');
+    const p = G.player;
+    ring(p.x + p.w / 2, p.y + p.h / 2, 160, '#ffe14a', 0.6, 8);
+    burst(p.x + p.w / 2, p.y + p.h / 2, 40, ['#ffe14a', '#ffffff', ...RAINBOW], 320, { add: true, g: -80 });
+    openDialog('Powerup: ' + r.name, [r.text], then, r.icon);
+  };
+  setTimeout(show, 1500);
+}
+
 export function onBossDefeated(b) {
   const s = G.save;
   s.bosses[b.id] = 1;
@@ -342,7 +362,7 @@ export function onBossDefeated(b) {
     s.won = 1;
     setTheme('victory');
     saveGame();
-    setTimeout(() => {
+    rewardCard('hades', () => {
       $('ending-title').textContent = 'The Way Up';
       $('ending-text').innerHTML = `Hades falls, and his crown of blue fire gutters out. Far above, a crack of daylight splits the rock, and a stair of light pours down into the throne room.<br><br>` +
         `Zeus cast you out for shining too brightly. Now you are brighter still. Climb back to Olympus, take the Sigils from his gods, and face the King of the Gods himself.`;
@@ -350,11 +370,12 @@ export function onBossDefeated(b) {
       endingNext = () => playCutscene('ascent', arriveOlympus);
       G.scene = 'ending';
       show('ending');
-    }, 2200);
+    });
     return;
   }
   if (b.id === 'zeus') {
     s.won2 = 1;
+    const zr = grantReward('zeus');
     setTheme('victory');
     saveGame();
     setTimeout(() => playCutscene('finale', () => {
@@ -362,6 +383,7 @@ export function onBossDefeated(b) {
       $('ending-title').textContent = 'The Brightest Star';
       $('ending-text').innerHTML = `The King of the Gods falls, and his thunder rolls away into silence. The clouds part, and all of Olympus is bathed in your light.<br><br>` +
         `<b>Time:</b> ${Math.floor(st.time / 60)} min · <b>Foes defeated:</b> ${st.kills} · <b>Gems found:</b> ${st.gemsEarned.toLocaleString()} · <b>Falls:</b> ${st.deaths}<br><br>` +
+        (zr ? `<b>Powerup: ${zr.icon} ${zr.name}.</b> ${zr.text}<br><br>` : '') +
         `You have conquered the underworld and the heavens. Both are still yours to explore.`;
       $('btn-ending').textContent = 'Keep exploring';
       endingNext = null;
@@ -377,6 +399,7 @@ export function onBossDefeated(b) {
     toast(n >= 4 ? 'All four Sigils! The Gate of the Thunderer in the hub is open.' : `${n} of 4 Sigils claimed.`, 4000);
     G.player.hp = stats().maxHp;
     saveGame();
+    rewardCard(b.id);
     return;
   }
   sfx('seal');
@@ -385,6 +408,7 @@ export function onBossDefeated(b) {
   toast(n >= 4 ? 'All four Seals! Return to the Gate in Limbo Market.' : `${n} of 4 Seals claimed.`, 4000);
   G.player.hp = stats().maxHp;
   saveGame();
+  rewardCard(b.id);
 }
 
 // ---------- Update ----------

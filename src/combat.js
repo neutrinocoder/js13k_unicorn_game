@@ -168,7 +168,7 @@ export function updateProjs(dt) {
         for (const e of list) {
           if (e.dead) continue;
           if (b.x > e.x - b.r && b.x < e.x + e.w + b.r && b.y > e.y - b.r && b.y < e.y + e.h + b.r) {
-            if (b.kind === 'blast') { dead = true; break; }
+            if (b.kind === 'blast' || b.kind === 'bomb') { dead = true; break; }
             damageEnemy(e, b.dmg, Math.sign(b.vx), 120);
             dead = true;
             break;
@@ -178,6 +178,7 @@ export function updateProjs(dt) {
     }
     if (dead) {
       if (b.kind === 'blast') explode(b.x, b.y, b.radius || 85, b.dmg, 'player', true);
+      else if (b.kind === 'bomb') { explode(b.x, b.y, b.radius || 115, b.dmg, 'player', true); ring(b.x, b.y, (b.radius || 115) * 0.8, '#ffb347', 0.4, 10); shake(10); }
       else if (b.kind === 'meteor') explode(b.x, b.y, 60, b.dmg, 'enemy');
       else burst(b.x, b.y, 6, b.color, 140, { add: true });
       G.projs.splice(i, 1);
@@ -214,6 +215,25 @@ export function drawProjs(ctx) {
       ctx.lineTo(-b.r, -b.r * 0.6);
       ctx.lineTo(-b.r, b.r * 0.6);
       ctx.fill();
+      ctx.restore();
+    } else if (b.kind === 'bomb') {
+      // a round black bomb with a fizzing fuse
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.rotate(b.t * 8);
+      ctx.fillStyle = '#1c1626';
+      ctx.strokeStyle = '#ffb347';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.35)';
+      ctx.beginPath(); ctx.arc(-b.r * 0.35, -b.r * 0.35, b.r * 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8a6a4a';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, -b.r); ctx.quadraticCurveTo(4, -b.r - 6, 2, -b.r - 9); ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = Math.floor(b.t * 20) % 2 ? '#fff6c4' : '#ff9a2e';
+      ctx.beginPath(); ctx.arc(2, -b.r - 9, 3 + Math.random() * 2, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     } else if (b.kind === 'spear') {
       // a thrown spear of war, pointing where it flies
