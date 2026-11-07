@@ -20,10 +20,10 @@ export const ETYPES = {
 };
 
 export function makeEnemy(type, x, y, level, biome, hang = false) {
-  const d = ETYPES[type], B = BIOMES[BIOME_LIST[biome]], m = 1 + 0.3 * (level - 1);
+  const d = ETYPES[type], B = BIOMES[BIOME_LIST[biome]], m = 1 + (type === 'spider' ? 0.45 : 0.3) * (level - 1);
   const e = {
     type, x: x - d.w / 2, y: y - d.h, w: d.w, h: d.h, vx: 0, vy: 0, hp: d.hp * m, max: d.hp * m,
-    dmg: d.dmg + Math.floor((level - 1) / 7), level, gem: d.gem, fly: d.fly, ghost: d.ghost,
+    dmg: d.dmg + Math.floor((level - 1) / (type === 'spider' ? 4 : 7)), level, gem: d.gem, fly: d.fly, ghost: d.ghost,
     tint: B.tint, accent: B.accent, face: 1, t: rand(0, 10), cd: rand(0.5, 2), t2: 0, flash: 0, trap: 0, state: 'idle', ground: false, biome,
   };
   if (type === 'spider') {
@@ -47,7 +47,7 @@ export function updateEnemy(e, dt) {
     e.x += e.vx * dt;
     return;
   }
-  const aware = d < 540 && !p.dead;
+  const aware = d < (e.type === 'spider' ? 680 : 540) && !p.dead;
   const wander = speed => {
     if (e.hitWall || (e.ground && !groundAhead(e, e.face))) e.face *= -1;
     e.vx = e.face * speed;
@@ -68,7 +68,7 @@ export function updateEnemy(e, dt) {
         e.vx = e.vy = 0;
         e.x = e.homeX - e.w / 2 + Math.sin(e.t * 0.9) * 3;
         e.y = e.anchorY + 22 + Math.sin(e.t * 1.6) * 4;
-        if (e.flash > 0 || (aware && dy > -20 && Math.abs(dx) < 160)) { e.state = 'drop'; e.vy = 120; }
+        if (e.flash > 0 || (aware && dy > -20 && Math.abs(dx) < 210)) { e.state = 'drop'; e.vy = 120; }
       } else if (e.state === 'drop') {
         e.vy = Math.min(e.vy + 1700 * dt, 800);
         e.vx *= 0.9;
@@ -77,8 +77,8 @@ export function updateEnemy(e, dt) {
       } else {
         if (aware) {
           e.face = dx < 0 ? -1 : 1;
-          e.vx += (e.face * (150 + e.level * 4) - e.vx) * Math.min(1, 7 * dt);
-          if (e.ground && e.cd < 0 && Math.abs(dx) < 280 && Math.abs(dy) < 170) { e.vy = -520; e.vx = e.face * 400; e.cd = 2.1; }
+          e.vx += (e.face * (190 + e.level * 5) - e.vx) * Math.min(1, 7 * dt);
+          if (e.ground && e.cd < 0 && Math.abs(dx) < 280 && Math.abs(dy) < 170) { e.vy = -560; e.vx = e.face * 480; e.cd = 1.4; }
           else if (e.ground && e.hitWall && e.cd < 0) { e.vy = -640; e.cd = 0.6; }
         } else wander(70);
         e.vy = Math.min(e.vy + 1800 * dt, 900);
