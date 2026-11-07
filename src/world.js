@@ -71,6 +71,9 @@ export const ZS = SITES[9];
 // Olympus spans this rectangle of tiles, walled off by a shell of cloud-stone.
 export const OLY = { x0: -300, x1: 300, y0: -3230, y1: -2840, hub: -2999 };
 export const inOly = (tx, ty, pad = 0) => tx >= OLY.x0 - pad && tx <= OLY.x1 + pad && ty >= OLY.y0 - pad && ty <= OLY.y1 + pad;
+// Everything this high above the underworld is open sky: the heavens around Olympus, and a
+// storm band higher still around the summit where Zeus waits.
+export const SKY_Y = -2790, STORM_Y = -3420;
 const nearZeus = (tx, ty, pad) => Math.abs(tx - ZS.tx) <= ZS.w / 2 + pad && Math.abs(ty - ZS.ty) <= ZS.h / 2 + pad;
 export const OUTPOST_D = 220;
 const inRect = (tx, ty, s, pad) => Math.abs(tx - s.tx) <= s.w / 2 + pad && Math.abs(ty - s.ty) <= s.h / 2 + pad;
@@ -104,6 +107,8 @@ export function roadTile(tx, ty) {
 export function biomeAt(tx, ty) {
   if (nearZeus(tx, ty, 60)) return 7;
   if (inOly(tx, ty, 12)) return 6;
+  if (ty < STORM_Y) return 7;
+  if (ty < SKY_Y) return 6;
   if (Math.abs(tx - HS.tx) < 140 && Math.abs(ty - HS.ty) < 110) return 5;
   for (let i = 0; i < 4; i++) {
     const s = SITES[i];
@@ -185,6 +190,13 @@ function olyTile(tx, ty) {
   return AIR;
 }
 
+// Open sky: drifting cloud islands, thickening into a sea of cloud just above the underworld.
+function skyTile(tx, ty) {
+  const sea = clamp((ty - (SKY_Y - 14)) / 14, 0, 1);
+  const n = fbm(tx * 0.03, ty * 0.07, 23, 3) + (vnoise(tx * 0.2, ty * 0.3, 31) - 0.5) * 0.1;
+  return n > 0.68 - sea * 0.32 ? ROCK : AIR;
+}
+
 function caveTile(tx, ty) {
   const B = BIOMES[BIOME_LIST[biomeAt(tx, ty)]];
   let n = fbm(tx * 0.034, ty * 0.05, 11, 4) + (vnoise(tx * 0.15, ty * 0.15, 23) - 0.5) * 0.14;
@@ -195,6 +207,7 @@ function caveTile(tx, ty) {
 export function baseTile(tx, ty) {
   if (nearZeus(tx, ty, 40)) return inRect(tx, ty, ZS, 4) ? arenaTile(ZS, tx, ty) : BRICK;
   if (inOly(tx, ty, 8)) return inOly(tx, ty) ? olyTile(tx, ty) : BRICK;
+  if (ty < SKY_Y) return skyTile(tx, ty);
   if (Math.abs(tx - HS.tx) <= HS.w / 2 + 40 && Math.abs(ty - HS.ty) <= HS.h / 2 + 40) {
     return inRect(tx, ty, HS, 4) ? arenaTile(HS, tx, ty) : ROCK;
   }
