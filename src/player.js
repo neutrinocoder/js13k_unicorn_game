@@ -56,7 +56,7 @@ export function updatePlayer(dt) {
   // Developer flight: move freely in every direction and pass through walls.
   const devF = G.save.dev || {};
   if (devF.fly) {
-    const sp = (held('ShiftLeft', 'ShiftRight') ? 1500 : 650) * (devF.speed || 1);
+    const sp = (held('ShiftLeft', 'ShiftRight') ? 1800 : 900) * (devF.speed || 1);
     const fy = (D ? 1 : 0) - (U || held('Space') ? 1 : 0), l = Math.hypot(dir, fy) || 1;
     p.vx += ((dir / l) * sp - p.vx) * Math.min(1, 10 * dt);
     p.vy += ((fy / l) * sp - p.vy) * Math.min(1, 10 * dt);
@@ -71,10 +71,10 @@ export function updatePlayer(dt) {
   } else {
     // Horizontal movement
     const ice = B.ice && p.ground;
-    const top = (p.slow > 0 ? 200 : 330) * ((G.save.dev && G.save.dev.speed) || 1);
+    const top = (p.slow > 0 ? 300 : 540) * ((G.save.dev && G.save.dev.speed) || 1);
     if (p.dashT > 0) {
       p.dashT -= dt;
-      p.vx = p.dashDir * 780;
+      p.vx = p.dashDir * 1100;
       p.vy = 0;
       if (Math.random() < 0.9) part({ x: cx - p.dashDir * 10, y: cy + rand(-10, 10), vx: -p.dashDir * 60, life: 0.3, size: 5, color: pick(RAINBOW), add: true });
     } else {
@@ -141,7 +141,7 @@ export function updatePlayer(dt) {
     }
     p.sx += (1 - p.sx) * Math.min(1, 12 * dt);
     p.sy += (1 - p.sy) * Math.min(1, 12 * dt);
-    p.runPhase += dt * Math.abs(p.vx) * 0.045;
+    p.runPhase += dt * Math.abs(p.vx) * 0.036;
     if (p.ground && Math.abs(p.vx) > 80) {
       p.stepT -= dt;
       if (p.stepT < 0) {
@@ -483,7 +483,7 @@ export function drawTail(ctx, p) {
 
 // ---------- The unicorn ----------
 export function drawUnicorn(ctx, p, t) {
-  const f = p.face, run = Math.min(1, Math.abs(p.vx) / 300), air = !p.ground;
+  const f = p.face, run = Math.min(1, Math.abs(p.vx) / 420), air = !p.ground;
   const up = (G.save && G.save.up) || {};
   const blink = p.inv > 0 && !p.dashT && Math.floor(t * 20) % 2;
 

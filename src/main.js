@@ -369,7 +369,7 @@ function update(dt) {
         if (sp.ent || G.t - sp.deadAt < 90 || G.enemies.length >= 45) continue;
         const d = Math.hypot(sp.x - px, sp.y - py);
         if (d < 560 || d > 1900) continue;
-        const e = makeEnemy(sp.type, sp.x, sp.y, sp.level, sp.biome);
+        const e = makeEnemy(sp.type, sp.x, sp.y, sp.level, sp.biome, sp.hang);
         e.spawn = sp;
         sp.ent = e;
         G.enemies.push(e);

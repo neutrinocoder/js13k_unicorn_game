@@ -11,27 +11,27 @@ export const BIOMES = {
   limbo: {
     name: 'Limbo', sub: 'The First Circle', rock: ['#433c5e', '#5d5484', '#231e36'], top: '#b4a6ee',
     sky: ['#0d0a1c', '#2b2348'], far: '#251e3d', mid: '#1a152d', fog: '#6a58b0', dark: 0.6, accent: '#c9baff',
-    haz: 'spikes', part: 'mote', thr: 0.483, tint: '#8a6bd6', enemies: { imp: 3, bat: 2, wisp: 2, spitter: 1, brute: 1 },
+    haz: 'spikes', part: 'mote', thr: 0.483, tint: '#8a6bd6', enemies: { imp: 3, spider: 3, bat: 2, wisp: 2, spitter: 1, brute: 1 },
   },
   lust: {
     name: 'Lust', sub: 'The Circle of Endless Storms', rock: ['#4d2246', '#713063', '#26102a'], top: '#ff8ad8',
     sky: ['#1c0620', '#5c1550'], far: '#3d0f3a', mid: '#280a27', fog: '#c0388f', dark: 0.55, accent: '#ff8ad8',
-    haz: 'thorns', part: 'petal', thr: 0.495, tint: '#e0479e', wind: 1, enemies: { bat: 4, wisp: 3, imp: 2, brute: 1 },
+    haz: 'thorns', part: 'petal', thr: 0.495, tint: '#e0479e', wind: 1, enemies: { bat: 4, wisp: 3, spider: 2, imp: 2, brute: 1 },
   },
   gluttony: {
     name: 'Gluttony', sub: 'The Circle of Ceaseless Rain', rock: ['#34412b', '#4c5e38', '#182013'], top: '#a6e36b',
     sky: ['#081008', '#213a1c'], far: '#18291a', mid: '#0f1b0f', fog: '#4f8a35', dark: 0.64, accent: '#b6ff6b',
-    haz: 'acid', part: 'rain', thr: 0.462, tint: '#6fae3a', enemies: { imp: 3, spitter: 3, brute: 2, bat: 1 },
+    haz: 'acid', part: 'rain', thr: 0.462, tint: '#6fae3a', enemies: { spider: 4, imp: 3, spitter: 3, brute: 2, bat: 1 },
   },
   heresy: {
     name: 'Heresy', sub: 'The Circle of Burning Tombs', rock: ['#552517', '#7a3820', '#2a0f08'], top: '#ffae4a',
     sky: ['#1a0402', '#6a1a06'], far: '#3a0c05', mid: '#250703', fog: '#c2481a', dark: 0.48, accent: '#ffb347',
-    haz: 'lava', part: 'ember', thr: 0.524, tint: '#ff5a1f', enemies: { spitter: 3, imp: 3, wisp: 2, brute: 2 },
+    haz: 'lava', part: 'ember', thr: 0.524, tint: '#ff5a1f', enemies: { imp: 4, spitter: 3, wisp: 3, spider: 2, brute: 2 },
   },
   treachery: {
     name: 'Treachery', sub: 'The Frozen Lake of Cocytus', rock: ['#2c3e5c', '#47638c', '#141f35'], top: '#e6f8ff',
     sky: ['#050b18', '#1a3358'], far: '#132744', mid: '#0b182c', fog: '#5a86c0', dark: 0.58, accent: '#a8ecff',
-    haz: 'icicle', part: 'snow', thr: 0.47, tint: '#6fc6ff', ice: 1, enemies: { wisp: 3, brute: 3, bat: 2, imp: 1 },
+    haz: 'icicle', part: 'snow', thr: 0.47, tint: '#6fc6ff', ice: 1, enemies: { spider: 3, wisp: 3, brute: 3, bat: 2, imp: 1 },
   },
   abyss: {
     name: 'The Throne of Hades', sub: 'Where the Rivers End', rock: ['#2c0c12', '#4a151c', '#12040a'], top: '#ff3b4a',
@@ -255,12 +255,13 @@ function genChunk(cx, cy, k) {
   // Random content
   const rng = mulberry(Math.floor(hash2(cx, cy, 99) * 2 ** 31));
   const get = (i, j) => (i >= 0 && i < CS && j >= 0 && j < CS ? tiles[j * CS + i] : at(i, j));
-  const floor = [], air = [];
+  const floor = [], air = [], ceil = [];
   for (let j = 1; j < CS; j++) for (let i = 1; i < CS - 1; i++) {
     const t = get(i, j), below = get(i, j + 1);
     if (t !== AIR || spec[j * CS + i]) continue;
     if ((isSolid(below) || below === PLAT) && get(i, j - 1) === AIR && get(i - 1, j) !== HAZ && get(i + 1, j) !== HAZ) floor.push([i, j]);
     else if (get(i, j - 1) === AIR && below === AIR && get(i - 1, j) === AIR && get(i + 1, j) === AIR) air.push([i, j]);
+    if (isSolid(get(i, j - 1)) && below === AIR && get(i, j + 2) === AIR) ceil.push([i, j]);
   }
   const tcx = cx * CS + 8, tcy = cy * CS + 8, dist = Math.hypot(tcx, tcy), lvl = levelAt(tcx, tcy);
   const bi = bio[8 * CS + 8], B = BIOMES[BIOME_LIST[bi]];
@@ -280,9 +281,10 @@ function genChunk(cx, cy, k) {
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
         const fly = type === 'bat' || type === 'wisp';
-        const s = take(fly ? (air.length ? air : floor) : floor);
+        const hang = type === 'spider' && ceil.length && rng() < 0.75;
+        const s = take(hang ? ceil : fly ? (air.length ? air : floor) : floor);
         if (!s) continue;
-        c.spawns.push({ type, x: (cx * CS + s[0] + 0.5) * T, y: (cy * CS + s[1] + 1) * T, level: lvl, biome: bi, ent: null, deadAt: -999 });
+        c.spawns.push({ type, x: (cx * CS + s[0] + 0.5) * T, y: (cy * CS + s[1] + (hang ? 0 : 1)) * T, hang: !!hang, level: lvl, biome: bi, ent: null, deadAt: -999 });
       }
     }
   }
