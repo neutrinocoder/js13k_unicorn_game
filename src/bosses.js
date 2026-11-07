@@ -22,8 +22,8 @@ export function spawnBoss(site) {
   const boss = {
     boss: true, site, id: site.id, name: site.name, title: site.title, w, h,
     x: left ? ax1 - w - 120 : ax0 + 120, y: FLYING[site.id] ? ay0 + 120 : ay1 - h - 4,
-    vx: 0, vy: 0, hp: site.hp, max: site.hp, face: left ? -1 : 1, t: 0, st: 'intro', stT: 1.6, last: '', phase: 1,
-    flash: 0, dead: false, ground: false, tint: B.tint, accent: B.accent, ax0, ax1, ay0, ay1, level: 10, n: 0, out: 0,
+    vx: 0, vy: 0, hp: site.hp, max: site.hp, face: left ? -1 : 1, t: 0, st: 'intro', stT: 1.6, stDur: 1.6, last: '', phase: 1,
+    flash: 0, hurtT: 0, roarT: 0, seed: Math.random() * 5, dead: false, ground: false, tint: B.tint, accent: B.accent, ax0, ax1, ay0, ay1, level: 10, n: 0, out: 0,
   };
   G.boss = boss;
   if (site.id === 'storm') {
@@ -52,7 +52,7 @@ function choose(b, list) {
   return s;
 }
 
-function setState(b, st, time) { b.st = st; b.stT = time; b.n = 0; b.sub = 0; }
+function setState(b, st, time) { b.st = st; b.stT = time; b.stDur = time; b.n = 0; b.sub = 0; }
 
 // Telegraphed column strike (lightning, fire pillar, icicle).
 function column(x, w, delay, kind, top, bottom) {
@@ -179,11 +179,12 @@ export function updateBoss(dt) {
   const b = G.boss;
   if (!b || b.dead) return;
   const p = G.player;
-  b.t += dt; b.stT -= dt; b.flash -= dt;
+  b.t += dt; b.stT -= dt; b.flash -= dt; b.hurtT -= dt; b.roarT -= dt;
   const hpK = b.hp / b.max;
   const newPhase = b.id === 'hades' ? (hpK < 0.25 ? 3 : hpK < 0.6 ? 2 : 1) : hpK < 0.5 ? 2 : 1;
   if (newPhase > b.phase) {
     b.phase = newPhase;
+    b.roarT = 1.1;
     sfx('roar');
     shake(14);
     ring(cxOf(b), cyOf(b), 200, b.accent, 0.6, 10);
@@ -229,7 +230,7 @@ export function updateBoss(dt) {
           b.n++;
           const n = b.phase > 1 ? 5 : 3;
           for (let h = 0; h < 3; h++) {
-            const hx = cxOf(b) + b.face * (60 + h * 4), hy = b.y + 18 + h * 12;
+            const MOUTH = [[100, -140], [134, -98], [114, -54]], hx = cxOf(b) + b.face * MOUTH[h][0], hy = b.y + b.h + MOUTH[h][1];
             const tt = 0.9, gx = pcx() - hx + rand(-60, 60) + (h - 1) * 80, gy = pcy() - hy;
             shoot({ x: hx, y: hy, vx: gx / tt, vy: (gy - 0.5 * 900 * tt * tt) / tt, g: 900, r: 9, dmg: 1, color: '#b6ff6b', kind: 'glob', life: 4, trail: '#6fae3a' });
           }
@@ -433,6 +434,7 @@ export function updateBoss(dt) {
 
 export function bossDefeated(b) {
   b.dead = true;
+  b.dieAt = G.t;
   G.windForce = 0;
   const cx = cxOf(b), cy = cyOf(b);
   sfx('roar');
@@ -452,18 +454,23 @@ export function bossDefeated(b) {
 // ---------- Drawing ----------
 export function drawBoss(ctx, t) {
   const b = G.boss;
-  if (!b || b.dead && !b.fading) return;
-  const fl = b.flash > 0;
+  if (!b) return;
+  // The mood: where the player is (in facing space), how far into the attack, hurt, roaring, dying.
+  const m = ART.mood(b, t, (pcx() - cxOf(b)) * b.face, pcy() - cyOf(b));
+  const fl = b.flash > 0 || (b.dead && m.dying < 0.12);
   ctx.save();
   ctx.translate(cxOf(b), b.y + b.h);
   ctx.scale(b.face, 1);
+  if (m.hurt) ctx.translate(-m.hurt * m.hurt * 8, 0);
+  if (b.dead) {
+    ctx.translate((Math.random() - 0.5) * 12 * (1 - m.dying), 0);
+    ctx.globalAlpha = 1 - m.dying * m.dying;
+  }
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  DRAW[b.id](ctx, b, t, fl);
+  ART[b.id](ctx, b, t, fl, m);
   ctx.restore();
 }
-
-const DRAW = ART;
 
 // Projectile shape for floor waves and rocks.
 export function drawBossBar(ctx, W, H) {

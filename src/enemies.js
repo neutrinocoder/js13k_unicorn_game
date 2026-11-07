@@ -16,7 +16,7 @@ export const ETYPES = {
   bat: { hp: 3, w: 28, h: 18, dmg: 1, gem: 2, fly: 1 },
   wisp: { hp: 5, w: 26, h: 26, dmg: 1, gem: 3, fly: 1, ghost: 1 },
   spitter: { hp: 9, w: 34, h: 26, dmg: 1, gem: 4, fly: 0 },
-  brute: { hp: 26, w: 46, h: 52, dmg: 2, gem: 8, fly: 0 },
+  brute: { hp: 15, w: 46, h: 52, dmg: 2, gem: 8, fly: 0 },
 };
 
 export function makeEnemy(type, x, y, level, biome, hang = false) {
@@ -33,6 +33,16 @@ export function makeEnemy(type, x, y, level, biome, hang = false) {
     if (hang) e.y = y + 26;
   }
   return e;
+}
+
+// Walking enemies only turn once the player is clearly off to one side, and slow to a stop as
+// they get underneath. Without this, a player straight above or below makes them flip direction
+// every frame and shake left and right. Returns the speed to move at in the facing direction.
+function chase(e, dx, speed) {
+  const dz = e.w * 0.5 + 16;
+  if (dx > dz) e.face = 1;
+  else if (dx < -dz) e.face = -1;
+  return Math.sign(dx) === e.face ? speed * clamp((Math.abs(dx) - 4) / dz, 0, 1) : 0;
 }
 
 export function updateEnemy(e, dt) {
@@ -55,8 +65,7 @@ export function updateEnemy(e, dt) {
   switch (e.type) {
     case 'imp': {
       if (aware) {
-        e.face = dx < 0 ? -1 : 1;
-        e.vx += (e.face * (135 + e.level * 4) - e.vx) * Math.min(1, 6 * dt);
+        e.vx += (e.face * chase(e, dx, 135 + e.level * 4) - e.vx) * Math.min(1, 6 * dt);
         if (e.ground && e.cd < 0 && (e.hitWall || (dy < -50 && Math.abs(dx) < 260) || !groundAhead(e, e.face))) { e.vy = -680; e.cd = 1.2; }
       } else wander(60);
       e.vy = Math.min(e.vy + 1800 * dt, 900);
@@ -76,9 +85,8 @@ export function updateEnemy(e, dt) {
         if (e.ground) { e.state = 'hunt'; e.cd = 0.35; sfx('land', 0.4); }
       } else {
         if (aware) {
-          e.face = dx < 0 ? -1 : 1;
-          e.vx += (e.face * (190 + e.level * 5) - e.vx) * Math.min(1, 7 * dt);
-          if (e.ground && e.cd < 0 && Math.abs(dx) < 280 && Math.abs(dy) < 170) { e.vy = -560; e.vx = e.face * 480; e.cd = 1.4; }
+          e.vx += (e.face * chase(e, dx, 190 + e.level * 5) - e.vx) * Math.min(1, 7 * dt);
+          if (e.ground && e.cd < 0 && Math.abs(dx) < 280 && Math.abs(dy) < 170) { e.vy = -560; e.vx = clamp(dx * 2.4, -480, 480); e.cd = 1.4; }
           else if (e.ground && e.hitWall && e.cd < 0) { e.vy = -640; e.cd = 0.6; }
         } else wander(70);
         e.vy = Math.min(e.vy + 1800 * dt, 900);
@@ -89,18 +97,18 @@ export function updateEnemy(e, dt) {
     case 'brute': {
       if (e.state === 'wind') {
         e.vx *= 0.85;
+        chase(e, dx, 0);
         if (Math.random() < 0.5) part({ x: cx + rand(-20, 20), y: e.y + e.h, vy: -40, life: 0.4, size: 3, color: '#ccc' });
-        if (e.t2 <= 0) { e.state = 'charge'; e.t2 = 0.75; }
+        if (e.t2 <= 0) { e.state = 'charge'; e.t2 = 1; }
       } else if (e.state === 'charge') {
-        e.vx = e.face * 420;
-        if (Math.random() < 0.6) part({ x: cx - e.face * 20, y: e.y + e.h - 4, vx: -e.face * 80, vy: -30, life: 0.4, size: 4, color: e.accent, add: true });
-        if (e.hitWall) { e.state = 'idle'; e.cd = 1.9; shake(6); sfx('land'); }
-        else if (e.t2 <= 0) { e.state = 'idle'; e.cd = 2; }
+        e.vx = e.face * 640;
+        if (Math.random() < 0.7) part({ x: cx - e.face * 20, y: e.y + e.h - 4, vx: -e.face * 80, vy: -30, life: 0.4, size: 4, color: e.accent, add: true });
+        if (e.hitWall) { e.state = 'idle'; e.cd = 1.1; shake(6); sfx('land'); }
+        else if (e.t2 <= 0) { e.state = 'idle'; e.cd = 0.9; }
       } else {
         if (aware) {
-          e.face = dx < 0 ? -1 : 1;
-          e.vx += (e.face * 100 - e.vx) * Math.min(1, 4 * dt);
-          if (e.cd < 0 && Math.abs(dy) < 80 && Math.abs(dx) < 420) { e.state = 'wind'; e.t2 = 0.8; }
+          e.vx += (e.face * chase(e, dx, 165) - e.vx) * Math.min(1, 5 * dt);
+          if (e.cd < 0 && Math.abs(dy) < 120 && Math.abs(dx) > 40 && Math.abs(dx) < 600) { e.state = 'wind'; e.t2 = 0.45; }
           if (e.ground && e.hitWall && e.cd < 0) { e.vy = -600; e.cd = 0.6; }
         } else wander(45);
       }
@@ -112,7 +120,7 @@ export function updateEnemy(e, dt) {
       e.vx *= 0.8;
       e.vy = Math.min(e.vy + 1800 * dt, 900);
       moveBody(e, dt);
-      if (aware) e.face = dx < 0 ? -1 : 1;
+      if (aware) chase(e, dx, 0);
       if (aware && e.cd < 0 && d < 600) {
         e.cd = Math.max(2.2, 3.4 - e.level * 0.05);
         e.t2 = 0.25;

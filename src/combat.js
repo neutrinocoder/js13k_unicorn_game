@@ -40,6 +40,7 @@ export function damageEnemy(e, n, dir = 0, kb = 220) {
   if (e.trap > 0) n *= 1.5;
   e.hp -= n;
   e.flash = 0.12;
+  if (e.boss) e.hurtT = 0.35;
   const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
   if (!e.boss) {
     e.vx += dir * kb;
