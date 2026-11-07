@@ -1,4 +1,6 @@
 // Endless chunked world: regions in every direction, roads to four boss arenas, and a town at the centre.
+// Far above it all, sealed off from the underworld, floats Olympus: cloud islands, a marble hub,
+// four temples of the gods and, higher still, the summit where Zeus waits.
 import { hash2, vnoise, fbm, mulberry, clamp, mix, shade } from './util.js';
 import { G } from './state.js';
 
@@ -6,7 +8,7 @@ export const T = 32, CS = 16, CPX = T * CS;
 export const AIR = 0, ROCK = 1, PLAT = 2, HAZ = 3, BRICK = 4, CRYSTAL = 5, ORE = 6, HAZC = 7;
 export const isSolid = t => t === ROCK || t === BRICK || t === CRYSTAL || t === ORE;
 
-export const BIOME_LIST = ['limbo', 'lust', 'gluttony', 'heresy', 'treachery', 'abyss'];
+export const BIOME_LIST = ['limbo', 'lust', 'gluttony', 'heresy', 'treachery', 'abyss', 'olympus', 'zeus'];
 export const BIOMES = {
   limbo: {
     name: 'Limbo', sub: 'The First Circle', rock: ['#433c5e', '#5d5484', '#231e36'], top: '#b4a6ee',
@@ -38,6 +40,16 @@ export const BIOMES = {
     sky: ['#050002', '#2a0408'], far: '#1a0306', mid: '#100204', fog: '#a0102a', dark: 0.5, accent: '#ff4a5a',
     haz: 'lava', part: 'ember', thr: 0.5, tint: '#ff2a3a', enemies: {},
   },
+  olympus: {
+    name: 'Olympus', sub: 'The Halls of the Gods', rock: ['#c3cde6', '#f4f7ff', '#97a5ca'], top: '#ffe9a8',
+    sky: ['#4f86d8', '#ffd9a8'], far: '#cfdcf5', mid: '#e6ecf9', fog: '#fff2d0', dark: 0.05, accent: '#ffe28a',
+    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, enemies: { bat: 3, wisp: 3, imp: 2, brute: 2 },
+  },
+  zeus: {
+    name: 'The Summit of Olympus', sub: 'Throne of the Thunderer', rock: ['#9aa4c8', '#d2d9f0', '#5e668e'], top: '#fff27a',
+    sky: ['#111633', '#463b7c'], far: '#272c56', mid: '#1b1f45', fog: '#8a9aff', dark: 0.2, accent: '#fff27a',
+    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffe14a', heaven: 1, cloud: 1, enemies: {},
+  },
 };
 
 export const SITES = [
@@ -46,8 +58,20 @@ export const SITES = [
   { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -430, w: 76, h: 30, hp: 185 },
   { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 430, w: 76, h: 30, hp: 210 },
   { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 480 },
+  // Olympus: four gods guard the Sigils that open the way to Zeus.
+  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -200, ty: -3015, w: 76, h: 30, hp: 300, god: 1 },
+  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 200, ty: -3015, w: 76, h: 30, hp: 270, god: 1 },
+  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -3120, w: 76, h: 30, hp: 290, god: 1 },
+  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -2880, w: 76, h: 30, hp: 330, god: 1 },
+  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -3600, w: 84, h: 36, hp: 800 },
 ];
 const HS = SITES[4];
+export const GODS = SITES.slice(5, 9);
+export const ZS = SITES[9];
+// Olympus spans this rectangle of tiles, walled off by a shell of cloud-stone.
+export const OLY = { x0: -300, x1: 300, y0: -3230, y1: -2840, hub: -2999 };
+export const inOly = (tx, ty, pad = 0) => tx >= OLY.x0 - pad && tx <= OLY.x1 + pad && ty >= OLY.y0 - pad && ty <= OLY.y1 + pad;
+const nearZeus = (tx, ty, pad) => Math.abs(tx - ZS.tx) <= ZS.w / 2 + pad && Math.abs(ty - ZS.ty) <= ZS.h / 2 + pad;
 export const OUTPOST_D = 220;
 const inRect = (tx, ty, s, pad) => Math.abs(tx - s.tx) <= s.w / 2 + pad && Math.abs(ty - s.ty) <= s.h / 2 + pad;
 export const siteAt = (tx, ty, pad = 0) => SITES.find(s => inRect(tx, ty, s, pad));
@@ -78,6 +102,8 @@ export function roadTile(tx, ty) {
 }
 
 export function biomeAt(tx, ty) {
+  if (nearZeus(tx, ty, 60)) return 7;
+  if (inOly(tx, ty, 12)) return 6;
   if (Math.abs(tx - HS.tx) < 140 && Math.abs(ty - HS.ty) < 110) return 5;
   for (let i = 0; i < 4; i++) {
     const s = SITES[i];
@@ -105,7 +131,9 @@ function arenaInner(s, dx, dy) {
 function arenaTile(s, tx, ty) {
   const dx = tx - s.tx, dy = ty - s.ty, hh = s.h / 2;
   if (Math.abs(dx) <= s.w / 2 && Math.abs(dy) <= hh) return arenaInner(s, dx, dy);
-  if (s !== HS) {
+  // temples of the gods: a doorway at floor level in each side wall, lower than any god is tall
+  if (s.god) return Math.abs(dx) > s.w / 2 && dy >= hh - 2 && dy <= hh ? AIR : BRICK;
+  if (s !== HS && s !== ZS) {
     const r = roadTile(tx, ty);
     if (r !== undefined && r !== -1) return dy > hh ? (dy === hh + 1 ? PLAT : AIR) : AIR;
   }
@@ -127,6 +155,36 @@ function townTile(tx, ty) {
   return ty <= 1 ? BRICK : ROCK;
 }
 
+// Olympus: a marble hub, causeways west to Ares and east to Apollo, stairs up to Athena and down
+// to Poseidon, and drifting cloud islands everywhere else.
+function olyClear(tx, ty) {
+  const ax = Math.abs(tx), H = OLY.hub;
+  if (ax <= 70 && ty > H - 40 && ty < H + 8) return true;
+  if (ax <= 170 && ty > H - 9 && ty < H + 3) return true;
+  if (ax >= 40 && ax <= 56 && ty > -3115 && ty < -2858) return true;
+  for (const s of GODS) if (inRect(tx, ty, s, 10)) return true;
+  return false;
+}
+
+function olyTile(tx, ty) {
+  for (const s of GODS) if (inRect(tx, ty, s, 4)) return arenaTile(s, tx, ty);
+  if (ty >= OLY.y1 - 3) return ROCK;
+  const ax = Math.abs(tx), H = OLY.hub;
+  if (ax <= 42 && ty >= H && ty <= H + 2) return BRICK;
+  if (ty === H && ax <= 162) return tx >= -51 && tx <= -44 ? PLAT : BRICK;
+  // landings that run from the last stair into each temple door
+  if (ty === -3104 && tx >= 43 && tx <= 51) return PLAT;
+  if (ty === -2864 && tx >= -51 && tx <= -43) return PLAT;
+  if (tx >= 44 && tx <= 51 && ty < H && ty >= -3104 && ty % 4 === 0) return ((Math.floor(ty / 4) & 1) ? tx < 48 : tx >= 48) ? PLAT : AIR;
+  if (tx >= -51 && tx <= -44 && ty > H && ty <= -2864 && ty % 4 === 0) return ((Math.floor(ty / 4) & 1) ? tx < -47 : tx >= -47) ? PLAT : AIR;
+  if (olyClear(tx, ty)) return AIR;
+  const n = fbm(tx * 0.04, ty * 0.085, 17, 3) + (vnoise(tx * 0.2, ty * 0.3, 19) - 0.5) * 0.12;
+  if (n > 0.64) return ROCK;
+  // a scattering of floating marble ledges between the islands
+  if (ty % 7 === 0 && vnoise(tx * 0.18, ty * 0.4, 29) > 0.72) return PLAT;
+  return AIR;
+}
+
 function caveTile(tx, ty) {
   const B = BIOMES[BIOME_LIST[biomeAt(tx, ty)]];
   let n = fbm(tx * 0.034, ty * 0.05, 11, 4) + (vnoise(tx * 0.15, ty * 0.15, 23) - 0.5) * 0.14;
@@ -135,6 +193,8 @@ function caveTile(tx, ty) {
 }
 
 export function baseTile(tx, ty) {
+  if (nearZeus(tx, ty, 40)) return inRect(tx, ty, ZS, 4) ? arenaTile(ZS, tx, ty) : BRICK;
+  if (inOly(tx, ty, 8)) return inOly(tx, ty) ? olyTile(tx, ty) : BRICK;
   if (Math.abs(tx - HS.tx) <= HS.w / 2 + 40 && Math.abs(ty - HS.ty) <= HS.h / 2 + 40) {
     return inRect(tx, ty, HS, 4) ? arenaTile(HS, tx, ty) : ROCK;
   }
@@ -149,6 +209,8 @@ export function baseTile(tx, ty) {
 export function isSpecial(tx, ty) {
   if (tx >= -52 && tx <= 52 && ty >= -44 && ty <= 18) return true;
   if (Math.abs(tx - HS.tx) <= HS.w / 2 + 42 && Math.abs(ty - HS.ty) <= HS.h / 2 + 42) return true;
+  if (nearZeus(tx, ty, 42)) return true;
+  if (inOly(tx, ty, 10)) return !inOly(tx, ty) || olyClear(tx, ty);
   for (let i = 0; i < 4; i++) if (inRect(tx, ty, SITES[i], 7)) return true;
   return roadTile(tx, ty) !== undefined || roadTile(tx, ty - 1) !== undefined || roadTile(tx, ty + 1) !== undefined ||
     roadTile(tx - 1, ty) !== undefined || roadTile(tx + 1, ty) !== undefined;
@@ -175,6 +237,24 @@ for (const [dx, dy, b] of [[1, 0, 'lust'], [-1, 0, 'gluttony'], [0, -1, 'heresy'
   LANDMARKS.push({ type: 'shop', id: 'shop_' + b, tx: mx, ty: dx ? roadH(mx) + 3 : ty, name: 'Wandering Merchant' });
 }
 LANDMARKS.push({ type: 'portal', id: 'portal_home', tx: HS.tx, ty: HS.ty + HS.h / 2 + 1, hidden: 1 });
+LANDMARKS.push(
+  { type: 'portal', id: 'portal_down', tx: -36, ty: OLY.hub, oly: 1 },
+  { type: 'shop', id: 'shop_oly', tx: -22, ty: OLY.hub, name: "Hermes' Bazaar", main: 1, oly: 1 },
+  { type: 'fountain', id: 'fountain_oly', tx: -9, ty: OLY.hub, oly: 1 },
+  { type: 'npc', id: 'iris', tx: 2, ty: OLY.hub },
+  { type: 'shrine', id: 'oly_hub', tx: 12, ty: OLY.hub, name: 'Gates of Olympus' },
+  { type: 'gate', id: 'gate_zeus', tx: 28, ty: OLY.hub, oly: 1 },
+  { type: 'sign', id: 'sign_ow', tx: -40, ty: OLY.hub, text: '←  Ares' },
+  { type: 'sign', id: 'sign_oe', tx: 40, ty: OLY.hub, text: 'Apollo  →' },
+  { type: 'sign', id: 'sign_ou', tx: 55, ty: OLY.hub, text: 'Athena  ↑' },
+  { type: 'sign', id: 'sign_od', tx: -56, ty: OLY.hub, text: 'Poseidon  ↓' },
+  // a shrine at the door of each temple
+  { type: 'shrine', id: 'oly_ares', tx: -150, ty: OLY.hub, name: 'Temple of Ares' },
+  { type: 'shrine', id: 'oly_apollo', tx: 150, ty: OLY.hub, name: 'Temple of Apollo' },
+  { type: 'shrine', id: 'oly_athena', tx: 50, ty: -3104, name: 'Temple of Athena' },
+  { type: 'shrine', id: 'oly_poseidon', tx: -45, ty: -2864, name: 'Temple of Poseidon' },
+  { type: 'portal', id: 'portal_zeus', tx: ZS.tx, ty: ZS.ty + ZS.h / 2 + 1, hidden: 1 },
+);
 for (const l of LANDMARKS) { l.x = (l.tx + 0.5) * T; l.y = l.ty * T; }
 
 // ---------- Chunks ----------
@@ -237,7 +317,8 @@ function genChunk(cx, cy, k) {
         } else if (t === AIR) {
           const below = at(i, j + 1), above = at(i, j - 1);
           const pool = B.haz === 'lava' || B.haz === 'acid';
-          if (isSolid(below) && below !== CRYSTAL && vnoise(tx * 0.22, ty * 1.3, 13) > (pool ? 0.74 : 0.8)) t = HAZ;
+          if (B.haz === 'none') { /* no hazards in Olympus */ }
+          else if (isSolid(below) && below !== CRYSTAL && vnoise(tx * 0.22, ty * 1.3, 13) > (pool ? 0.74 : 0.8)) t = HAZ;
           else if (B.haz === 'icicle' && isSolid(above) && h > 0.94) t = HAZC;
           else if (((ty % 6) + 6) % 6 === 0 && vnoise(tx * 0.25, ty * 0.5, 41) > 0.66 && below === AIR && above === AIR && at(i, j + 2) === AIR) t = PLAT;
         }
@@ -263,8 +344,8 @@ function genChunk(cx, cy, k) {
     else if (get(i, j - 1) === AIR && below === AIR && get(i - 1, j) === AIR && get(i + 1, j) === AIR) air.push([i, j]);
     if (isSolid(get(i, j - 1)) && below === AIR && get(i, j + 2) === AIR) ceil.push([i, j]);
   }
-  const tcx = cx * CS + 8, tcy = cy * CS + 8, dist = Math.hypot(tcx, tcy), lvl = levelAt(tcx, tcy);
   const bi = bio[8 * CS + 8], B = BIOMES[BIOME_LIST[bi]];
+  const tcx = cx * CS + 8, tcy = cy * CS + 8, dist = Math.hypot(tcx, tcy), lvl = B.heaven ? 12 : levelAt(tcx, tcy);
   const take = list => (list.length ? list.splice(Math.floor(rng() * list.length), 1)[0] : null);
   const place = (spot, o) => {
     o.x = (cx * CS + spot[0] + 0.5) * T;
@@ -276,7 +357,7 @@ function genChunk(cx, cy, k) {
     if (rng() < 0.2) { const s = take(floor); if (s) place(s, { type: 'chest', id: k + ':c', level: lvl, big: rng() < 0.15 }); }
     if (rng() < 0.035) { const s = take(floor); if (s) place(s, { type: 'shrine', id: k + ':s', name: B.name + ' Shrine' }); }
     if (rng() < 0.4) { const s = take(floor); if (s) place(s, { type: 'torch', id: k + ':t' }); }
-    if (dist > 60) {
+    if (dist > 60 && Object.keys(B.enemies).length) {
       const n = rng() < 0.65 ? 1 + Math.floor(rng() * 1.7) : 0;
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
@@ -311,6 +392,7 @@ function evict() {
 }
 
 const TOWN_BRICK = ['#4d4566', '#5f567d', '#2e2942'];
+const MARBLE = ['#e6dfcc', '#fbf8ef', '#b5ad9b'];
 
 function renderChunk(c) {
   const x = c.canvas.getContext('2d');
@@ -329,19 +411,19 @@ function renderChunk(c) {
         const edge = up || dn || lf || rt;
         const deep = !edge && isSolid(get(i - 1, j - 1)) && isSolid(get(i + 1, j - 1)) && isSolid(get(i - 1, j + 1)) && isSolid(get(i + 1, j + 1)) &&
           isSolid(get(i, j - 2)) && isSolid(get(i, j + 2)) && isSolid(get(i - 2, j)) && isSolid(get(i + 2, j));
-        const pal = t === BRICK ? (c.bio[j * CS + i] === 0 ? TOWN_BRICK : [shade(B.rock[0], -0.1), B.rock[1], B.rock[2]]) : B.rock;
+        const pal = t === BRICK ? (c.bio[j * CS + i] === 0 ? TOWN_BRICK : B.cloud ? MARBLE : [shade(B.rock[0], -0.1), B.rock[1], B.rock[2]]) : B.rock;
         let col = deep ? pal[2] : edge ? pal[1] : mix(pal[0], pal[2], 0.35);
         x.fillStyle = shade(col, (h - 0.5) * 0.14);
         x.fillRect(px, py, T, T);
         if (t === BRICK) {
-          x.fillStyle = 'rgba(0,0,0,.28)';
+          x.fillStyle = B.cloud ? 'rgba(120,100,60,.2)' : 'rgba(0,0,0,.28)';
           const off = (ty & 1) * 16;
           x.fillRect(px, py + 15, T, 2);
           x.fillRect(px + ((off + 8) % 32), py, 2, 15);
           x.fillRect(px + ((off + 24) % 32), py + 17, 2, 15);
           x.fillStyle = 'rgba(255,255,255,.06)';
           x.fillRect(px, py, T, 2);
-        } else if (!deep) {
+        } else if (!deep && !B.cloud) {
           x.fillStyle = 'rgba(0,0,0,.18)';
           x.fillRect(px + Math.floor(h * 22), py + Math.floor(h2 * 22), 6, 4);
           x.fillRect(px + Math.floor(h2 * 26), py + Math.floor(h * 26), 4, 3);
@@ -368,6 +450,19 @@ function renderChunk(c) {
         if (dn && rt) { x.moveTo(px + T, py + T); x.lineTo(px + T - R, py + T); x.arc(px + T - R, py + T - R, R, Math.PI / 2, 0, true); x.closePath(); }
         x.fill();
         x.restore();
+        if (B.cloud && t !== BRICK) {
+          // soft puffs bulging out of the cloud's top and underside
+          if (up) {
+            x.fillStyle = pal[1];
+            x.beginPath(); x.arc(px + 9 + h * 6, py + 6, 9 + h2 * 3, 0, Math.PI * 2); x.arc(px + 23 - h2 * 4, py + 5, 10 + h * 2, 0, Math.PI * 2); x.fill();
+            x.fillStyle = 'rgba(255,255,255,.7)';
+            x.beginPath(); x.arc(px + 9 + h * 6, py + 3, 5, Math.PI, Math.PI * 2); x.fill();
+          }
+          if (dn) {
+            x.fillStyle = shade(pal[2], 0.1);
+            x.beginPath(); x.arc(px + 10 + h2 * 6, py + T - 6, 8, 0, Math.PI * 2); x.arc(px + 24 - h * 4, py + T - 5, 7, 0, Math.PI * 2); x.fill();
+          }
+        }
         if (lf) { x.fillStyle = 'rgba(255,255,255,.06)'; x.fillRect(px, py + (up ? R : 0), 2, T - (up ? R : 0) - (dn ? R : 0)); }
         if (rt) { x.fillStyle = 'rgba(0,0,0,.28)'; x.fillRect(px + T - 3, py + (up ? R : 0), 3, T - (up ? R : 0) - (dn ? R : 0)); }
         if (dn) {
@@ -505,8 +600,14 @@ export function drawLiquids(ctx, runs, t, emit) {
 function drawSurface(x, B, px, py, h, h2, lf, rt, brick) {
   const a = lf ? 6 : 0, b = rt ? 6 : 0, w = T - a - b;
   if (brick) {
-    x.fillStyle = 'rgba(255,255,255,.12)';
+    x.fillStyle = B.cloud ? '#e8c25a' : 'rgba(255,255,255,.12)';
     x.fillRect(px + a, py, w, 3);
+    return;
+  }
+  if (B.cloud) {
+    x.fillStyle = 'rgba(255,255,255,.9)';
+    x.fillRect(px + a, py + 1, w, 2);
+    if (h > 0.75) { x.fillStyle = B.top; x.beginPath(); x.arc(px + a + h2 * w, py - 1, 2, 0, Math.PI * 2); x.fill(); }
     return;
   }
   const top = B.top;

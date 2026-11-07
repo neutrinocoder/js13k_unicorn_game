@@ -192,6 +192,14 @@ export function drawEnemy(ctx, e, t) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   DRAW[e.type](ctx, e, t);
+  if (BIOMES[BIOME_LIST[e.biome]].heaven) {
+    // Zeus's guardians in Olympus wear golden halos
+    const hy = -e.h - 10 + Math.sin(t * 3 + e.x) * 2;
+    ctx.strokeStyle = 'rgba(255,230,140,.9)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(0, hy, e.w * 0.32, 4, 0, 0, Math.PI * 2); ctx.stroke();
+    glow(ctx, 0, hy, 18, '#ffe28a', 0.35);
+  }
   ctx.restore();
   if (e.trap > 0) {
     const cx = e.x + e.w / 2, cy = e.y + e.h / 2;

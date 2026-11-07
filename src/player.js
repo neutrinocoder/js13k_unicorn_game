@@ -355,7 +355,7 @@ function tailAnchor(p) {
   return { x: p.x + p.w / 2 - p.face * 19 * p.sx, y: p.y + p.h - 27 * p.sy };
 }
 
-function updateTail(p, dt) {
+export function updateTail(p, dt) {
   const f = p.face, an = tailAnchor(p), ax = an.x, ay = an.y;
   const N = p.tail.length;
   if (p.whipT > 0) {

@@ -1,6 +1,7 @@
 // Game loop, world streaming, interactions, saving and screens.
 import { G, SAVE_KEY, newSave } from './state.js';
-import { T, CS, CPX, getChunk, biomeAt, BIOMES, BIOME_LIST, SITES, LANDMARKS } from './world.js';
+import { T, CS, CPX, getChunk, biomeAt, BIOMES, BIOME_LIST, SITES, LANDMARKS, GODS, ZS, OLY } from './world.js';
+import { playCutscene, cutsceneKey, drawCutscene } from './cutscene.js';
 import { initInput, endFrame, tapped, held, mouse, keys } from './input.js';
 import { initAudio, sfx, setTheme, setMuted, muted } from './audio.js';
 import { makePlayer, updatePlayer, updateBubbles } from './player.js';
@@ -37,7 +38,7 @@ resize();
 
 function bgTarget(b) {
   const B = BIOMES[BIOME_LIST[b]];
-  return { sky0: B.sky[0], sky1: B.sky[1], far: B.far, mid: B.mid, fog: B.fog, accent: B.accent, dark: B.dark };
+  return { sky0: B.sky[0], sky1: B.sky[1], far: B.far, mid: B.mid, fog: B.fog, accent: B.accent, dark: B.dark, heaven: B.heaven ? 1 : 0, sun: b === 6 ? 1 : 0, storm: b === 7 ? 1 : 0 };
 }
 G.bg = bgTarget(0);
 
@@ -95,22 +96,33 @@ export function announce(title, sub, dur = 3) {
 
 // ---------- Objectives ----------
 export const sealCount = () => (G.save ? SITES.slice(0, 4).filter(s => G.save.bosses[s.id]).length : 0);
-const SEAL_COL = { cerberus: '#b6ff6b', storm: '#ff8ad8', heretic: '#ffb347', titan: '#a8ecff' };
+export const sigilCount = () => (G.save ? GODS.filter(s => G.save.bosses[s.id]).length : 0);
+export const SEAL_COL = { cerberus: '#b6ff6b', storm: '#ff8ad8', heretic: '#ffb347', titan: '#a8ecff', ares: '#ff5a3a', apollo: '#ffd34a', athena: '#9fd0ff', poseidon: '#3ad8ff', zeus: '#fff27a' };
 
-export function objective() {
-  const s = G.save, p = G.player;
-  if (!s || !p) return null;
-  if (!s.talked) return { tx: 8, ty: -1, label: 'Talk to Virgil', color: '#ffe14a' };
-  if (s.bosses.hades) return null;
-  if (sealCount() >= 4) return { tx: -32, ty: -2, label: 'The Gate', color: '#ff4a5a' };
-  const ptx = p.x / T, pty = p.y / T;
+function nearestSite(list) {
+  const s = G.save, p = G.player, ptx = p.x / T, pty = p.y / T;
   let best = null, bd = Infinity;
-  for (const site of SITES.slice(0, 4)) {
+  for (const site of list) {
     if (s.bosses[site.id]) continue;
     const d = Math.hypot(site.tx - ptx, site.ty - pty);
     if (d < bd) { bd = d; best = site; }
   }
   return best && { tx: best.tx, ty: best.ty, label: best.name, color: SEAL_COL[best.id] };
+}
+
+export function objective() {
+  const s = G.save, p = G.player;
+  if (!s || !p) return null;
+  if (s.bosses.zeus) return null;
+  if (s.bosses.hades) {
+    if (!s.oly) return { tx: SITES[4].tx, ty: SITES[4].ty + SITES[4].h / 2 - 1, label: 'Ascend to Olympus', color: '#ffe14a' };
+    if (!s.irisTalked) return { tx: 2, ty: OLY.hub - 1, label: 'Talk to Iris', color: '#ffe14a' };
+    if (sigilCount() >= 4) return { tx: 28, ty: OLY.hub - 2, label: 'Gate of the Thunderer', color: '#fff27a' };
+    return nearestSite(GODS);
+  }
+  if (!s.talked) return { tx: 8, ty: -1, label: 'Talk to Virgil', color: '#ffe14a' };
+  if (sealCount() >= 4) return { tx: -32, ty: -2, label: 'The Gate', color: '#ff4a5a' };
+  return nearestSite(SITES.slice(0, 4));
 }
 
 export function interactLabel(o) {
@@ -120,9 +132,14 @@ export function interactLabel(o) {
     case 'shrine': return s.shrines[o.id] ? (s.spawn.id === o.id ? 'Rest' : 'Bind to shrine') : 'Awaken shrine';
     case 'shop': return 'Trade';
     case 'npc': return 'Talk';
-    case 'gate': return sealCount() >= 4 ? (s.bosses.hades ? 'The way is open' : 'Descend to Hades') : `Sealed  ${sealCount()}/4`;
+    case 'gate':
+      if (o.oly) return sigilCount() >= 4 ? (s.bosses.zeus ? 'The throne is empty' : 'Face Zeus') : `Sealed  ${sigilCount()}/4 Sigils`;
+      return sealCount() >= 4 ? (s.bosses.hades ? 'The way is open' : 'Descend to Hades') : `Sealed  ${sealCount()}/4`;
     case 'fountain': return 'Drink';
-    case 'portal': return s.bosses.hades ? 'Return to Limbo' : null;
+    case 'portal':
+      if (o.id === 'portal_down') return 'Descend to Limbo';
+      if (o.id === 'portal_zeus') return s.bosses.zeus ? 'Return to Olympus' : null;
+      return s.bosses.hades ? 'Ascend to Olympus' : null;
   }
   return null;
 }
@@ -147,16 +164,17 @@ function virgilLines() {
   const s = G.save, n = sealCount();
   if (!s.talked) {
     return [
-      'A unicorn of Olympus, down here in the dark? Then the stories are true: Hades has snared one of Zeus\'s own soldiers.',
-      'I am Virgil. I have walked these circles before, and I will guide you as far as I can.',
+      'A unicorn, fallen out of the sky? So the thunder last night was Zeus casting you down. They say you shone too brightly for the gods to bear.',
+      'I am Virgil. I have walked these circles before, and I will guide you as far as I can. The only road back to the heavens runs through Hades himself.',
       'Hades sealed the way out with four Seals. Each one is held by a Warden at the far end of a road.',
       'West, in Gluttony, Cerberus gnaws. East, Semiramis rides the storms of Lust. Above burns Farinata in Heresy. Below, Ephialtes lies frozen in Treachery.',
-      'Bring all four Seals to the Gate beside this market and the road to Hades will open. Defeat him, and you go home.',
+      'Bring all four Seals to the Gate beside this market and the road to Hades will open. Defeat him, and the way up to Olympus will open with him.',
       'Gems spill from every fallen thing and every glittering stone. Charon will trade you anything for them. And wake the shrines you find: they remember you, and you may travel between them.',
       'The roads lead to the Wardens, but the caves around them hide the treasure. Your blast can even break rock. Go well, little star.',
     ];
   }
-  if (s.bosses.hades) return ['You did it. The sky remembers you, and so do I.', 'The underworld is still yours to roam, if you wish. There is always more to find.'];
+  if (s.bosses.zeus) return ['They say a new light burns on the summit of Olympus. I knew it would be you.', 'The underworld is still yours to roam, if you wish. There is always more to find.'];
+  if (s.bosses.hades) return ['You did it. Hades is broken, and the way up is open.', 'Step into the light in his throne room and climb. Show Zeus what he threw away.'];
   if (n >= 4) return ['All four Seals! The Gate is listening. Step through it, and face Hades.'];
   const left = SITES.slice(0, 4).filter(x => !s.bosses[x.id]).map(x => x.name);
   const tips = [
@@ -168,6 +186,40 @@ function virgilLines() {
     'Press M to open your map, and click a shrine you have woken to travel there.',
   ];
   return [`${n} of 4 Seals. Still waiting: ${left.join(', ')}.`, pick(tips)];
+}
+
+function irisLines() {
+  const s = G.save, n = sigilCount();
+  if (!s.irisTalked) {
+    return [
+      'Welcome home, little star. I am Iris, the rainbow that runs between the worlds. Every god on Olympus felt you climb out of Hades.',
+      'They are afraid of you. Zeus most of all. He has shut himself away on the summit, behind the Gate of the Thunderer.',
+      'Only the four Sigils of Olympus can open it, and four gods guard them: Ares in his temple to the west, Apollo burning in the east...',
+      '...Athena watching from the heights above, and Poseidon, who rules the deep clouds below.',
+      'Take their Sigils and the Gate will open for you. Hermes trades in the bazaar here, and the nectar in the fountain will heal you. Go and shine.',
+    ];
+  }
+  if (s.bosses.zeus) return ['Olympus has a new light now, and it is yours.', 'The heavens and the underworld are both open to you. Wander as you like.'];
+  if (n >= 4) return ['All four Sigils! The Gate of the Thunderer is open. Zeus is waiting on the summit.'];
+  const left = GODS.filter(x => !s.bosses[x.id]).map(x => x.name);
+  return [`${n} of 4 Sigils. Still to face: ${left.join(', ')}.`, pick(['Ares charges like a bull. Get above him and let him crash into his own walls.', 'Apollo calls down the sun. Watch for the light on the floor and step away.', 'Athena rains spears from the sky. Keep moving and never stand still.', 'Poseidon\'s waves roll along the floor. Jump them, and strike when he raises his trident.'])];
+}
+
+// Arriving in Olympus after the ascent: bind the hub shrine so death brings you back here.
+function arriveOlympus() {
+  const s = G.save;
+  s.oly = 1;
+  s.shrines.oly_hub = 1;
+  const hub = LANDMARKS.find(l => l.id === 'oly_hub');
+  s.spawn = { x: hub.x, y: hub.y, id: hub.id };
+  teleport(hub.x - 60, hub.y - 4);
+  G.scene = 'play';
+  setTheme('olympus');
+  G.biome = 6;
+  G.bg = bgTarget(6);
+  announce('Olympus', 'The Halls of the Gods', 4);
+  G.player.hp = stats().maxHp;
+  saveGame();
 }
 
 function interact(o) {
@@ -197,22 +249,35 @@ function interact(o) {
       break;
     }
     case 'shop': openShop(o, saveGame); break;
-    case 'npc': openDialog('Virgil', virgilLines(), () => { if (!s.talked) { s.talked = 1; saveGame(); toast('Follow the arrow on your minimap to a Warden.'); } }); break;
+    case 'npc':
+      if (o.id === 'iris') openDialog('Iris', irisLines(), () => { if (!s.irisTalked) { s.irisTalked = 1; saveGame(); toast('Follow the arrow on your minimap to a god.'); } });
+      else openDialog('Virgil', virgilLines(), () => { if (!s.talked) { s.talked = 1; saveGame(); toast('Follow the arrow on your minimap to a Warden.'); } });
+      break;
     case 'fountain':
       p.hp = stats().maxHp;
       sfx('heal');
       burst(p.x + p.w / 2, p.y, 20, RAINBOW, 160, { add: true, g: -100 });
-      toast('The water of Lethe is sweet here. Health restored.');
+      toast(o.oly ? 'Nectar of the gods. Health restored.' : 'The water of Lethe is sweet here. Health restored.');
       break;
     case 'gate':
+      if (o.oly) {
+        if (sigilCount() < 4) { sfx('deny'); toast('The Gate of the Thunderer needs four Sigils. You have ' + sigilCount() + '.'); return; }
+        if (s.bosses.zeus) { toast('The summit is quiet now.'); return; }
+        teleport((ZS.tx - 34) * T, (ZS.ty + ZS.h / 2) * T - 60);
+        sfx('portal');
+        return;
+      }
       if (sealCount() < 4) { sfx('deny'); toast('The Gate needs four Seals. You have ' + sealCount() + '.'); return; }
       if (s.bosses.hades) { toast('Hades is defeated. The way home is open.'); return; }
       teleport((SITES[4].tx - 34) * T, (SITES[4].ty + SITES[4].h / 2) * T - 60);
       sfx('portal');
       break;
     case 'portal':
-      teleport(18 * T, -60);
       sfx('portal');
+      if (o.id === 'portal_down') { teleport(18 * T, -60); toast('Back in Limbo Market. Your Olympus shrines will bring you home.'); }
+      else if (o.id === 'portal_zeus') { const hub = LANDMARKS.find(l => l.id === 'oly_hub'); teleport(hub.x - 60, hub.y - 4); }
+      else if (!s.oly) playCutscene('ascent', arriveOlympus);
+      else { const hub = LANDMARKS.find(l => l.id === 'oly_hub'); teleport(hub.x - 60, hub.y - 4); }
       break;
   }
 }
@@ -278,13 +343,40 @@ export function onBossDefeated(b) {
     setTheme('victory');
     saveGame();
     setTimeout(() => {
-      const st = s.stats;
-      $('ending-text').innerHTML = `Hades falls, and his crown of blue fire gutters out. Far above, a crack of daylight opens in the rock, and through it you hear Olympus calling your name.<br><br>` +
-        `<b>Time:</b> ${Math.floor(st.time / 60)} min · <b>Foes defeated:</b> ${st.kills} · <b>Gems found:</b> ${st.gemsEarned.toLocaleString()} · <b>Falls:</b> ${st.deaths}<br><br>` +
-        `A portal has opened in the throne room. The underworld is still yours to explore.`;
+      $('ending-title').textContent = 'The Way Up';
+      $('ending-text').innerHTML = `Hades falls, and his crown of blue fire gutters out. Far above, a crack of daylight splits the rock, and a stair of light pours down into the throne room.<br><br>` +
+        `Zeus cast you out for shining too brightly. Now you are brighter still. Climb back to Olympus, take the Sigils from his gods, and face the King of the Gods himself.`;
+      $('btn-ending').textContent = 'Ascend';
+      endingNext = () => playCutscene('ascent', arriveOlympus);
       G.scene = 'ending';
       show('ending');
     }, 2200);
+    return;
+  }
+  if (b.id === 'zeus') {
+    s.won2 = 1;
+    setTheme('victory');
+    saveGame();
+    setTimeout(() => playCutscene('finale', () => {
+      const st = s.stats;
+      $('ending-title').textContent = 'The Brightest Star';
+      $('ending-text').innerHTML = `The King of the Gods falls, and his thunder rolls away into silence. The clouds part, and all of Olympus is bathed in your light.<br><br>` +
+        `<b>Time:</b> ${Math.floor(st.time / 60)} min · <b>Foes defeated:</b> ${st.kills} · <b>Gems found:</b> ${st.gemsEarned.toLocaleString()} · <b>Falls:</b> ${st.deaths}<br><br>` +
+        `You have conquered the underworld and the heavens. Both are still yours to explore.`;
+      $('btn-ending').textContent = 'Keep exploring';
+      endingNext = null;
+      G.scene = 'ending';
+      show('ending');
+    }), 2200);
+    return;
+  }
+  if (b.site.god) {
+    sfx('seal');
+    announce('Sigil of ' + b.name, b.name + ', ' + b.title + ', is defeated', 4);
+    const n = sigilCount();
+    toast(n >= 4 ? 'All four Sigils! The Gate of the Thunderer in the hub is open.' : `${n} of 4 Sigils claimed.`, 4000);
+    G.player.hp = stats().maxHp;
+    saveGame();
     return;
   }
   sfx('seal');
@@ -329,6 +421,7 @@ function update(dt) {
   const nearTown = Math.hypot(ptx, pty) < 70 ? 0.55 : 1;
   for (const key of ['sky0', 'sky1', 'far', 'mid', 'fog', 'accent']) G.bg[key] = mix(G.bg[key], tgt[key], k);
   G.bg.dark += (tgt.dark * nearTown - G.bg.dark) * k;
+  for (const key of ['heaven', 'sun', 'storm']) G.bg[key] += (tgt[key] - (G.bg[key] || 0)) * k;
 
   // Wind gusts in Lust
   const B = BIOMES[BIOME_LIST[G.biome]];
@@ -349,6 +442,10 @@ function update(dt) {
       case 'rain': for (let i = 0; i < 2; i++) part({ x: vx0 + rand(0, vw), y: vy0 - 10, vx: -40, vy: 900, life: 1, size: 2.2, color: 'rgba(170,255,120,.55)', shape: 'streak' }); break;
       case 'ember': part({ x, y: vy0 + vh + 10, vx: rand(-20, 20), vy: rand(-120, -50), life: 4, size: rand(1.2, 2.6), color: pick(['#ffb347', '#ff6a1a', '#ffe36b']), add: true }); break;
       case 'snow': part({ x, y: vy0 - 10, vx: rand(-30, 10), vy: rand(40, 90), life: 8, size: rand(1.5, 3), color: '#eaf8ff' }); break;
+      case 'feather':
+        part({ x, y, vx: rand(-12, 12), vy: rand(-18, -4), life: 3, size: rand(1, 2.4), color: pick(['#ffe28a', '#fff6d0', '#ffffff']), add: true });
+        if (Math.random() < 0.08) part({ x, y: vy0 - 10, vx: rand(-20, 20), vy: rand(25, 50), life: 9, size: rand(3, 4.5), color: '#ffffff', shape: 'petal', vr: rand(-2, 2) });
+        break;
     }
     if (G.windForce) part({ x: G.windForce > 0 ? vx0 : vx0 + vw, y: vy0 + rand(0, vh), vx: G.windForce * 0.9, vy: 0, life: 1.2, size: 2.5, color: 'rgba(255,200,240,.35)', shape: 'streak' });
   }
@@ -436,6 +533,7 @@ function step(dt) {
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
+  if (G.scene === 'cutscene') { drawCutscene(ctx, dt); return false; }
   render(ctx);
   if (G.scene === 'map') drawMap(ctx);
   return frozen;
@@ -462,6 +560,7 @@ function onKey(code) {
   if (devOpen()) return;
   if (code === 'KeyN') { setMuted(!muted); $('btn-mute').textContent = 'Sound: ' + (muted ? 'Off' : 'On'); toast(muted ? 'Sound off' : 'Sound on', 1200); return; }
   switch (G.scene) {
+    case 'cutscene': cutsceneKey(code); break;
     case 'play':
       if (code === 'Escape' || code === 'KeyP') pause();
       else if (code === 'KeyM' || code === 'Tab') openMap();
@@ -545,9 +644,12 @@ $('btn-new').onclick = () => {
   }
   sfx('ui');
   hide('title');
-  $('story-text').innerHTML = 'You are one of Zeus\'s divine soldiers, a unicorn of Olympus. Hades dragged you down into the underworld and sealed the way home behind you.<br><br>The circles of Hell stretch out in every direction: storms to the east, endless rain to the west, burning tombs above and frozen ice below.<br><br>Find the four Seals. Open the Gate. Ascend.<br><br><i>“Through me the way into the suffering city.”</i> — Dante, <i>Inferno</i>';
-  show('story');
-  G.scene = 'story';
+  playCutscene('prelude', () => {
+    $('story-text').innerHTML = 'You were the brightest of the unicorns of Olympus, so bright that Zeus himself grew afraid of you. He cast you out of the heavens, and you fell all the way into the underworld.<br><br>Hades has sealed the way out. The circles of Hell stretch in every direction: storms to the east, endless rain to the west, burning tombs above and frozen ice below.<br><br>Find the four Seals. Defeat Hades. Then climb back to Olympus and make the gods answer for what they did.<br><br><i>“Through me the way into the suffering city.”</i> — Dante, <i>Inferno</i>';
+    show('story');
+    G.scene = 'story';
+    setTheme('title');
+  });
 };
 $('btn-story').onclick = () => {
   hide('story');
@@ -581,12 +683,20 @@ $('btn-quit').onclick = () => {
   show('title');
 };
 $('btn-respawn').onclick = respawn;
-$('btn-ending').onclick = () => { hide('ending'); G.scene = 'play'; setTheme(BIOME_LIST[G.biome]); };
+let endingNext = null;
+$('btn-ending').onclick = () => {
+  hide('ending');
+  const next = endingNext;
+  endingNext = null;
+  if (next) { next(); return; }
+  G.scene = 'play';
+  setTheme(BIOME_LIST[G.biome]);
+};
 
 function refreshTitle() {
   const s = loadSave();
   $('btn-continue').style.display = s ? '' : 'none';
-  if (s) $('btn-continue').textContent = `Continue  ·  ${SITES.slice(0, 4).filter(x => s.bosses[x.id]).length}/4 Seals`;
+  if (s) $('btn-continue').textContent = s.bosses.zeus ? 'Continue  ·  Olympus conquered' : s.bosses.hades ? `Continue  ·  ${GODS.filter(x => s.bosses[x.id]).length}/4 Sigils` : `Continue  ·  ${SITES.slice(0, 4).filter(x => s.bosses[x.id]).length}/4 Seals`;
 }
 
 initInput(canvas, onKey);

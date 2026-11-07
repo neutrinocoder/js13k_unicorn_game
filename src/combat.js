@@ -208,12 +208,26 @@ export function drawProjs(ctx) {
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.rotate(Math.atan2(b.vy, b.vx));
-      ctx.fillStyle = '#e8fbff';
+      ctx.fillStyle = b.tip || '#e8fbff';
       ctx.beginPath();
       ctx.moveTo(b.r * 2, 0);
       ctx.lineTo(-b.r, -b.r * 0.6);
       ctx.lineTo(-b.r, b.r * 0.6);
       ctx.fill();
+      ctx.restore();
+    } else if (b.kind === 'spear') {
+      // a thrown spear of war, pointing where it flies
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = '#5a3418';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-b.r * 5, 0); ctx.lineTo(b.r * 1.2, 0); ctx.stroke();
+      ctx.fillStyle = '#ffcf7a';
+      ctx.strokeStyle = '#6a3a10';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(b.r * 3, 0); ctx.lineTo(b.r * 0.8, -b.r * 0.7); ctx.lineTo(b.r * 1.1, 0); ctx.lineTo(b.r * 0.8, b.r * 0.7); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.restore();
     }
   }

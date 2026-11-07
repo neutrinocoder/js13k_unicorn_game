@@ -192,6 +192,10 @@ const THEMES = {
   abyss: { root: 43, scale: 'phryg', tempo: 120, prog: [0, 1, 0, 6], arp: 'sawtooth', pad: 'sawtooth', bass: 1, drums: 2, mel: 0.3 },
   boss: { root: 45, scale: 'harm', tempo: 132, prog: [0, 5, 1, 4], arp: 'sawtooth', pad: 'sawtooth', bass: 1, drums: 2, mel: 0.2 },
   victory: { root: 55, scale: 'lyd', tempo: 84, prog: [0, 4, 5, 3], arp: 'sine', pad: 'triangle', bass: 1, drums: 0, mel: 0.5 },
+  olympus: { root: 57, scale: 'lyd', tempo: 92, prog: [0, 4, 1, 5], arp: 'triangle', pad: 'triangle', bass: 1, drums: 1, mel: 0.45 },
+  zeus: { root: 50, scale: 'harm', tempo: 140, prog: [0, 6, 5, 1], arp: 'sawtooth', pad: 'sawtooth', bass: 1, drums: 2, mel: 0.25 },
+  prelude: { root: 52, scale: 'lyd', tempo: 70, prog: [0, 4, 3, 5], arp: 'sine', pad: 'triangle', bass: 1, drums: 0, mel: 0.45 },
+  fall: { root: 45, scale: 'phryg', tempo: 64, prog: [0, 1, 6, 0], arp: 'sine', pad: 'sawtooth', bass: 1, drums: 0, mel: 0.3 },
 };
 
 export function setTheme(name) { pending = name; }

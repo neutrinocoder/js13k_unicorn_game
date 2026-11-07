@@ -4,12 +4,12 @@
 import { flame, eye, glow, lightning, strand, limb, teeth } from './art.js';
 import { shade, rgba, clamp, lerp } from './util.js';
 
-const TAU = Math.PI * 2;
-const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
-const sm = k => { k = cl(k); return k * k * (3 - 2 * k); };
-const pulse = (t, f, a = 0, b = 1) => a + (b - a) * (0.5 + 0.5 * Math.sin(t * f));
+export const TAU = Math.PI * 2;
+export const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+export const sm = k => { k = cl(k); return k * k * (3 - 2 * k); };
+export const pulse = (t, f, a = 0, b = 1) => a + (b - a) * (0.5 + 0.5 * Math.sin(t * f));
 
-function ell(ctx, x, y, rx, ry, rot = 0) {
+export function ell(ctx, x, y, rx, ry, rot = 0) {
   ctx.beginPath();
   ctx.ellipse(x, y, rx, ry, rot, 0, TAU);
 }
@@ -33,7 +33,7 @@ export function mood(b, t, dx, dy) {
 
 // Merge a state's expression with the overlays every boss shares: a flinch when hit, a roar at
 // a phase change, and eyes closing as it dies.
-function expr(m, base) {
+export function expr(m, base) {
   const e = { open: 0.2, brow: 0.2, lid: 0, tilt: 0, ...base };
   const h = m.hurt * m.hurt, r = Math.sin(m.roar * Math.PI);
   e.open = cl(e.open * (1 - r) + h * 0.45 + r);
@@ -46,7 +46,7 @@ function expr(m, base) {
 
 // An expressive eye: glowing iris, a pupil that follows the player, lids that squint or blink,
 // and a brow that slants with anger. nx says which way the nose is (+1 = toward +x).
-function gaze(ctx, x, y, r, col, m, e, o = {}) {
+export function gaze(ctx, x, y, r, col, m, e, o = {}) {
   const { skin = '#000', nx = 1, browW = r * 0.7, browCol = skin, core = '#fff', halo = 3.5, pupil = 0.42, look = 0.38, brow = true } = o;
   const lid = cl(Math.max(e.lid, m.blink * (1 - m.dying)));
   eye(ctx, x, y, r, col, core, halo);
@@ -78,7 +78,7 @@ function gaze(ctx, x, y, r, col, m, e, o = {}) {
 }
 
 // Four clawed fingers from a wrist point, spread open or curled into a fist.
-function claws(ctx, x, y, dirX, dirY, len, open, col, w = 2) {
+export function claws(ctx, x, y, dirX, dirY, len, open, col, w = 2) {
   ctx.strokeStyle = col;
   ctx.lineWidth = w;
   ctx.lineCap = 'round';
@@ -101,7 +101,7 @@ function claws(ctx, x, y, dirX, dirY, len, open, col, w = 2) {
 // attacks, and the mad one (bottom) pants, snaps and lolls its tongue.
 
 // A filled tube along a list of points, tapering from w0 to w1. Returns the edge points.
-function tube(ctx, pts, w0, w1, fill, outline, lw = 2.5) {
+export function tube(ctx, pts, w0, w1, fill, outline, lw = 2.5) {
   const L = [], R = [], n = pts.length - 1;
   for (let i = 0; i <= n; i++) {
     const a = pts[Math.max(0, i - 1)], c = pts[Math.min(n, i + 1)];
@@ -124,7 +124,7 @@ function tube(ctx, pts, w0, w1, fill, outline, lw = 2.5) {
   return { L, R };
 }
 
-function bez(p0, p1, p2, n = 10) {
+export function bez(p0, p1, p2, n = 10) {
   const out = [];
   for (let i = 0; i <= n; i++) {
     const u = i / n, v = 1 - u;
@@ -134,7 +134,7 @@ function bez(p0, p1, p2, n = 10) {
 }
 
 // A tapered, curving horn from (x, y), heading a0 and bending by curl along its length.
-function hornC(ctx, x, y, len, a0, curl, w, c0, c1) {
+export function hornC(ctx, x, y, len, a0, curl, w, c0, c1) {
   const pts = [[x, y]];
   let px = x, py = y;
   for (let i = 1; i <= 9; i++) {

@@ -1,6 +1,6 @@
 # Unicorn Ascent
 
-You are one of Zeus's divine soldiers, trapped in Hell by Hades. Find a way out with a rainbow tail, a recoil blast and a little help from some bubbles.
+You were the brightest unicorn on Olympus, until Zeus grew afraid of you and cast you down into Hell. Fight your way out of the underworld, defeat Hades, then climb back to the heavens to face Ares, Apollo, Athena, Poseidon and finally Zeus himself. You have a rainbow tail, a recoil blast and a little help from some bubbles.
 
 The game uses JavaScript, Canvas 2D and Web Audio. All artwork and sound are made in code. You do not need to install libraries to play.
 

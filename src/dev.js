@@ -1,6 +1,7 @@
 // Developer console: press ` (backtick) to open, then type a command. Flags live in G.save.dev.
 import { G } from './state.js';
-import { T, CS, SITES, getChunk } from './world.js';
+import { T, CS, SITES, getChunk, GODS, ZS, OLY } from './world.js';
+import { playCutscene } from './cutscene.js';
 import { SHOP, stats } from './items.js';
 import { keys } from './input.js';
 import { sfx } from './audio.js';
@@ -36,7 +37,10 @@ const PLACES = {
   heretic: [SITES[2].tx, SITES[2].ty + SITES[2].h / 2 + 1], farinata: [SITES[2].tx, SITES[2].ty + SITES[2].h / 2 + 1], heresy: [SITES[2].tx, SITES[2].ty + SITES[2].h / 2 + 1],
   titan: [SITES[3].tx, SITES[3].ty + SITES[3].h / 2 + 1], ephialtes: [SITES[3].tx, SITES[3].ty + SITES[3].h / 2 + 1], treachery: [SITES[3].tx, SITES[3].ty + SITES[3].h / 2 + 1],
   hades: [SITES[4].tx - 34, SITES[4].ty + SITES[4].h / 2 + 1],
+  olympus: [-6, OLY.hub], heaven: [-6, OLY.hub],
+  zeus: [ZS.tx - 34, ZS.ty + ZS.h / 2 + 1],
 };
+for (const g of GODS) PLACES[g.id] = [g.tx, g.ty + g.h / 2 + 1];
 
 const COMMANDS = {
   help: {
@@ -105,6 +109,28 @@ const COMMANDS = {
   seals: {
     desc: 'claim all four Seals (opens the Gate to Hades)',
     run() { for (const s of SITES.slice(0, 4)) G.save.bosses[s.id] = 1; return 'all four Seals claimed'; },
+  },
+  sigils: {
+    desc: 'claim the four Sigils of Olympus (opens the Gate of the Thunderer)',
+    run() { for (const s of GODS) G.save.bosses[s.id] = 1; return 'all four Sigils claimed'; },
+  },
+  ascend: {
+    desc: 'skip to Olympus: count Hades as beaten and unlock the heavens',
+    run() {
+      const s = G.save;
+      for (const x of SITES.slice(0, 5)) s.bosses[x.id] = 1;
+      s.won = 1; s.oly = 1; s.talked = 1; s.shrines.oly_hub = 1;
+      teleport((-6 + 0.5) * T, OLY.hub * T);
+      return 'welcome to Olympus';
+    },
+  },
+  scene: {
+    args: '<prelude|ascent|finale>', desc: 'play a story cutscene',
+    run([a]) {
+      if (!['prelude', 'ascent', 'finale'].includes(a)) return 'scenes: prelude, ascent, finale';
+      setTimeout(() => playCutscene(a, () => {}), 50);
+      return 'playing ' + a;
+    },
   },
   reveal: {
     args: '[radius]', desc: 'reveal the map around you (default 300 tiles)',
