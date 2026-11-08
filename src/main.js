@@ -524,6 +524,16 @@ function update(dt) {
   G.near = p.dead ? null : findNear();
   if (G.near && tapped('KeyE', 'Enter')) interact(G.near);
 
+  // T: warp back to the plaza of this realm (the town square below, the marble plaza in Olympus)
+  if (tapped('KeyT') && !p.dead) {
+    if (G.boss) toast('No warping out of a boss fight!');
+    else {
+      const l = LANDMARKS.find(x => x.id === (BIOMES[BIOME_LIST[G.biome]].heaven ? 'oly_hub' : 'town'));
+      teleport(l.x - 60, l.y - 4);
+      sfx('shrine');
+    }
+  }
+
   saveT -= dt;
   if (saveT < 0) { saveT = 15; saveGame(); }
 
