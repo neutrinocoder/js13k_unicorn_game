@@ -33,7 +33,7 @@ export const SAVE_KEY = 'unicornAscent.adventure.v1';
 export function newSave() {
   return {
     v: 1,
-    mapV: 2,
+    mapV: 3,
     gems: 0,
     up: { heart: 0, tail: 0, reach: 0, blast: 0, triple: 0, wings: 0, stars: 0, beam: 0, magnet: 0, bubble: 0, lantern: 0, hooves: 0, bombs: 0, fly: 0, might: 0, swift: 0,
       constellation: 0, icarus: 0, forge: 0, apple: 0, aegis: 0, lens: 0, talaria: 0, ichor: 0, phoenix: 0, midas: 0 },

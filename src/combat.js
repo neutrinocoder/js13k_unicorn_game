@@ -169,7 +169,7 @@ export function updateProjs(dt) {
     b.life -= dt;
     if (b.homing) {
       let best = null, bd = 420;
-      const targets = G.boss && !G.boss.dead ? [...G.enemies, G.boss] : G.enemies;
+      const targets = G.boss && !G.boss.dead && !G.boss.hidden ? [...G.enemies, G.boss] : G.enemies;
       for (const e of targets) {
         if (e.dead) continue;
         const d = Math.hypot(e.x + e.w / 2 - b.x, e.y + e.h / 2 - b.y);
@@ -179,6 +179,23 @@ export function updateProjs(dt) {
         const dx = best.x + best.w / 2 - b.x, dy = best.y + best.h / 2 - b.y, d = Math.hypot(dx, dy) || 1, sp = Math.hypot(b.vx, b.vy);
         b.vx += (dx / d * sp - b.vx) * Math.min(1, 7 * dt);
         b.vy += (dy / d * sp - b.vy) * Math.min(1, 7 * dt);
+      }
+    }
+    // boss tricks: shots that bend as they fly, shots that speed up, and orbs that hang in the
+    // air until their moment comes and then fire straight at the player
+    if (b.curve) {
+      const a = b.curve * dt, c = Math.cos(a), s = Math.sin(a), vx = b.vx;
+      b.vx = vx * c - b.vy * s;
+      b.vy = vx * s + b.vy * c;
+    }
+    if (b.accel) { const k = 1 + b.accel * dt; b.vx *= k; b.vy *= k; }
+    if (b.hang != null) {
+      if (b.t < b.hang) { b.vx *= 1 - Math.min(1, 4 * dt); b.vy *= 1 - Math.min(1, 4 * dt); }
+      else {
+        const dx = p.x + p.w / 2 - b.x, dy = p.y + p.h / 2 - b.y, d = Math.hypot(dx, dy) || 1;
+        b.vx = dx / d * b.hangSp; b.vy = dy / d * b.hangSp;
+        b.hang = null;
+        burst(b.x, b.y, 5, b.color, 160, { add: true });
       }
     }
     b.vy += b.g * dt;
@@ -195,7 +212,7 @@ export function updateProjs(dt) {
           dead = true;
         }
       } else {
-        const list = G.boss && !G.boss.dead ? [...G.enemies, G.boss] : G.enemies;
+        const list = G.boss && !G.boss.dead && !G.boss.hidden ? [...G.enemies, G.boss] : G.enemies;
         for (const e of list) {
           if (e.dead) continue;
           if (b.x > e.x - b.r && b.x < e.x + e.w + b.r && b.y > e.y - b.r && b.y < e.y + e.h + b.r) {

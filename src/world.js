@@ -54,17 +54,17 @@ export const BIOMES = {
 };
 
 export const SITES = [
-  { id: 'cerberus', name: 'Cerberus', title: 'The Great Worm of Gluttony', biome: 'gluttony', tx: -700, ty: 0, w: 76, h: 30, hp: 170 },
-  { id: 'storm', name: 'Semiramis', title: 'Queen of the Endless Storm', biome: 'lust', tx: 700, ty: 0, w: 76, h: 30, hp: 160 },
-  { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -700, w: 76, h: 30, hp: 185 },
-  { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 700, w: 76, h: 30, hp: 210 },
-  { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 480 },
+  { id: 'cerberus', name: 'Cerberus', title: 'The Great Worm of Gluttony', biome: 'gluttony', tx: -700, ty: 0, w: 76, h: 30, hp: 230 },
+  { id: 'storm', name: 'Semiramis', title: 'Queen of the Endless Storm', biome: 'lust', tx: 700, ty: 0, w: 76, h: 30, hp: 215 },
+  { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -700, w: 76, h: 30, hp: 250 },
+  { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 700, w: 76, h: 30, hp: 285 },
+  { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 650 },
   // Olympus: four gods guard the Sigils that open the way to Zeus.
-  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -400, ty: -3096, w: 76, h: 30, hp: 660, god: 1 },
-  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 400, ty: -3096, w: 76, h: 30, hp: 600, god: 1 },
-  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -3330, w: 76, h: 30, hp: 640, god: 1 },
-  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -2895, w: 76, h: 30, hp: 720, god: 1 },
-  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -3600, w: 84, h: 36, hp: 1700 },
+  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -400, ty: -3096, w: 76, h: 30, hp: 880, god: 1 },
+  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 400, ty: -3096, w: 76, h: 30, hp: 800, god: 1 },
+  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -3330, w: 76, h: 30, hp: 860, god: 1 },
+  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -2895, w: 76, h: 30, hp: 960, god: 1 },
+  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -3600, w: 84, h: 36, hp: 2300 },
 ];
 const HS = SITES[4];
 export const GODS = SITES.slice(5, 9);
@@ -80,8 +80,8 @@ export const OUTPOST_D = 300;
 // The roads from town stop a little past the outposts. Beyond them lie the mazes.
 export const ROAD_END = 330;
 // The underworld's tunnels and the cloud-halls of Olympus are both endless mazes.
-const UNDER = makeMaze(501, 10, 8);
-const SKYM = makeMaze(777, 12, 9);
+const UNDER = makeMaze(501, 8, 8);
+const SKYM = makeMaze(777, 10, 8);
 const inRect = (tx, ty, s, pad) => Math.abs(tx - s.tx) <= s.w / 2 + pad && Math.abs(ty - s.ty) <= s.h / 2 + pad;
 export const siteAt = (tx, ty, pad = 0) => SITES.find(s => inRect(tx, ty, s, pad));
 
@@ -400,7 +400,7 @@ function deadEnds(c, get, lvl) {
   for (let gy = Math.floor(y0 / CH) - 1; gy <= Math.floor((y0 + CS) / CH); gy++) {
     for (let gx = Math.floor(x0 / CW) - 1; gx <= Math.floor((x0 + CS) / CW); gx++) {
       const e = M.exits(gx, gy);
-      if (e.l + e.u + e.r + e.d !== 1 || hash2(gx, gy, M.seed + 11) > 0.5) continue;
+      if (e.l + e.u + e.r + e.d !== 1 || hash2(gx, gy, M.seed + 11) > 0.38) continue;
       const lx = e.l ? CW - 1 : e.r ? 2 : hash2(gx, gy, M.seed + 12) < 0.5 ? 2 : CW - 1;
       const tx = gx * CW + lx, ty = gy * CH + CH - 1, i = tx - x0, j = ty - y0;
       if (i < 0 || i >= CS || j < 0 || j >= CS) continue;

@@ -7,7 +7,7 @@ import { hash2, vnoise, mulberry } from './util.js';
 export const M_AIR = 0, M_WALL = 1, M_PLAT = 2;
 
 // CW x CH tiles per cell, with walls two tiles thick; BW x BH cells per block.
-export function makeMaze(seed, CW, CH, BW = 6, BH = 6, loops = 0.03) {
+export function makeMaze(seed, CW, CH, BW = 8, BH = 8, loops = 0.012, branch = 0.35) {
   const cache = new Map();
   let lastK = '', lastB = null;
 
@@ -18,14 +18,17 @@ export function makeMaze(seed, CW, CH, BW = 6, BH = 6, loops = 0.03) {
     const stack = [Math.floor(rng() * n)];
     seen[stack[0]] = 1;
     while (stack.length) {
-      const c = stack[stack.length - 1], x = c % BW, y = (c / BW) | 0;
+      // usually carry on from the newest cell (long twisting halls), but sometimes branch off an
+      // older one, which grows many more side passages and dead ends
+      const si = rng() < branch ? Math.floor(rng() * stack.length) : stack.length - 1;
+      const c = stack[si], x = c % BW, y = (c / BW) | 0;
       // sideways passages are twice as likely as shafts, which suits a platformer
       const opts = [];
       if (x > 0 && !seen[c - 1]) opts.push(0, 0);
       if (x < BW - 1 && !seen[c + 1]) opts.push(1, 1);
       if (y > 0 && !seen[c - BW]) opts.push(2);
       if (y < BH - 1 && !seen[c + BW]) opts.push(3);
-      if (!opts.length) { stack.pop(); continue; }
+      if (!opts.length) { stack.splice(si, 1); continue; }
       const d = opts[Math.floor(rng() * opts.length)];
       let m;
       if (d === 0) { m = c - 1; L[c] |= 1; }

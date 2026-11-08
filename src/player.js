@@ -237,7 +237,7 @@ function selectWeapon(i) {
 }
 
 function targets() {
-  return G.boss && !G.boss.dead ? [...G.enemies, G.boss] : G.enemies;
+  return G.boss && !G.boss.dead && !G.boss.hidden ? [...G.enemies, G.boss] : G.enemies;
 }
 
 function fireWhip(p, S, dir) {
