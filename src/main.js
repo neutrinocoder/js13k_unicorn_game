@@ -48,7 +48,15 @@ function loadSave() {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (s && s.v === 1) {
       const base = newSave();
-      return { ...base, ...s, up: { ...base.up, ...s.up }, stats: { ...base.stats, ...s.stats } };
+      const out = { ...base, ...s, up: { ...base.up, ...s.up }, stats: { ...base.stats, ...s.stats } };
+      if (out.mapV !== base.mapV) {
+        out.mapV = base.mapV;
+        out.mods = {};
+        out.explored = {};
+        const l = LANDMARKS.find(x => x.id === out.spawn.id) || LANDMARKS.find(x => x.id === (out.oly ? 'oly_hub' : 'town'));
+        out.spawn = l ? { x: l.x, y: l.y, id: l.id } : base.spawn;
+      }
+      return out;
     }
   } catch (e) {}
   return null;
@@ -490,7 +498,7 @@ function update(dt) {
     const pcx = Math.floor((p.x + p.w / 2) / CPX), pcy = Math.floor((p.y + p.h / 2) / CPX), px = p.x + p.w / 2, py = p.y + p.h / 2;
     for (let j = -2; j <= 2; j++) for (let i = -3; i <= 3; i++) {
       for (const sp of getChunk(pcx + i, pcy + j).spawns) {
-        if (sp.ent || G.t - sp.deadAt < 90 || G.enemies.length >= 45) continue;
+        if (sp.ent || G.t - sp.deadAt < 90 || G.enemies.length >= 60) continue;
         const d = Math.hypot(sp.x - px, sp.y - py);
         if (d < 560 || d > 1900) continue;
         const e = makeEnemy(sp.type, sp.x, sp.y, sp.level, sp.biome, sp.hang);

@@ -3,6 +3,7 @@
 // four temples of the gods and, higher still, the summit where Zeus waits.
 import { hash2, vnoise, fbm, mulberry, clamp, mix, shade } from './util.js';
 import { G } from './state.js';
+import { makeMaze, mazeTile, M_WALL, M_PLAT } from './maze.js';
 
 export const T = 32, CS = 16, CPX = T * CS;
 export const AIR = 0, ROCK = 1, PLAT = 2, HAZ = 3, BRICK = 4, CRYSTAL = 5, ORE = 6, HAZC = 7;
@@ -53,29 +54,34 @@ export const BIOMES = {
 };
 
 export const SITES = [
-  { id: 'cerberus', name: 'Cerberus', title: 'The Great Worm of Gluttony', biome: 'gluttony', tx: -430, ty: 0, w: 76, h: 30, hp: 170 },
-  { id: 'storm', name: 'Semiramis', title: 'Queen of the Endless Storm', biome: 'lust', tx: 430, ty: 0, w: 76, h: 30, hp: 160 },
-  { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -430, w: 76, h: 30, hp: 185 },
-  { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 430, w: 76, h: 30, hp: 210 },
+  { id: 'cerberus', name: 'Cerberus', title: 'The Great Worm of Gluttony', biome: 'gluttony', tx: -700, ty: 0, w: 76, h: 30, hp: 170 },
+  { id: 'storm', name: 'Semiramis', title: 'Queen of the Endless Storm', biome: 'lust', tx: 700, ty: 0, w: 76, h: 30, hp: 160 },
+  { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -700, w: 76, h: 30, hp: 185 },
+  { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 700, w: 76, h: 30, hp: 210 },
   { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 480 },
   // Olympus: four gods guard the Sigils that open the way to Zeus.
-  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -200, ty: -3015, w: 76, h: 30, hp: 660, god: 1 },
-  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 200, ty: -3015, w: 76, h: 30, hp: 600, god: 1 },
-  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -3120, w: 76, h: 30, hp: 640, god: 1 },
-  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -2880, w: 76, h: 30, hp: 720, god: 1 },
+  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -400, ty: -3096, w: 76, h: 30, hp: 660, god: 1 },
+  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 400, ty: -3096, w: 76, h: 30, hp: 600, god: 1 },
+  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -3330, w: 76, h: 30, hp: 640, god: 1 },
+  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -2895, w: 76, h: 30, hp: 720, god: 1 },
   { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -3600, w: 84, h: 36, hp: 1700 },
 ];
 const HS = SITES[4];
 export const GODS = SITES.slice(5, 9);
 export const ZS = SITES[9];
 // Olympus spans this rectangle of tiles, walled off by a shell of cloud-stone.
-export const OLY = { x0: -300, x1: 300, y0: -3230, y1: -2840, hub: -2999 };
+export const OLY = { x0: -480, x1: 480, y0: -3400, y1: -2840, hub: -3080 };
 export const inOly = (tx, ty, pad = 0) => tx >= OLY.x0 - pad && tx <= OLY.x1 + pad && ty >= OLY.y0 - pad && ty <= OLY.y1 + pad;
 // Everything this high above the underworld is open sky: the heavens around Olympus, and a
 // storm band higher still around the summit where Zeus waits.
 export const SKY_Y = -2790, STORM_Y = -3420;
 const nearZeus = (tx, ty, pad) => Math.abs(tx - ZS.tx) <= ZS.w / 2 + pad && Math.abs(ty - ZS.ty) <= ZS.h / 2 + pad;
-export const OUTPOST_D = 220;
+export const OUTPOST_D = 300;
+// The roads from town stop a little past the outposts. Beyond them lie the mazes.
+export const ROAD_END = 330;
+// The underworld's tunnels and the cloud-halls of Olympus are both endless mazes.
+const UNDER = makeMaze(501, 10, 8);
+const SKYM = makeMaze(777, 12, 9);
 const inRect = (tx, ty, s, pad) => Math.abs(tx - s.tx) <= s.w / 2 + pad && Math.abs(ty - s.ty) <= s.h / 2 + pad;
 export const siteAt = (tx, ty, pad = 0) => SITES.find(s => inRect(tx, ty, s, pad));
 
@@ -88,12 +94,12 @@ export function roadV(ty) {
 // undefined = not a road. -1 = bridge (platform if the cave is open there).
 export function roadTile(tx, ty) {
   const ax = Math.abs(tx);
-  if (ax > 48 && ax <= 430) {
+  if (ax > 48 && ax <= ROAD_END) {
     const c = roadH(tx);
     if (ty >= c - 2 && ty <= c + 2) return AIR;
     if (ty === c + 3) return -1;
   }
-  if ((ty < -40 && ty >= -430) || (ty > 14 && ty <= 430)) {
+  if ((ty < -40 && ty >= -ROAD_END) || (ty > 14 && ty <= ROAD_END)) {
     const c = roadV(ty);
     if (tx >= c - 3 && tx <= c + 2) {
       if (Math.abs(ty) === OUTPOST_D) return PLAT;
@@ -123,7 +129,7 @@ export function biomeAt(tx, ty) {
   return 2;
 }
 
-export const levelAt = (tx, ty) => 1 + Math.floor(Math.hypot(tx, ty) / 55);
+export const levelAt = (tx, ty) => 1 + Math.floor(Math.hypot(tx, ty) / 90);
 // Everything in the heavens fights at this level: far stronger than the underworld's circles.
 export const HEAVEN_LVL = 18;
 
@@ -138,13 +144,19 @@ function arenaInner(s, dx, dy) {
 function arenaTile(s, tx, ty) {
   const dx = tx - s.tx, dy = ty - s.ty, hh = s.h / 2;
   if (Math.abs(dx) <= s.w / 2 && Math.abs(dy) <= hh) return arenaInner(s, dx, dy);
-  // temples of the gods: a doorway at floor level in each side wall, lower than any god is tall
-  if (s.god) return Math.abs(dx) > s.w / 2 && dy >= hh - 2 && dy <= hh ? AIR : BRICK;
-  if (s !== HS && s !== ZS) {
-    const r = roadTile(tx, ty);
-    if (r !== undefined && r !== -1) return dy > hh ? (dy === hh + 1 ? PLAT : AIR) : AIR;
-  }
+  // a doorway at floor level in each side wall, lower than any boss is tall
+  if (s !== HS && s !== ZS) return Math.abs(dx) > s.w / 2 && dy >= hh - 2 && dy <= hh ? AIR : BRICK;
   return BRICK;
+}
+
+// A corridor running out from each arena door far enough to break into the maze around it.
+const DOORS = SITES.filter((s, i) => i < 4 || s.god);
+function approach(tx, ty) {
+  for (const s of DOORS) {
+    const ax = Math.abs(tx - s.tx) - s.w / 2, dy = ty - s.ty, hh = s.h / 2;
+    if (ax > 0 && ax <= 26 && dy >= hh - 3 && dy <= hh + 1) return dy === hh + 1 ? BRICK : AIR;
+  }
+  return undefined;
 }
 
 function townTile(tx, ty) {
@@ -162,34 +174,27 @@ function townTile(tx, ty) {
   return ty <= 1 ? BRICK : ROCK;
 }
 
-// Olympus: a marble hub, causeways west to Ares and east to Apollo, stairs up to Athena and down
-// to Poseidon, and drifting cloud islands everywhere else.
+// Olympus: a marble hub, with a passage out of each side into an endless maze of cloud.
+// The four temples lie deep inside it.
+const HUB_W = 60, HUB_H = 16, HUB_EXIT = 78;
 function olyClear(tx, ty) {
   const ax = Math.abs(tx), H = OLY.hub;
-  if (ax <= 70 && ty > H - 40 && ty < H + 8) return true;
-  if (ax <= 170 && ty > H - 9 && ty < H + 3) return true;
-  if (ax >= 40 && ax <= 56 && ty > -3115 && ty < -2858) return true;
+  if (ax <= HUB_EXIT + 2 && ty >= H - HUB_H - 2 && ty <= H + 3) return true;
   for (const s of GODS) if (inRect(tx, ty, s, 10)) return true;
-  return false;
+  return approach(tx, ty) !== undefined;
 }
 
 function olyTile(tx, ty) {
   for (const s of GODS) if (inRect(tx, ty, s, 4)) return arenaTile(s, tx, ty);
   if (ty >= OLY.y1 - 3) return ROCK;
+  const a = approach(tx, ty);
+  if (a !== undefined) return a;
   const ax = Math.abs(tx), H = OLY.hub;
-  if (ax <= 42 && ty >= H && ty <= H + 2) return BRICK;
-  if (ty === H && ax <= 162) return tx >= -51 && tx <= -44 ? PLAT : BRICK;
-  // landings that run from the last stair into each temple door
-  if (ty === -3104 && tx >= 43 && tx <= 51) return PLAT;
-  if (ty === -2864 && tx >= -51 && tx <= -43) return PLAT;
-  if (tx >= 44 && tx <= 51 && ty < H && ty >= -3104 && ty % 4 === 0) return ((Math.floor(ty / 4) & 1) ? tx < 48 : tx >= 48) ? PLAT : AIR;
-  if (tx >= -51 && tx <= -44 && ty > H && ty <= -2864 && ty % 4 === 0) return ((Math.floor(ty / 4) & 1) ? tx < -47 : tx >= -47) ? PLAT : AIR;
-  if (olyClear(tx, ty)) return AIR;
-  const n = fbm(tx * 0.04, ty * 0.085, 17, 3) + (vnoise(tx * 0.2, ty * 0.3, 19) - 0.5) * 0.12;
-  if (n > 0.64) return ROCK;
-  // a scattering of floating marble ledges between the islands
-  if (ty % 7 === 0 && vnoise(tx * 0.18, ty * 0.4, 29) > 0.72) return PLAT;
-  return AIR;
+  if (ax <= HUB_EXIT && ty >= H && ty <= H + 2) return BRICK;
+  if (ax <= HUB_W && ty >= H - HUB_H && ty < H) return AIR;
+  if (ax <= HUB_EXIT && ty >= H - 4 && ty < H) return AIR;
+  const m = mazeTile(SKYM, tx, ty);
+  return m === M_WALL ? ROCK : m === M_PLAT ? PLAT : AIR;
 }
 
 // Open sky: drifting cloud islands, thickening into a sea of cloud just above the underworld.
@@ -200,10 +205,8 @@ function skyTile(tx, ty) {
 }
 
 function caveTile(tx, ty) {
-  const B = BIOMES[BIOME_LIST[biomeAt(tx, ty)]];
-  let n = fbm(tx * 0.034, ty * 0.05, 11, 4) + (vnoise(tx * 0.15, ty * 0.15, 23) - 0.5) * 0.14;
-  n -= Math.max(0, vnoise(tx * 0.009, ty * 0.009, 99) - 0.62) * 1.1;
-  return n > B.thr ? ROCK : AIR;
+  const m = mazeTile(UNDER, tx, ty);
+  return m === M_WALL ? ROCK : m === M_PLAT ? PLAT : AIR;
 }
 
 export function baseTile(tx, ty) {
@@ -214,6 +217,8 @@ export function baseTile(tx, ty) {
     return inRect(tx, ty, HS, 4) ? arenaTile(HS, tx, ty) : ROCK;
   }
   for (let i = 0; i < 4; i++) if (inRect(tx, ty, SITES[i], 4)) return arenaTile(SITES[i], tx, ty);
+  const a = approach(tx, ty);
+  if (a !== undefined) return a;
   if (tx >= -48 && tx <= 48 && ty >= -40 && ty <= 14) return townTile(tx, ty);
   const r = roadTile(tx, ty);
   if (r !== undefined) return r === -1 ? (caveTile(tx, ty) === AIR ? PLAT : ROCK) : r;
@@ -227,6 +232,7 @@ export function isSpecial(tx, ty) {
   if (nearZeus(tx, ty, 42)) return true;
   if (inOly(tx, ty, 10)) return !inOly(tx, ty) || olyClear(tx, ty);
   for (let i = 0; i < 4; i++) if (inRect(tx, ty, SITES[i], 7)) return true;
+  if (approach(tx, ty) !== undefined) return true;
   return roadTile(tx, ty) !== undefined || roadTile(tx, ty - 1) !== undefined || roadTile(tx, ty + 1) !== undefined ||
     roadTile(tx - 1, ty) !== undefined || roadTile(tx + 1, ty) !== undefined;
 }
@@ -264,10 +270,7 @@ LANDMARKS.push(
   { type: 'sign', id: 'sign_ou', tx: 55, ty: OLY.hub, text: 'Athena  ↑' },
   { type: 'sign', id: 'sign_od', tx: -56, ty: OLY.hub, text: 'Poseidon  ↓' },
   // a shrine at the door of each temple
-  { type: 'shrine', id: 'oly_ares', tx: -150, ty: OLY.hub, name: 'Temple of Ares' },
-  { type: 'shrine', id: 'oly_apollo', tx: 150, ty: OLY.hub, name: 'Temple of Apollo' },
-  { type: 'shrine', id: 'oly_athena', tx: 50, ty: -3104, name: 'Temple of Athena' },
-  { type: 'shrine', id: 'oly_poseidon', tx: -45, ty: -2864, name: 'Temple of Poseidon' },
+  ...GODS.map(s => ({ type: 'shrine', id: 'oly_' + s.id, tx: s.tx + (s.tx > 0 || s.id === 'poseidon' ? -1 : 1) * (s.w / 2 + 8), ty: s.ty + s.h / 2 + 1, name: 'Temple of ' + s.name })),
   { type: 'portal', id: 'portal_zeus', tx: ZS.tx, ty: ZS.ty + ZS.h / 2 + 1, hidden: 1 },
 );
 for (const l of LANDMARKS) { l.x = (l.tx + 0.5) * T; l.y = l.ty * T; }
@@ -371,10 +374,10 @@ function genChunk(cx, cy, k) {
   if (bi !== 5 && dist > 40) {
     if (rng() < 0.2) { const s = take(floor); if (s) place(s, { type: 'chest', id: k + ':c', level: lvl, big: rng() < 0.15 }); }
     if (rng() < 0.035) { const s = take(floor); if (s) place(s, { type: 'shrine', id: k + ':s', name: B.name + ' Shrine' }); }
-    if (rng() < 0.4) { const s = take(floor); if (s) place(s, { type: 'torch', id: k + ':t' }); }
+    if (rng() < 0.55) { const s = take(floor); if (s) place(s, { type: 'torch', id: k + ':t' }); }
     if (dist > 60 && Object.keys(B.enemies).length) {
       // the heavens are crowded with guardians: one to three in every chunk
-      const n = B.heaven ? 1 + Math.floor(rng() * 2.4) : rng() < 0.65 ? 1 + Math.floor(rng() * 1.7) : 0;
+      const n = B.heaven ? 2 + Math.floor(rng() * 1.8) : 1 + Math.floor(rng() * 2.6);
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
         const fly = type === 'bat' || type === 'wisp' || type === 'cherub' || type === 'seraph' || type === 'ophan';
@@ -384,8 +387,27 @@ function genChunk(cx, cy, k) {
         c.spawns.push({ type, x: (cx * CS + s[0] + 0.5) * T, y: (cy * CS + s[1] + (hang ? 0 : 1)) * T, hang: !!hang, level: lvl, biome: bi, ent: null, deadAt: -999 });
       }
     }
+    deadEnds(c, get, lvl);
   }
   return c;
+}
+
+// Treasure at the far end of many dead ends, to make every wrong turn worth taking.
+function deadEnds(c, get, lvl) {
+  const x0 = c.cx * CS, y0 = c.cy * CS, oly = inOly(x0 + 8, y0 + 8);
+  if (!oly && y0 + 8 < SKY_Y) return;
+  const M = oly ? SKYM : UNDER, { CW, CH } = M;
+  for (let gy = Math.floor(y0 / CH) - 1; gy <= Math.floor((y0 + CS) / CH); gy++) {
+    for (let gx = Math.floor(x0 / CW) - 1; gx <= Math.floor((x0 + CS) / CW); gx++) {
+      const e = M.exits(gx, gy);
+      if (e.l + e.u + e.r + e.d !== 1 || hash2(gx, gy, M.seed + 11) > 0.5) continue;
+      const lx = e.l ? CW - 1 : e.r ? 2 : hash2(gx, gy, M.seed + 12) < 0.5 ? 2 : CW - 1;
+      const tx = gx * CW + lx, ty = gy * CH + CH - 1, i = tx - x0, j = ty - y0;
+      if (i < 0 || i >= CS || j < 0 || j >= CS) continue;
+      if (get(i, j) !== AIR || !isSolid(get(i, j + 1)) || isSpecial(tx, ty)) continue;
+      c.objects.push({ type: 'chest', id: c.k + ':d' + gx + '_' + gy, level: lvl, big: hash2(gx, gy, M.seed + 13) < 0.3, x: (tx + 0.5) * T, y: (ty + 1) * T });
+    }
+  }
 }
 
 // ---------- Chunk rendering ----------
