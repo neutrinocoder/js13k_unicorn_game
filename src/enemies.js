@@ -46,6 +46,8 @@ export function makeEnemy(type, x, y, level, biome, hang = false) {
 // Walking enemies only turn once the player is clearly off to one side, and slow to a stop as
 // they get underneath. Without this, a player straight above or below makes them flip direction
 // every frame and shake left and right. Returns the speed to move at in the facing direction.
+const shotDmg = e => Math.max(1, e.dmg - 1);
+
 function chase(e, dx, speed) {
   const dz = e.w * 0.5 + 16;
   if (dx > dz) e.face = 1;
@@ -110,14 +112,21 @@ export function updateEnemy(e, dt) {
         if (Math.random() < 0.5) part({ x: cx + rand(-20, 20), y: e.y + e.h, vy: -40, life: 0.4, size: 3, color: e.type === 'angel' ? '#fff6c4' : '#ccc', add: e.type === 'angel' });
         if (e.t2 <= 0) { e.state = 'charge'; e.t2 = 1; }
       } else if (e.state === 'charge') {
-        e.vx = e.face * 640;
+        e.vx = e.face * (e.type === 'angel' ? 800 : 640);
         if (Math.random() < 0.7) part({ x: cx - e.face * 20, y: e.y + e.h - 4, vx: -e.face * 80, vy: -30, life: 0.4, size: 4, color: e.accent, add: true });
-        if (e.hitWall) { e.state = 'idle'; e.cd = 1.1; shake(6); sfx('land'); }
-        else if (e.t2 <= 0) { e.state = 'idle'; e.cd = 0.9; }
+        if (e.hitWall) { e.state = 'idle'; e.cd = e.type === 'angel' ? 0.6 : 1.1; shake(6); sfx('land'); }
+        else if (e.t2 <= 0) { e.state = 'idle'; e.cd = e.type === 'angel' ? 0.5 : 0.9; }
       } else {
         if (aware) {
-          e.vx += (e.face * chase(e, dx, 165) - e.vx) * Math.min(1, 5 * dt);
-          if (e.cd < 0 && Math.abs(dy) < 120 && Math.abs(dx) > 40 && Math.abs(dx) < 600) { e.state = 'wind'; e.t2 = 0.45; }
+          const angel = e.type === 'angel';
+          e.vx += (e.face * chase(e, dx, angel ? 215 : 165) - e.vx) * Math.min(1, 5 * dt);
+          if (angel && e.ground && e.cd < 0 && dy < -110 && Math.abs(dx) < 340) {
+            // spread the wings and leap up at a player above
+            e.vy = -1000; e.vx = clamp(dx * 1.6, -420, 420); e.cd = 1.3;
+            for (let i = 0; i < 10; i++) part({ x: cx + rand(-18, 18), y: e.y + e.h - 6, vx: rand(-120, 120), vy: rand(-40, 60), life: 0.7, size: 3, color: '#ffffff', add: true });
+            sfx('dash', 0.5);
+          }
+          if (e.cd < 0 && Math.abs(dy) < 120 && Math.abs(dx) > 40 && Math.abs(dx) < 600) { e.state = 'wind'; e.t2 = angel ? 0.32 : 0.45; }
           if (e.ground && e.hitWall && e.cd < 0) { e.vy = -600; e.cd = 0.6; }
         } else wander(45);
       }
@@ -141,10 +150,14 @@ export function updateEnemy(e, dt) {
     }
     case 'bat':
     case 'cherub': {
-      if (e.type === 'cherub' && aware && e.cd < 0 && d < 520) {
-        e.cd = rand(2.2, 3.2);
+      if (e.type === 'cherub' && aware && e.cd < 0 && d < 560) {
+        e.cd = rand(1.6, 2.4);
         e.t2 = 0.3;
-        shoot({ x: cx + e.face * 8, y: cy, vx: (dx / d) * 420, vy: (dy / d) * 420, r: 5, dmg: 1, color: '#ff8ad8', kind: 'shard', tip: '#ffe9f6', life: 2.5 });
+        const a0 = Math.atan2(dy, dx);
+        for (let i = -1; i <= 1; i++) {
+          const a = a0 + i * 0.22;
+          shoot({ x: cx + e.face * 8, y: cy, vx: Math.cos(a) * 470, vy: Math.sin(a) * 470, r: 5, dmg: shotDmg(e), color: '#ff8ad8', kind: 'shard', tip: '#ffe9f6', life: 2.5 });
+        }
         sfx('shoot');
       }
       if (aware) {
@@ -162,17 +175,17 @@ export function updateEnemy(e, dt) {
     }
     case 'wisp':
     case 'seraph': {
-      if (e.type === 'seraph' && aware && e.cd < 0 && d < 460) {
-        e.cd = rand(3.2, 4.2);
+      if (e.type === 'seraph' && aware && e.cd < 0 && d < 500) {
+        e.cd = rand(2.5, 3.3);
         e.t2 = 0.3;
-        for (let i = 0; i < 6; i++) {
-          const a = (i / 6) * Math.PI * 2 + e.t;
-          shoot({ x: cx, y: cy, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, r: 6, dmg: 1, color: '#ffb347', kind: 'orb', ghost: true, life: 2.6, trail: '#ff7a2a' });
+        for (let i = 0; i < 9; i++) {
+          const a = (i / 9) * Math.PI * 2 + e.t;
+          shoot({ x: cx, y: cy, vx: Math.cos(a) * 230, vy: Math.sin(a) * 230, r: 6, dmg: shotDmg(e), color: '#ffb347', kind: 'orb', ghost: true, life: 2.6, trail: '#ff7a2a' });
         }
         sfx('fire');
       }
       if (aware) {
-        const s = 80 + e.level * 2;
+        const s = (e.type === 'seraph' ? 120 : 80) + e.level * 2;
         e.vx += ((dx / d) * s - e.vx) * 1.4 * dt;
         e.vy += ((dy / d) * s - e.vy) * 1.4 * dt;
         if (e.type === 'wisp' && e.level >= 5 && e.cd < 0 && d < 420) {
@@ -195,10 +208,14 @@ export function updateEnemy(e, dt) {
       e.vx *= 0.9;
       e.y = e.homeY + Math.sin(e.t * 1.6) * 6;
       if (aware) chase(e, dx, 0);
-      if (aware && e.cd < 0 && d < 620) {
-        e.cd = rand(2.1, 2.7);
+      if (aware && e.cd < 0 && d < 660) {
+        e.cd = rand(1.7, 2.2);
         e.t2 = 0.25;
-        shoot({ x: cx + e.face * 10, y: cy, vx: (dx / d) * 380, vy: (dy / d) * 380, r: 7, dmg: 1, color: '#fff2a8', kind: 'orb', life: 3, trail: '#ffe28a' });
+        const a0 = Math.atan2(dy, dx);
+        for (let i = -1; i <= 1; i++) {
+          const a = a0 + i * 0.16;
+          shoot({ x: cx + e.face * 10, y: cy, vx: Math.cos(a) * 430, vy: Math.sin(a) * 430, r: 7, dmg: shotDmg(e), color: '#fff2a8', kind: 'orb', life: 3, trail: '#ffe28a' });
+        }
         sfx('shoot');
       }
       break;

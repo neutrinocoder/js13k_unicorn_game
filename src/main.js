@@ -10,7 +10,7 @@ import { spawnBoss, updateBoss } from './bosses.js';
 import { updateProjs, updatePickups, dropGems } from './combat.js';
 import { updateFx, part, burst, ring, floater, shake } from './fx.js';
 import { render, drawMap, mapToScreen, shrinePos } from './render.js';
-import { stats, grantReward } from './items.js';
+import { stats, grantReward, SHOP } from './items.js';
 import { rand, clamp, mix, pick, RAINBOW } from './util.js';
 import { initDev, devOpen } from './dev.js';
 import { show, hide, isShown, toast as uiToast, openShop, closeShop, openDialog, advanceDialog } from './ui.js';
@@ -340,6 +340,9 @@ const WEAPON_OF = { stars: 2, beam: 3, bombs: 4 };
 function rewardCard(id, then) {
   const r = grantReward(id);
   if (!r) { then && then(); return; }
+  // tell the player which new wares the shopkeepers now sell
+  const wares = SHOP.filter(it => it.unlock === id).map(it => it.icon + ' ' + it.name);
+  const lines = wares.length ? [r.text, 'New wares at every shop: ' + wares.join(', ') + '.'] : [r.text];
   if (WEAPON_OF[r.up] != null && G.save.up[r.up] === 1) G.save.weapon = WEAPON_OF[r.up];
   if (r.up === 'fly' && G.player) G.player.wing = stats().flyMax;
   saveGame();
@@ -349,7 +352,7 @@ function rewardCard(id, then) {
     const p = G.player;
     ring(p.x + p.w / 2, p.y + p.h / 2, 160, '#ffe14a', 0.6, 8);
     burst(p.x + p.w / 2, p.y + p.h / 2, 40, ['#ffe14a', '#ffffff', ...RAINBOW], 320, { add: true, g: -80 });
-    openDialog('Powerup: ' + r.name, [r.text], then, r.icon);
+    openDialog('Powerup: ' + r.name, lines, then, r.icon);
   };
   setTimeout(show, 1500);
 }

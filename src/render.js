@@ -1,6 +1,6 @@
 // Drawing: parallax backgrounds, the tile world, objects, lighting and the HUD.
 import { G } from './state.js';
-import { T, CS, CPX, getChunk, chunkCanvas, chunkMini, BIOMES, BIOME_LIST, SITES, LANDMARKS, levelAt, drawLiquids, GODS } from './world.js';
+import { T, CS, CPX, getChunk, chunkCanvas, chunkMini, BIOMES, BIOME_LIST, SITES, LANDMARKS, levelAt, HEAVEN_LVL, drawLiquids, GODS } from './world.js';
 import { part } from './fx.js';
 
 // Sparks and fumes thrown up by bubbles popping on lava and acid.
@@ -1059,7 +1059,7 @@ function drawMinimap(ctx) {
   const B = BIOMES[BIOME_LIST[G.biome]];
   ctx.font = '700 14px Cinzel, serif';
   ctx.textAlign = 'center';
-  const lv = B.heaven ? 12 : levelAt(Math.round(ptx), Math.round(pty));
+  const lv = B.heaven ? HEAVEN_LVL : levelAt(Math.round(ptx), Math.round(pty));
   hudTextSmall(ctx, B.name + '  ·  Danger ' + lv, mx, my + R + 18, '#f3e7ff');
   ctx.font = '700 11px Nunito, sans-serif';
   hudTextSmall(ctx, 'M — map', mx, my + R + 50, 'rgba(255,255,255,.5)');

@@ -14,7 +14,7 @@ export function makePlayer(x, y) {
     x, y, w: 30, h: 34, vx: 0, vy: 0, face: 1, ground: false, jumps: 0, coyote: 0, jbuf: 0, rising: false,
     dashT: 0, dashCd: 0, dashDir: 1, inv: 0, hp: 5, shield: 0, ctrlLock: 0, wallDir: 0, dropT: 0,
     whipT: 0, whipAng: 0, whipCd: 0, whipSide: 1, combo: 0, lastWhip: -9, blastCd: 0, starCd: 0, atkBuf: 0, altBuf: 0,
-    energy: 100, beaming: false, beamLen: 0, beamTick: 0, wing: 200, flying: false, flapT: 0, bombCd: 0,
+    energy: 100, beaming: false, beamLen: 0, beamTick: 0, aegis: 0, wing: 200, flying: false, flapT: 0, bombCd: 0,
     charge: 0, slow: 0, gliding: false, runPhase: 0, sx: 1, sy: 1, ax: 1, ay: 0, stepT: 0, dead: false, tail: [],
   };
   for (let i = 0; i < 12; i++) p.tail.push({ x: x, y: y + 10, px: x, py: y + 10 });
@@ -33,6 +33,8 @@ export function updatePlayer(dt) {
   if (p.dead) return;
   p.inv -= dt; p.dashCd -= dt; p.ctrlLock -= dt; p.whipCd -= dt; p.blastCd -= dt; p.starCd -= dt; p.bombCd -= dt;
   p.shield -= dt; p.slow -= dt; p.dropT -= dt; p.whipT -= dt;
+  // the Aegis recharges after blocking a hit
+  if (S.aegis && p.aegis > 0) { p.aegis -= dt; if (p.aegis <= 0) { sfx('bubble', 0.5); ring(p.x + p.w / 2, p.y + p.h / 2, 50, '#ffe14a', 0.4, 5); } }
   if (p.hp > S.maxHp) p.hp = S.maxHp;
 
   const L = held('KeyA', 'ArrowLeft'), R = held('KeyD', 'ArrowRight'), U = held('KeyW', 'ArrowUp'), D = held('KeyS', 'ArrowDown');
@@ -139,7 +141,7 @@ export function updatePlayer(dt) {
 
     // Dash
     if (tapped('KeyC', 'ShiftLeft', 'ShiftRight', 'KeyL') && p.dashCd <= 0) {
-      p.dashT = 0.16; p.dashCd = 0.55; p.dashDir = dir || p.face; p.inv = Math.max(p.inv, 0.25);
+      p.dashT = 0.16; p.dashCd = S.dashCd; p.dashDir = dir || p.face; p.inv = Math.max(p.inv, S.dashInv);
       sfx('dash');
       ring(cx, cy, 30, '#ffffff', 0.25, 4);
     }
@@ -303,8 +305,11 @@ function fireBlast(p, S) {
 function fireStar(p, S) {
   if (p.starCd > 0) return false;
   p.starCd = 0.11;
-  const h = hornTip(p), a = Math.atan2(p.ay, p.ax) + rand(-0.12, 0.12);
-  shoot({ x: h.x, y: h.y, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760, r: 6, dmg: S.starDmg, team: 'player', kind: 'star', color: pick(['#ffe14a', '#ff9ad6', '#8fe8ff']), homing: true, life: 1.3, trail: '#fff2a8' });
+  const h = hornTip(p), a0 = Math.atan2(p.ay, p.ax);
+  for (let i = 0; i < S.stars; i++) {
+    const a = a0 + (S.stars > 1 ? (i / (S.stars - 1) - 0.5) * 0.5 : 0) + rand(-0.12, 0.12);
+    shoot({ x: h.x, y: h.y, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760, r: 6, dmg: S.starDmg, team: 'player', kind: 'star', color: pick(['#ffe14a', '#ff9ad6', '#8fe8ff']), homing: true, life: 1.3, trail: '#fff2a8' });
+  }
   sfx('star');
   return true;
 }
@@ -312,7 +317,7 @@ function fireStar(p, S) {
 function fireBeam(p, S, dt) {
   if (p.energy <= 0) return false;
   p.beaming = true;
-  p.energy = Math.max(0, p.energy - 42 * dt);
+  p.energy = Math.max(0, p.energy - S.beamDrain * dt);
   const h = hornTip(p), ox = h.x, oy = h.y;
   const len = rayLength(ox, oy, p.ax, p.ay, 560);
   p.beamLen = len;
@@ -749,6 +754,13 @@ export function drawUnicorn(ctx, p, t) {
   ctx.globalAlpha = 1;
 
   // Shield bubble
+  if (G.save.up.aegis > 0 && p.aegis <= 0) {
+    // a faint golden ring while the Aegis Shield is ready to block
+    const cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 14;
+    ctx.strokeStyle = `rgba(255,225,74,${0.35 + Math.sin(t * 4) * 0.12})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 48, 0, Math.PI * 2); ctx.stroke();
+  }
   if (p.shield > 0) {
     const cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 14;
     ctx.globalCompositeOperation = 'lighter';

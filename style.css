@@ -61,6 +61,8 @@ h1 .t2 { display: block; font-size: clamp(56px, 12vw, 150px); background: var(--
 .item em { font-style: normal; color: var(--gold); font-size: 12px; letter-spacing: 0.1em; }
 .item .price { font: 900 17px Nunito, sans-serif; color: #ffe9b0; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
 .item.poor .price { color: #8a7a9a; }
+.item.locked { opacity: 0.45; cursor: default; filter: grayscale(0.7); }
+.item.locked em { color: #b8a8d0; }
 .item.poor { opacity: 0.75; }
 .item.done { opacity: 0.5; cursor: default; }
 .item.done .price { color: #7fe0a0; }

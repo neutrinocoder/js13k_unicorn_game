@@ -19,6 +19,17 @@ export function hurtPlayer(n, sx, kb = 1) {
     p.inv = 0.4;
     return false;
   }
+  const S = stats();
+  if (S.aegis && p.aegis <= 0) {
+    // the Aegis Shield takes the whole blow, then needs time to recharge
+    p.aegis = S.aegisCd;
+    p.inv = 1;
+    ring(cx, cy, 70, '#ffe14a', 0.4, 8);
+    burst(cx, cy, 18, ['#ffe14a', '#ffffff'], 260, { add: true });
+    floater(cx, p.y - 6, 'BLOCKED', '#ffe14a', 18);
+    sfx('bubble');
+    return false;
+  }
   p.hp -= n;
   p.inv = 1.5;
   p.vy = -380 * kb;
@@ -31,6 +42,16 @@ export function hurtPlayer(n, sx, kb = 1) {
   sfx('hurt');
   floater(cx, p.y - 6, '-' + n, '#ff5a6a', 20);
   burst(cx, cy, 14, ['#ff3d5a', '#ffffff'], 260);
+  if (p.hp <= 0 && G.save.up.phoenix > 0) {
+    // the Phoenix Feather burns away and you rise again
+    G.save.up.phoenix = 0;
+    p.hp = S.maxHp;
+    p.inv = 2.5;
+    ring(cx, cy, 220, '#ff8a1a', 0.7, 12);
+    burst(cx, cy, 60, ['#ffe36b', '#ff8a1a', '#ff4a1a', '#ffffff'], 460, { add: true, g: -200 });
+    floater(cx, p.y - 10, 'REBORN!', '#ffb347', 26);
+    sfx('heal');
+  }
   if (p.hp <= 0) onPlayerDeath();
   return true;
 }
@@ -62,7 +83,17 @@ export function killEnemy(e) {
   ring(cx, cy, 60, e.accent || '#fff');
   shake(4);
   sfx('kill');
-  dropGems(cx, cy, Math.round(e.gem * (0.6 + e.level * 0.5) * rand(1, 1.5)));
+  const S = stats();
+  dropGems(cx, cy, Math.round(e.gem * (0.6 + e.level * 0.5) * rand(1, 1.5) * S.gemK));
+  if (S.ichor) {
+    // the Chalice of Ichor heals you after enough foes fall
+    G.save.ichorN = (G.save.ichorN || 0) + 1;
+    const p = G.player;
+    if (G.save.ichorN >= S.ichor && p && !p.dead) {
+      G.save.ichorN = 0;
+      if (p.hp < S.maxHp) { p.hp++; floater(p.x + p.w / 2, p.y - 10, '+1 ♥', '#ff8aa6', 18); sfx('heal'); }
+    }
+  }
   if (Math.random() < 0.16) G.pickups.push({ kind: 'heart', x: cx, y: cy, vx: rand(-80, 80), vy: -300, t: 0 });
   if (e.spawn) { e.spawn.deadAt = G.t; e.spawn.ent = null; }
   G.save.stats.kills++;

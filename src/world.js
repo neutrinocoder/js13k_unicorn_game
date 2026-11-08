@@ -59,11 +59,11 @@ export const SITES = [
   { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 430, w: 76, h: 30, hp: 210 },
   { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 480 },
   // Olympus: four gods guard the Sigils that open the way to Zeus.
-  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -200, ty: -3015, w: 76, h: 30, hp: 300, god: 1 },
-  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 200, ty: -3015, w: 76, h: 30, hp: 270, god: 1 },
-  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -3120, w: 76, h: 30, hp: 290, god: 1 },
-  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -2880, w: 76, h: 30, hp: 330, god: 1 },
-  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -3600, w: 84, h: 36, hp: 800 },
+  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -200, ty: -3015, w: 76, h: 30, hp: 660, god: 1 },
+  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 200, ty: -3015, w: 76, h: 30, hp: 600, god: 1 },
+  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -3120, w: 76, h: 30, hp: 640, god: 1 },
+  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -2880, w: 76, h: 30, hp: 720, god: 1 },
+  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -3600, w: 84, h: 36, hp: 1700 },
 ];
 const HS = SITES[4];
 export const GODS = SITES.slice(5, 9);
@@ -124,6 +124,8 @@ export function biomeAt(tx, ty) {
 }
 
 export const levelAt = (tx, ty) => 1 + Math.floor(Math.hypot(tx, ty) / 55);
+// Everything in the heavens fights at this level: far stronger than the underworld's circles.
+export const HEAVEN_LVL = 18;
 
 function arenaInner(s, dx, dy) {
   const hw = s.w / 2, hh = s.h / 2, ax = Math.abs(dx);
@@ -358,7 +360,7 @@ function genChunk(cx, cy, k) {
     if (isSolid(get(i, j - 1)) && below === AIR && get(i, j + 2) === AIR) ceil.push([i, j]);
   }
   const bi = bio[8 * CS + 8], B = BIOMES[BIOME_LIST[bi]];
-  const tcx = cx * CS + 8, tcy = cy * CS + 8, dist = Math.hypot(tcx, tcy), lvl = B.heaven ? 12 : levelAt(tcx, tcy);
+  const tcx = cx * CS + 8, tcy = cy * CS + 8, dist = Math.hypot(tcx, tcy), lvl = B.heaven ? HEAVEN_LVL : levelAt(tcx, tcy);
   const take = list => (list.length ? list.splice(Math.floor(rng() * list.length), 1)[0] : null);
   const place = (spot, o) => {
     o.x = (cx * CS + spot[0] + 0.5) * T;
@@ -371,7 +373,8 @@ function genChunk(cx, cy, k) {
     if (rng() < 0.035) { const s = take(floor); if (s) place(s, { type: 'shrine', id: k + ':s', name: B.name + ' Shrine' }); }
     if (rng() < 0.4) { const s = take(floor); if (s) place(s, { type: 'torch', id: k + ':t' }); }
     if (dist > 60 && Object.keys(B.enemies).length) {
-      const n = rng() < 0.65 ? 1 + Math.floor(rng() * 1.7) : 0;
+      // the heavens are crowded with guardians: one to three in every chunk
+      const n = B.heaven ? 1 + Math.floor(rng() * 2.4) : rng() < 0.65 ? 1 + Math.floor(rng() * 1.7) : 0;
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
         const fly = type === 'bat' || type === 'wisp' || type === 'cherub' || type === 'seraph' || type === 'ophan';

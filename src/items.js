@@ -13,7 +13,21 @@ export const SHOP = [
   { id: 'bubble', name: 'Sea-Foam Pearl', icon: '🫧', desc: 'Bubbles charge 30% faster.', max: 2, cost: l => 70 + l * 70 },
   { id: 'lantern', name: 'Horn Lantern', icon: '🏮', desc: 'Your horn lights the dark further.', max: 2, cost: l => 45 + l * 45 },
   { id: 'hooves', name: 'Bronze Hooves', icon: '🐎', desc: 'Dashing through enemies hurts them.', max: 1, cost: () => 110 },
+  // Wares the shopkeepers only bring out once a great foe has fallen ("unlock" names that boss).
+  { id: 'constellation', name: 'Constellation', icon: '✨', desc: 'Starfall shoots one more star with every shot.', max: 2, unlock: 'cerberus', cost: l => 160 + l * 160 },
+  { id: 'icarus', name: 'Icarus Feathers', icon: '🦢', desc: '+50% flight energy, and it refills faster.', max: 2, unlock: 'storm', cost: l => 150 + l * 150 },
+  { id: 'forge', name: "Hephaestus' Forge", icon: '🔨', desc: 'Bombs hit 30% harder and recharge faster.', max: 3, unlock: 'heretic', cost: l => 170 + l * 150 },
+  { id: 'apple', name: 'Golden Apple', icon: '🍎', desc: '+1 maximum health, beyond the Hearts of Olympus.', max: 4, unlock: 'hades', cost: l => 260 + l * 180 },
+  { id: 'aegis', name: 'Aegis Shield', icon: '🛡️', desc: 'Blocks one hit completely, then recharges (30s, or 18s at level 2).', max: 2, unlock: 'hades', cost: l => 380 + l * 320 },
+  { id: 'lens', name: 'Helios Lens', icon: '🔭', desc: 'Rainbow Lance burns 30% hotter and drains less energy.', max: 3, unlock: 'hades', cost: l => 240 + l * 200 },
+  { id: 'talaria', name: 'Winged Sandals', icon: '👟', desc: 'Dash recharges 30% faster and keeps you safe for longer.', max: 2, unlock: 'ares', cost: l => 320 + l * 260 },
+  { id: 'ichor', name: 'Chalice of Ichor', icon: '🏆', desc: 'Heal 1 health for every 10 foes you defeat (6 at level 2).', max: 2, unlock: 'apollo', cost: l => 420 + l * 380 },
+  { id: 'phoenix', name: 'Phoenix Feather', icon: '🔥', desc: 'If you fall, rise again with full health. It burns away when used.', max: 1, unlock: 'athena', cost: () => 600 },
+  { id: 'midas', name: "Midas' Ring", icon: '💍', desc: 'Defeated foes drop 40% more gems.', max: 2, unlock: 'poseidon', cost: l => 380 + l * 340 },
 ];
+
+// Shop items that are still locked behind a boss.
+export const shopLocked = it => !!it.unlock && !(G.save.bosses && G.save.bosses[it.unlock]);
 
 export const WEAPONS = [
   { id: 'whip', name: 'Tail Whip', key: '1' },
@@ -58,19 +72,28 @@ export const ownsWeapon = i => !WEAPONS[i].need || G.save.up[WEAPONS[i].need] > 
 
 export function stats() {
   const u = G.save.up, dm = 1 + 0.25 * (u.might || 0), fly = u.fly || 0, bombs = u.bombs || 0;
+  const ic = u.icarus || 0, fg = u.forge || 0, ln = u.lens || 0;
   return {
-    maxHp: 6 + u.heart,
+    maxHp: 6 + u.heart + (u.apple || 0),
     whipDmg: (2 + u.tail * 1.5) * dm,
     reach: 125 * (1 + 0.15 * u.reach),
     blastCd: 1.1 * Math.pow(0.8, u.blast),
     blastDmg: (6 + u.blast * 3) * dm,
     speed: 1 + 0.2 * (u.swift || 0),
     fly: fly > 0,
-    flyMax: fly >= 2 ? 200 : 100,
-    flyRegen: fly >= 2 ? 90 : 55,
-    bombDmg: (bombs >= 2 ? 16 : 11) * dm,
+    flyMax: (fly >= 2 ? 200 : 100) * (1 + 0.5 * ic),
+    flyRegen: (fly >= 2 ? 90 : 55) * (1 + 0.4 * ic),
+    bombDmg: (bombs >= 2 ? 16 : 11) * dm * (1 + 0.3 * fg),
     bombR: bombs >= 2 ? 150 : 115,
-    bombCd: bombs >= 2 ? 0.45 : 0.7,
+    bombCd: (bombs >= 2 ? 0.45 : 0.7) * Math.pow(0.82, fg),
+    stars: 1 + (u.constellation || 0),
+    beamDrain: 42 * Math.pow(0.78, ln),
+    dashCd: 0.55 * Math.pow(0.7, u.talaria || 0),
+    dashInv: 0.25 + 0.1 * (u.talaria || 0),
+    aegis: u.aegis > 0,
+    aegisCd: u.aegis >= 2 ? 18 : 30,
+    ichor: u.ichor >= 2 ? 6 : u.ichor > 0 ? 10 : 0,
+    gemK: 1 + 0.4 * (u.midas || 0),
     jumps: 2 + u.triple,
     glide: u.wings > 0,
     bubbleT: 10 * Math.pow(0.7, u.bubble),
@@ -78,6 +101,6 @@ export function stats() {
     light: 330 + u.lantern * 120,
     hooves: u.hooves > 0,
     starDmg: (1 + u.tail * 0.4) * dm,
-    beamDmg: (1.6 + u.tail * 0.5) * dm,
+    beamDmg: (1.6 + u.tail * 0.5) * dm * (1 + 0.3 * ln),
   };
 }

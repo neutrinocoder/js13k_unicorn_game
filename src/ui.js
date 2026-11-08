@@ -1,6 +1,7 @@
 // HTML overlays: shop, dialogue, toasts and screens.
 import { G } from './state.js';
-import { SHOP, stats } from './items.js';
+import { SHOP, stats, shopLocked } from './items.js';
+import { SITES } from './world.js';
 import { sfx } from './audio.js';
 
 const $ = id => document.getElementById(id);
@@ -55,7 +56,17 @@ function renderShop() {
   $('shop-gems').textContent = inf ? '∞' : G.save.gems.toLocaleString();
   const box = $('shop-items');
   box.innerHTML = '';
-  for (const it of SHOP) {
+  // items still locked behind a boss go to the end of the list, greyed out
+  const list = [...SHOP.filter(it => !shopLocked(it)), ...SHOP.filter(shopLocked)];
+  for (const it of list) {
+    if (shopLocked(it)) {
+      const card = document.createElement('div');
+      const boss = SITES.find(x => x.id === it.unlock);
+      card.className = 'item locked';
+      card.innerHTML = `<span class="icon">🔒</span><span class="info"><b>${it.name}</b><small>${it.desc}</small><em>Defeat ${boss ? boss.name : 'a great foe'} to unlock</em></span><span class="price">${it.icon}</span>`;
+      box.appendChild(card);
+      continue;
+    }
     const lv = level(it), max = it.consumable ? 3 : it.max, done = lv >= max, cost = it.cost(lv), afford = inf || G.save.gems >= cost;
     const card = document.createElement('button');
     card.className = 'item' + (done ? ' done' : afford ? '' : ' poor');
@@ -68,6 +79,7 @@ function renderShop() {
 }
 
 function buy(it) {
+  if (shopLocked(it)) return;
   const lv = level(it), max = it.consumable ? 3 : it.max, cost = it.cost(lv);
   if (lv >= max) return;
   const inf = G.save.dev && G.save.dev.infGems;
@@ -76,7 +88,8 @@ function buy(it) {
   if (it.id === 'potion') G.save.potions++;
   else {
     G.save.up[it.id]++;
-    if (it.id === 'heart') G.player.hp = stats().maxHp;
+    if (it.id === 'heart' || it.id === 'apple') G.player.hp = stats().maxHp;
+    if (it.id === 'icarus') G.player.wing = stats().flyMax;
     if (it.id === 'stars') { G.save.weapon = 2; toast('Starfall ready — press 3.'); }
     if (it.id === 'beam') { G.save.weapon = 3; toast('Rainbow Lance ready — press 4.'); }
   }

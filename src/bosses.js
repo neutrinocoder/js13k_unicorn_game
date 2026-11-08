@@ -1,12 +1,12 @@
 // Boss fights: Cerberus, Semiramis, Farinata, Ephialtes and Hades in the underworld, then the gods of
 // Olympus (Ares, Apollo, Athena, Poseidon) and Zeus himself.
 import { G } from './state.js';
-import { T, BIOMES, BIOME_LIST, SITES } from './world.js';
+import { T, BIOMES, BIOME_LIST, SITES, HEAVEN_LVL } from './world.js';
 import { moveBody } from './physics.js';
 import { rand, pick, clamp, shade, overlap, RAINBOW } from './util.js';
 import { burst, part, ring, shake, floater } from './fx.js';
 import { sfx, setTheme } from './audio.js';
-import { hurtPlayer, shoot, dropGems } from './combat.js';
+import { hurtPlayer as hurtP, shoot as shootP, dropGems } from './combat.js';
 import { makeEnemy } from './enemies.js';
 import { announce, onBossDefeated } from './main.js';
 import * as BART from './bossart.js';
@@ -14,6 +14,10 @@ import * as GART from './godart.js';
 import { lightning } from './art.js';
 
 const ART = { ...BART, ...GART };
+// The gods of Olympus hit one point harder with every attack than the underworld's wardens.
+const bonus = () => (G.boss && G.boss.heaven ? 1 : 0);
+const shoot = o => shootP({ ...o, dmg: (o.dmg || 1) + bonus() });
+const hurtPlayer = (n, x) => hurtP(n + bonus(), x);
 const SIZES = {
   cerberus: [170, 104], storm: [80, 120], heretic: [110, 92], titan: [150, 220], hades: [110, 160],
   ares: [96, 150], apollo: [90, 130], athena: [96, 140], poseidon: [150, 210], zeus: [130, 190],
@@ -55,6 +59,9 @@ export function spawnBoss(site) {
     vx: 0, vy: 0, hp: site.hp, max: site.hp, face: left ? -1 : 1, t: 0, st: 'intro', stT: 1.6, stDur: 1.6, last: '', phase: 1,
     flash: 0, hurtT: 0, roarT: 0, seed: Math.random() * 5, dead: false, ground: false, tint: B.tint, accent: B.accent, ax0, ax1, ay0, ay1, level: 10, n: 0, out: 0,
   };
+  // the gods start the fight already at full fury, and grow fiercer still when wounded
+  boss.heaven = !!(site.god || site.id === 'zeus');
+  if (boss.heaven) boss.phase = 2;
   G.boss = boss;
   const ENTRY = { storm: '#ffb0f0', zeus: '#fff6b0', apollo: '#ffe9a0' };
   if (ENTRY[site.id]) {
@@ -158,7 +165,7 @@ function floorWave(b, dir, color) {
 function summon(b, type, n) {
   if (G.enemies.length > 30) return;
   for (let i = 0; i < n; i++) {
-    const lvl = b.id === 'zeus' || b.site.god ? 12 : b.id === 'hades' ? 10 : 7;
+    const lvl = b.heaven ? HEAVEN_LVL : b.id === 'hades' ? 10 : 7;
     const e = makeEnemy(type, rand(b.ax0 + 100, b.ax1 - 100), b.ay0 + 120, lvl, BIOME_LIST.indexOf(b.site.biome));
     e.summoned = true;
     G.enemies.push(e);
@@ -216,7 +223,7 @@ export function updateBoss(dt) {
   const p = G.player;
   b.t += dt; b.stT -= dt; b.flash -= dt; b.hurtT -= dt; b.roarT -= dt;
   const hpK = b.hp / b.max;
-  const newPhase = b.ai === 'hades' ? (hpK < 0.25 ? 3 : hpK < 0.6 ? 2 : 1) : hpK < 0.5 ? 2 : 1;
+  const newPhase = b.heaven ? (hpK < 0.4 ? 3 : 2) : b.ai === 'hades' ? (hpK < 0.25 ? 3 : hpK < 0.6 ? 2 : 1) : hpK < 0.5 ? 2 : 1;
   const P = b.pal;
   if (newPhase > b.phase) {
     b.phase = newPhase;
@@ -226,7 +233,7 @@ export function updateBoss(dt) {
     ring(cxOf(b), cyOf(b), 200, b.accent, 0.6, 10);
     floater(cxOf(b), b.y - 20, b.phase === 3 ? 'FINAL FURY' : 'ENRAGED', '#ff5a6a', 24);
   }
-  const fast = b.phase > 1 ? 0.75 : 1;
+  const fast = (b.heaven && b.phase > 2 ? 0.55 : b.phase > 1 ? 0.75 : 1) * (b.heaven ? 0.85 : 1);
   const mid = (b.ax0 + b.ax1) / 2, dx = pcx() - cxOf(b);
 
   switch (b.ai) {
