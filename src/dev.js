@@ -1,6 +1,6 @@
 // Developer console: press ` (backtick) to open, then type a command. Flags live in G.save.dev.
 import { G } from './state.js';
-import { T, CS, SITES, getChunk, GODS, ZS, OLY } from './world.js';
+import { T, CS, SITES, getChunk, GODS, ZS, OLY, BIOMES, BIOME_LIST } from './world.js';
 import { playCutscene } from './cutscene.js';
 import { SHOP, stats, ARMOURS } from './items.js';
 import { keys } from './input.js';
@@ -107,13 +107,16 @@ const COMMANDS = {
     run() { const p = G.player; return `x ${Math.round((p.x + p.w / 2) / T)}  y ${Math.round((p.y + p.h) / T)}`; },
   },
   give: {
-    args: 'all', desc: 'every upgrade, weapon and boss power at full level, plus 3 Ambrosia',
+    args: 'all', desc: 'every upgrade, weapon and boss power at full level, every suit of armour, plus 3 Ambrosia',
     run() {
       for (const it of SHOP) if (!it.consumable) G.save.up[it.id] = it.max;
       Object.assign(G.save.up, { stars: 1, beam: 1, bombs: 2, fly: 2, might: 2, swift: 2 });
       G.save.potions = 3;
+      G.save.armours = G.save.armours || {};
+      for (const a of ARMOURS) G.save.armours[a.id] = 1;
       G.player.hp = stats().maxHp;
-      return 'all upgrades given';
+      G.player.armour = stats().armour;
+      return `all upgrades given, and all ${ARMOURS.length} suits of armour (wear one at an armourer, or with: armour <id>)`;
     },
   },
   heal: { desc: 'restore full health', run() { G.player.hp = stats().maxHp; return 'healed'; } },
@@ -127,8 +130,12 @@ const COMMANDS = {
     },
   },
   seals: {
-    desc: 'claim all four Seals (opens the Gate to Hades)',
-    run() { for (const s of SITES.slice(0, 4)) G.save.bosses[s.id] = 1; return 'all four Seals claimed'; },
+    desc: 'claim all four Seals (opens the Gate to Hades). In heaven: the four Sigils (opens the Gate of the Thunderer)',
+    run() {
+      if (BIOMES[BIOME_LIST[G.biome]].heaven) return COMMANDS.sigils.run();
+      for (const s of SITES.slice(0, 4)) G.save.bosses[s.id] = 1;
+      return 'all four Seals claimed';
+    },
   },
   sigils: {
     desc: 'claim the four Sigils of Olympus (opens the Gate of the Thunderer)',
