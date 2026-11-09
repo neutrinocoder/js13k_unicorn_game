@@ -3,7 +3,7 @@
 // four temples of the gods and, higher still, the summit where Zeus waits.
 import { hash2, vnoise, fbm, mulberry, clamp, mix, shade } from './util.js';
 import { G } from './state.js';
-import { makeMaze, mazeTile, M_WALL, M_PLAT } from './maze.js';
+import { makeCaves, C_WALL, C_PLAT } from './caves.js';
 
 export const T = 32, CS = 16, CPX = T * CS;
 export const AIR = 0, ROCK = 1, PLAT = 2, HAZ = 3, BRICK = 4, CRYSTAL = 5, ORE = 6, HAZC = 7;
@@ -79,9 +79,6 @@ const nearZeus = (tx, ty, pad) => Math.abs(tx - ZS.tx) <= ZS.w / 2 + pad && Math
 export const OUTPOST_D = 300;
 // The roads from town stop a little past the outposts. Beyond them lie the mazes.
 export const ROAD_END = 330;
-// The underworld's tunnels and the cloud-halls of Olympus are both endless mazes.
-const UNDER = makeMaze(501, 8, 8);
-const SKYM = makeMaze(777, 10, 8);
 const inRect = (tx, ty, s, pad) => Math.abs(tx - s.tx) <= s.w / 2 + pad && Math.abs(ty - s.ty) <= s.h / 2 + pad;
 export const siteAt = (tx, ty, pad = 0) => SITES.find(s => inRect(tx, ty, s, pad));
 
@@ -96,7 +93,8 @@ export function roadTile(tx, ty) {
   const ax = Math.abs(tx);
   if (ax > 48 && ax <= ROAD_END) {
     const c = roadH(tx);
-    if (ty >= c - 2 && ty <= c + 2) return AIR;
+    // the first stretch out of town is opened up to the town's height, so you can walk straight out
+    if (ty >= (ax < 64 ? Math.min(c - 2, -4) : c - 2) && ty <= c + 2) return AIR;
     if (ty === c + 3) return -1;
   }
   if ((ty < -40 && ty >= -ROAD_END) || (ty > 14 && ty <= ROAD_END)) {
@@ -177,6 +175,22 @@ function townTile(tx, ty) {
 // Olympus: a marble hub, with a passage out of each side into an endless maze of cloud.
 // The four temples lie deep inside it.
 const HUB_W = 60, HUB_H = 16, HUB_EXIT = 78;
+// The underworld's tunnels and the cloud-halls of Olympus are both endless cave systems of rooms
+// and winding passages. Anchors are the spots that must open into them: the ends of the roads,
+// the corridors outside every boss's door, and the passages out of the Olympus plaza.
+const doorEnds = list => list.flatMap(s => [-1, 1].map(d => [s.tx + d * (s.w / 2 + 26), s.ty + s.h / 2]));
+const UNDER = makeCaves(501, {
+  anchors: [
+    ...doorEnds(SITES.slice(0, 4)),
+    [ROAD_END, roadH(ROAD_END) + 2], [-ROAD_END, roadH(-ROAD_END) + 2],
+    [roadV(-ROAD_END), -ROAD_END], [roadV(ROAD_END), ROAD_END],
+  ],
+});
+const SKYM = makeCaves(777, {
+  roomW: [9, 22], roomH: [6, 12],
+  anchors: [...doorEnds(GODS), [HUB_EXIT, OLY.hub - 1], [-HUB_EXIT, OLY.hub - 1]],
+});
+
 function olyClear(tx, ty) {
   const ax = Math.abs(tx), H = OLY.hub;
   if (ax <= HUB_EXIT + 2 && ty >= H - HUB_H - 2 && ty <= H + 3) return true;
@@ -193,8 +207,8 @@ function olyTile(tx, ty) {
   if (ax <= HUB_EXIT && ty >= H && ty <= H + 2) return BRICK;
   if (ax <= HUB_W && ty >= H - HUB_H && ty < H) return AIR;
   if (ax <= HUB_EXIT && ty >= H - 4 && ty < H) return AIR;
-  const m = mazeTile(SKYM, tx, ty);
-  return m === M_WALL ? ROCK : m === M_PLAT ? PLAT : AIR;
+  const m = SKYM.tile(tx, ty);
+  return m === C_WALL ? ROCK : m === C_PLAT ? PLAT : AIR;
 }
 
 // Open sky: drifting cloud islands, thickening into a sea of cloud just above the underworld.
@@ -205,8 +219,8 @@ function skyTile(tx, ty) {
 }
 
 function caveTile(tx, ty) {
-  const m = mazeTile(UNDER, tx, ty);
-  return m === M_WALL ? ROCK : m === M_PLAT ? PLAT : AIR;
+  const m = UNDER.tile(tx, ty);
+  return m === C_WALL ? ROCK : m === C_PLAT ? PLAT : AIR;
 }
 
 export function baseTile(tx, ty) {
@@ -377,7 +391,7 @@ function genChunk(cx, cy, k) {
     if (rng() < 0.55) { const s = take(floor); if (s) place(s, { type: 'torch', id: k + ':t' }); }
     if (dist > 60 && Object.keys(B.enemies).length) {
       // the heavens are crowded with guardians: one to three in every chunk
-      const n = B.heaven ? 2 + Math.floor(rng() * 1.8) : 1 + Math.floor(rng() * 2.6);
+      const n = B.heaven ? 2 + Math.floor(rng() * 2.2) : 1 + Math.floor(rng() * 3);
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
         const fly = type === 'bat' || type === 'wisp' || type === 'cherub' || type === 'seraph' || type === 'ophan';
@@ -396,17 +410,12 @@ function genChunk(cx, cy, k) {
 function deadEnds(c, get, lvl) {
   const x0 = c.cx * CS, y0 = c.cy * CS, oly = inOly(x0 + 8, y0 + 8);
   if (!oly && y0 + 8 < SKY_Y) return;
-  const M = oly ? SKYM : UNDER, { CW, CH } = M;
-  for (let gy = Math.floor(y0 / CH) - 1; gy <= Math.floor((y0 + CS) / CH); gy++) {
-    for (let gx = Math.floor(x0 / CW) - 1; gx <= Math.floor((x0 + CS) / CW); gx++) {
-      const e = M.exits(gx, gy);
-      if (e.l + e.u + e.r + e.d !== 1 || hash2(gx, gy, M.seed + 11) > 0.38) continue;
-      const lx = e.l ? CW - 1 : e.r ? 2 : hash2(gx, gy, M.seed + 12) < 0.5 ? 2 : CW - 1;
-      const tx = gx * CW + lx, ty = gy * CH + CH - 1, i = tx - x0, j = ty - y0;
-      if (i < 0 || i >= CS || j < 0 || j >= CS) continue;
-      if (get(i, j) !== AIR || !isSolid(get(i, j + 1)) || isSpecial(tx, ty)) continue;
-      c.objects.push({ type: 'chest', id: c.k + ':d' + gx + '_' + gy, level: lvl, big: hash2(gx, gy, M.seed + 13) < 0.3, x: (tx + 0.5) * T, y: (ty + 1) * T });
-    }
+  const M = oly ? SKYM : UNDER;
+  for (const [tx, ty] of M.spotsAt(Math.floor(x0 / M.B), Math.floor(y0 / M.B))) {
+    const i = tx - x0, j = ty - y0;
+    if (i < 0 || i >= CS || j < 0 || j >= CS || hash2(tx, ty, M.seed + 11) > 0.6) continue;
+    if (get(i, j) !== AIR || !isSolid(get(i, j + 1)) || isSpecial(tx, ty)) continue;
+    c.objects.push({ type: 'chest', id: c.k + ':d' + tx + '_' + ty, level: lvl, big: hash2(tx, ty, M.seed + 13) < 0.3, x: (tx + 0.5) * T, y: (ty + 1) * T });
   }
 }
 
