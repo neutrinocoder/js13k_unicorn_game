@@ -26,7 +26,8 @@ export const SHOP = [
   { id: 'midas', name: "Midas' Ring", icon: '💍', desc: 'Defeated foes drop 40% more gems.', max: 2, unlock: 'poseidon', cost: l => 380 + l * 340 },
 ];
 
-// One suit of armour for every land. A shop sells a land's armour once you have set foot there.
+// One suit of armour for every land, forged by the armourers (in Limbo Market and the Olympus plaza).
+// A land's armour goes on sale once its boss falls ("boss"); Limbo's needs no boss.
 // Armour gives shield pips that take hits before your hearts and refill when you stay out of
 // harm's way, plus a gift of its land. Only one suit can be worn at a time.
 // look: metal (light, mid, dark), trim, gem, plume, and a motif drawn on the barding.
@@ -34,42 +35,42 @@ export const ARMOURS = [
   { id: 'limbo', land: 'limbo', name: "Pilgrim's Mail", icon: '🌙', pips: 1, cost: 90,
     perk: 'Spikes cannot hurt you.', haz: ['spikes'],
     look: { metal: ['#ece6ff', '#9a8fc4', '#433a68'], trim: '#c9baff', gem: '#b4a6ee', plume: '#8a6bd6', motif: 'moon' } },
-  { id: 'lust', land: 'lust', name: 'Tempest Plate', icon: '🌪️', pips: 2, cost: 240,
+  { id: 'lust', land: 'lust', boss: 'storm', name: 'Tempest Plate', icon: '🌪️', pips: 2, cost: 240,
     perk: 'Storm winds cannot push you, and thorns cannot hurt you.', haz: ['thorns'], noWind: 1,
     look: { metal: ['#ffd6f2', '#e0479e', '#5c1550'], trim: '#ff8ad8', gem: '#ff4ac0', plume: '#ff8ad8', motif: 'heart' } },
-  { id: 'gluttony', land: 'gluttony', name: 'Bog-Hide Armour', icon: '🐸', pips: 2, cost: 240,
+  { id: 'gluttony', land: 'gluttony', boss: 'cerberus', name: 'Bog-Hide Armour', icon: '🐸', pips: 2, cost: 240,
     perk: 'Acid cannot hurt you, and Ambrosia heals 1 more health.', haz: ['acid'], potion: 1,
     look: { metal: ['#d8f5b0', '#6fae3a', '#24391a'], trim: '#b6ff6b', gem: '#9dff4a', plume: '#4f8a35', motif: 'scales' } },
-  { id: 'heresy', land: 'heresy', name: 'Emberforged Plate', icon: '🔥', pips: 3, cost: 420,
+  { id: 'heresy', land: 'heresy', boss: 'heretic', name: 'Emberforged Plate', icon: '🔥', pips: 3, cost: 420,
     perk: 'Lava cannot hurt you, and your attacks deal 10% more damage.', haz: ['lava'], dmg: 0.1,
     look: { metal: ['#ffd29a', '#c2481a', '#2a0f08'], trim: '#ffb347', gem: '#ff5a1f', plume: '#ff8a1a', motif: 'flame', spikes: 1, glow: '#ff6a1a' } },
-  { id: 'treachery', land: 'treachery', name: 'Rimefrost Mail', icon: '❄️', pips: 3, cost: 420,
+  { id: 'treachery', land: 'treachery', boss: 'titan', name: 'Rimefrost Mail', icon: '❄️', pips: 3, cost: 420,
     perk: 'You never slip on ice, icicles cannot hurt you, and the armour refills twice as fast.', haz: ['icicle'], grip: 1, regen: 2,
     look: { metal: ['#f2fcff', '#7fc4f0', '#24406a'], trim: '#a8ecff', gem: '#6fc6ff', plume: '#d9f1ff', motif: 'flake', spikes: 1 } },
-  { id: 'abyss', land: 'abyss', name: 'Dread Plate of Hades', icon: '💀', pips: 4, cost: 760,
+  { id: 'abyss', land: 'abyss', boss: 'hades', name: 'Dread Plate of Hades', icon: '💀', pips: 4, cost: 760,
     perk: 'No hazard of the underworld can hurt you, and your attacks deal 15% more damage.', hazAll: 1, dmg: 0.15,
     look: { metal: ['#8a7a86', '#3a1820', '#0c0306'], trim: '#ff3b4a', gem: '#ff2a3a', plume: '#a0102a', motif: 'skull', spikes: 1, glow: '#ff2a3a' } },
-  { id: 'olympus', land: 'olympus', name: 'White Marble Raiment', icon: '🏛️', pips: 4, cost: 900,
+  { id: 'olympus', land: 'olympus', boss: 'athena', name: 'White Marble Raiment', icon: '🏛️', pips: 4, cost: 900,
     perk: 'Heals you slowly: 1 health every 20 seconds.', heal: 20,
     look: { metal: ['#ffffff', '#e4e6f0', '#9aa2bc'], trim: '#f4c24a', gem: '#8fe8ff', plume: '#ffffff', motif: 'laurel' } },
-  { id: 'gold', land: 'gold', name: 'Sunforged Plate', icon: '☀️', pips: 5, cost: 1200,
+  { id: 'gold', land: 'gold', boss: 'apollo', name: 'Sunforged Plate', icon: '☀️', pips: 5, cost: 1200,
     perk: 'Defeated foes drop 30% more gems.', gem: 0.3,
     look: { metal: ['#fffbe0', '#ffc531', '#94600e'], trim: '#ffffff', gem: '#ff8a1a', plume: '#ffe36b', motif: 'sun', glow: '#ffd34a' } },
-  { id: 'silver', land: 'silver', name: 'Moonsilver Mail', icon: '🌒', pips: 5, cost: 1200,
+  { id: 'silver', land: 'silver', boss: 'ares', name: 'Moonsilver Mail', icon: '🌒', pips: 5, cost: 1200,
     perk: 'You run 10% faster, and your dash recharges 25% faster.', speed: 0.1, dash: 0.25,
     look: { metal: ['#ffffff', '#b8c2d6', '#4c556a'], trim: '#e8f0ff', gem: '#9ab8ff', plume: '#c3cde0', motif: 'crescent', spikes: 1 } },
-  { id: 'mist', land: 'mist', name: 'Mistweave Armour', icon: '☁️', pips: 5, cost: 1200,
+  { id: 'mist', land: 'mist', boss: 'poseidon', name: 'Mistweave Armour', icon: '☁️', pips: 5, cost: 1200,
     perk: '+50% flight energy, and 1 blow in 5 passes straight through you like mist.', fly: 0.5, dodge: 0.2,
     look: { metal: ['#eef6ff', '#8fa8c6', '#3c4a64'], trim: '#d8ecff', gem: '#7fd0ff', plume: '#b8c8da', motif: 'cloud', glow: '#cfe8ff' } },
-  { id: 'zeus', land: 'zeus', name: "Thunderer's Aegis", icon: '⚡', pips: 6, cost: 2200,
+  { id: 'zeus', land: 'zeus', boss: 'zeus', name: "Thunderer's Aegis", icon: '⚡', pips: 6, cost: 2200,
     perk: 'Whenever your armour takes a hit, lightning strikes every foe around you.', zap: 1,
     look: { metal: ['#fffbd0', '#8a9aff', '#1b1f45'], trim: '#fff27a', gem: '#fff27a', plume: '#8a9aff', motif: 'bolt', spikes: 1, glow: '#a8b8ff' } },
 ];
 export const armourById = id => ARMOURS.find(a => a.id === id) || null;
 // The armour being worn, if any.
 export const worn = () => (G.save && armourById(G.save.armour)) || null;
-// Seen this armour's land yet?
-export const armourKnown = a => !!(G.save.lands && G.save.lands[a.land]);
+// Has the boss of this armour's land fallen yet?
+export const armourKnown = a => !a.boss || !!(G.save.bosses && G.save.bosses[a.boss]);
 export const armourOwned = a => !!(G.save.armours && G.save.armours[a.id]);
 
 // Shop items that are still locked behind a boss.

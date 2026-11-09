@@ -120,6 +120,12 @@ export function makeCaves(seed, o = {}) {
       const lx = ax - bx * B, ly = ay - by * B;
       const r = nearest(lx, ly);
       if (r) tunnel(lx, ly, ...roomPt(r), true);
+      // a ladder of ledges straight down from the opening, in case it opens high up a room's wall
+      let run = 0;
+      for (let y = ly + 1; y < B - 1 && g[y * B + lx] === C_AIR; y++) {
+        if (++run % 4) continue;
+        for (let i = lx - 1; i <= lx + 1; i++) if (i >= 0 && i < B && g[y * B + i] === C_AIR) g[y * B + i] = C_PLAT;
+      }
     }
 
     // --- dead ends: side passages that wander off and stop, often with treasure at the end

@@ -14,13 +14,13 @@ function liquidFx(kind, x, y) {
     for (let i = 0; i < 3; i++) part({ x, y, vx: rand(-50, 50), vy: rand(-140, -60), g: 500, life: 0.5, size: 1.6, color: '#d6ff9a' });
   }
 }
-import { hash2, rand, mix, rgba, shade, RAINBOW, clamp, TAU } from './util.js';
+import { hash2, rand, mix, rgba, shade, RAINBOW, clamp, TAU, pick } from './util.js';
 import { drawParts, drawFloaters } from './fx.js';
 import { drawProjs, drawPickups, heartPath, starPath } from './combat.js';
 import { drawUnicorn, drawBubbles, hornTip } from './player.js';
 import { drawEnemy } from './enemies.js';
 import { drawBoss, drawBossBar } from './bosses.js';
-import { stats, WEAPONS, ownsWeapon, worn } from './items.js';
+import { stats, WEAPONS, ownsWeapon, worn, ARMOURS, armourKnown } from './items.js';
 import { devLabel } from './dev.js';
 import { objective, sealCount, sigilCount, interactLabel } from './main.js';
 import { lightning } from './art.js';
@@ -484,6 +484,7 @@ function drawObject(ctx, o, t, lights) {
       break;
     }
     case 'shop': drawShop(ctx, o, t, lights); break;
+    case 'armourer': drawArmourer(ctx, o, t, lights); break;
     case 'npc': if (o.id === 'iris') drawIris(ctx, o, t, lights); else drawVirgil(ctx, o, t, lights); break;
     case 'gate': drawGate(ctx, o, t, lights); break;
     case 'fountain': drawFountain(ctx, o, t, lights); break;
@@ -534,6 +535,115 @@ function drawSwirl(ctx, x, y, r, t, cols) {
   ctx.fillStyle = g;
   ctx.globalAlpha = 0.5;
   ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+// An armourer's forge: a smithy with a roaring furnace, an anvil, the smith at work, and a stand
+// showing off each armour that can be forged here in turn.
+function drawArmourer(ctx, o, t, lights) {
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  const oly = !!o.oly;
+  // walls, roof and chimney
+  ctx.fillStyle = oly ? '#d8d0bc' : '#2b2433';
+  ctx.fillRect(-100, -120, 200, 120);
+  ctx.fillStyle = oly ? '#efe8d6' : '#3a3046';
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 4; i++) ctx.fillRect(-98 + i * 50 + (j % 2) * 25, -118 + j * 24, 46, 20);
+  ctx.fillStyle = oly ? '#9aa6c8' : '#1d1824';
+  ctx.fillRect(48, -176, 30, 60);
+  ctx.fillStyle = oly ? '#b8c2de' : '#2a2232';
+  ctx.fillRect(44, -182, 38, 10);
+  ctx.fillStyle = oly ? '#5a6aa8' : '#4a1e1a';
+  ctx.beginPath(); ctx.moveTo(-116, -118); ctx.lineTo(0, -160); ctx.lineTo(116, -118); ctx.closePath(); ctx.fill();
+  // smoke from the chimney
+  for (let k = 0; k < 4; k++) {
+    const u = ((t * 0.35 + k / 4) % 1), r = 8 + u * 18;
+    ctx.fillStyle = `rgba(${oly ? '255,255,255' : '90,80,90'},${0.35 * (1 - u)})`;
+    ctx.beginPath(); ctx.arc(63 + Math.sin(t + k * 2) * 6 + u * 14, -186 - u * 90, r, 0, TAU); ctx.fill();
+  }
+  // the furnace: an arch of fire
+  const fl = 0.8 + Math.sin(t * 9) * 0.1 + Math.sin(t * 23) * 0.06;
+  ctx.fillStyle = '#120a0a';
+  ctx.beginPath(); ctx.moveTo(-82, -6); ctx.lineTo(-82, -60); ctx.arc(-52, -60, 30, Math.PI, 0); ctx.lineTo(-22, -6); ctx.closePath(); ctx.fill();
+  const fg = ctx.createRadialGradient(-52, -30, 4, -52, -30, 40);
+  fg.addColorStop(0, `rgba(255,240,170,${fl})`);
+  fg.addColorStop(0.4, `rgba(255,140,40,${fl})`);
+  fg.addColorStop(1, 'rgba(160,30,10,0.2)');
+  ctx.fillStyle = fg;
+  ctx.beginPath(); ctx.moveTo(-76, -6); ctx.lineTo(-76, -58); ctx.arc(-52, -58, 24, Math.PI, 0); ctx.lineTo(-28, -6); ctx.closePath(); ctx.fill();
+  lights.push({ x: o.x - 52, y: o.y - 34, r: 230 + fl * 30, c: '#ff8a2a', a: 0.85 });
+  // the armour stand cycles through every suit this forge can make
+  const list = ARMOURS.filter(armourKnown), A = list[Math.floor(t / 3) % list.length];
+  if (A) {
+    const [m0, m1, m2] = A.look.metal;
+    ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(62, -2); ctx.lineTo(62, -58); ctx.moveTo(48, -2); ctx.lineTo(76, -2); ctx.stroke();
+    const g = ctx.createLinearGradient(0, -82, 0, -46);
+    g.addColorStop(0, m0); g.addColorStop(0.5, m1); g.addColorStop(1, m2);
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#1a1424'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(44, -50); ctx.quadraticCurveTo(42, -80, 62, -82); ctx.quadraticCurveTo(82, -80, 80, -50); ctx.quadraticCurveTo(62, -42, 44, -50); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = A.look.trim; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(46, -53); ctx.quadraticCurveTo(62, -46, 78, -53); ctx.stroke();
+    ctx.fillStyle = A.look.gem;
+    ctx.beginPath(); ctx.arc(62, -66, 3.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = A.look.plume;
+    ctx.beginPath(); ctx.ellipse(62, -88, 4, 9, Math.sin(t * 2) * 0.2, 0, TAU); ctx.fill();
+    if (A.look.glow) lights.push({ x: o.x + 62, y: o.y - 64, r: 90, c: A.look.glow, a: 0.5 });
+  }
+  // anvil
+  ctx.fillStyle = '#3a3a46';
+  ctx.fillRect(-6, -22, 12, 22);
+  ctx.beginPath(); ctx.moveTo(-26, -30); ctx.lineTo(22, -30); ctx.quadraticCurveTo(30, -30, 32, -24); ctx.lineTo(-20, -22); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#6a6a7a'; ctx.fillRect(-24, -31, 44, 2);
+  // the smith: a cyclops below, Hephaestus above, hammering away
+  const beat = (t * 1.6) % 1, swing = beat < 0.25 ? -1.4 + beat * 6 : 0.1 - (beat - 0.25) * 2;
+  if (beat > 0.24 && beat < 0.3 && Math.random() < 0.5) for (let k = 0; k < 3; k++) part({ x: o.x + 4, y: o.y - 32, vx: rand(-120, 120), vy: rand(-220, -80), g: 600, life: 0.5, size: rand(1.2, 2.2), color: pick(['#ffe36b', '#ff9a3a']), add: true });
+  ctx.fillStyle = oly ? '#7a5a3a' : '#6a4a6a';
+  ctx.beginPath(); ctx.moveTo(-6, -32); ctx.quadraticCurveTo(-10, -78, 16, -80); ctx.quadraticCurveTo(38, -78, 34, -32); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#4a2e1c';
+  ctx.fillRect(-2, -58, 32, 26);
+  ctx.fillStyle = oly ? '#e8b890' : '#8a9ac0';
+  ctx.beginPath(); ctx.arc(14, -90, 12, 0, TAU); ctx.fill();
+  if (oly) {
+    // Hephaestus: curly beard and a smith's cap
+    ctx.fillStyle = '#5a3a22';
+    ctx.beginPath(); ctx.arc(14, -84, 11, 0.1, Math.PI - 0.1); ctx.fill();
+    ctx.fillStyle = '#8a2a1a';
+    ctx.beginPath(); ctx.ellipse(14, -100, 12, 6, 0, Math.PI, TAU); ctx.fill();
+    ctx.fillStyle = '#2a1d3a';
+    ctx.beginPath(); ctx.arc(10, -92, 1.5, 0, TAU); ctx.arc(18, -92, 1.5, 0, TAU); ctx.fill();
+  } else {
+    // Brontes the cyclops: one great eye
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(14, -92, 5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ff6a1a';
+    ctx.beginPath(); ctx.arc(15, -92, 2.4, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#3a2a4a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(8, -84); ctx.quadraticCurveTo(14, -81, 20, -84); ctx.stroke();
+  }
+  // hammer arm
+  ctx.save();
+  ctx.translate(2, -62);
+  ctx.rotate(swing);
+  ctx.strokeStyle = oly ? '#e8b890' : '#8a9ac0'; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-4, 24); ctx.stroke();
+  ctx.strokeStyle = '#6a4a30'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-4, 24); ctx.lineTo(-4, 40); ctx.stroke();
+  ctx.fillStyle = '#4a4a56';
+  ctx.fillRect(-12, 36, 16, 9);
+  ctx.restore();
+  // sign
+  ctx.fillStyle = oly ? '#3a4a8a' : '#2a1a10';
+  ctx.fillRect(-92, -152, 184, 30);
+  ctx.strokeStyle = '#e8c26a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-88, -148, 176, 22);
+  ctx.fillStyle = '#ffe9b0';
+  ctx.font = '700 15px Cinzel, serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(o.name, 0, -132);
   ctx.restore();
 }
 
@@ -842,7 +952,7 @@ function drawPrompt(ctx) {
   if (!n || G.scene !== 'play') return;
   const label = interactLabel(n);
   if (!label) return;
-  const y = n.y - (n.type === 'shop' && n.main ? 210 : n.type === 'gate' ? 340 : n.type === 'npc' ? 104 : 96) + Math.sin(G.t * 4) * 3;
+  const y = n.y - (n.type === 'shop' && n.main ? 210 : n.type === 'armourer' ? 190 : n.type === 'gate' ? 340 : n.type === 'npc' ? 104 : 96) + Math.sin(G.t * 4) * 3;
   ctx.font = '800 14px Nunito, sans-serif';
   const text = label, w = ctx.measureText(text).width + 44;
   ctx.fillStyle = 'rgba(10,6,20,.8)';
@@ -1108,7 +1218,7 @@ function drawMinimap(ctx) {
     const x = mx + (l.tx - ptx) * ppt, y = my + (l.ty - 1 - pty) * ppt;
     if (Math.hypot(x - mx, y - my) > R) continue;
     if (l.type === 'shrine' && !G.save.shrines[l.id]) continue;
-    const col = l.type === 'shop' ? '#ffd34a' : l.type === 'shrine' ? '#8fe8ff' : l.type === 'gate' ? '#ff4a5a' : null;
+    const col = l.type === 'shop' ? '#ffd34a' : l.type === 'armourer' ? '#ff9a4a' : l.type === 'shrine' ? '#8fe8ff' : l.type === 'gate' ? '#ff4a5a' : null;
     if (!col || l.hidden) continue;
     ctx.fillStyle = col;
     ctx.beginPath(); ctx.arc(x, y, 3.5, 0, TAU); ctx.fill();
@@ -1189,6 +1299,7 @@ export function drawMap(ctx) {
     const [x, y] = mapToScreen(l.tx, l.ty - 1);
     if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue;
     if (l.type === 'shop') { ctx.fillStyle = '#ffd34a'; ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.fill(); }
+    if (l.type === 'armourer') { ctx.fillStyle = '#ff9a4a'; ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.fill(); }
     if (l.type === 'gate') { ctx.fillStyle = l.oly ? '#fff27a' : '#ff4a5a'; ctx.fillRect(x - 6, y - 8, 12, 12); ctx.font = '700 12px Cinzel, serif'; hudTextSmall(ctx, l.oly ? 'Gate of the Thunderer' : 'The Gate', x, y - 14, l.oly ? '#fff6c4' : '#ff8a9a'); }
   }
   // shrines (discovered ones, including random ones)

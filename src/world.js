@@ -82,21 +82,22 @@ export const SITES = [
   { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 700, w: 76, h: 30, hp: 285 },
   { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 650 },
   // Olympus: four gods guard the Sigils that open the way to Zeus.
-  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -400, ty: -3096, w: 76, h: 30, hp: 880, god: 1 },
-  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 400, ty: -3096, w: 76, h: 30, hp: 800, god: 1 },
-  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -3330, w: 76, h: 30, hp: 860, god: 1 },
-  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -2895, w: 76, h: 30, hp: 960, god: 1 },
-  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -3600, w: 84, h: 36, hp: 2300 },
+  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -760, ty: -3716, w: 76, h: 30, hp: 880, god: 1 },
+  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 760, ty: -3716, w: 76, h: 30, hp: 800, god: 1 },
+  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -4330, w: 76, h: 30, hp: 860, god: 1 },
+  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -3110, w: 76, h: 30, hp: 960, god: 1 },
+  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -4760, w: 84, h: 36, hp: 2300 },
 ];
 const HS = SITES[4];
 export const GODS = SITES.slice(5, 9);
 export const ZS = SITES[9];
-// Olympus spans this rectangle of tiles, walled off by a shell of cloud-stone.
-export const OLY = { x0: -480, x1: 480, y0: -3400, y1: -2840, hub: -3080 };
+// Olympus spans this rectangle of tiles, walled off by a shell of cloud-stone. It is a little
+// bigger than the stretch of underworld between its four bosses.
+export const OLY = { x0: -950, x1: 950, y0: -4540, y1: -2840, hub: -3700 };
 export const inOly = (tx, ty, pad = 0) => tx >= OLY.x0 - pad && tx <= OLY.x1 + pad && ty >= OLY.y0 - pad && ty <= OLY.y1 + pad;
 // Everything this high above the underworld is open sky: the heavens around Olympus, and a
 // storm band higher still around the summit where Zeus waits.
-export const SKY_Y = -2790, STORM_Y = -3420;
+export const SKY_Y = -2790, STORM_Y = OLY.y0 - 20;
 const nearZeus = (tx, ty, pad) => Math.abs(tx - ZS.tx) <= ZS.w / 2 + pad && Math.abs(ty - ZS.ty) <= ZS.h / 2 + pad;
 export const OUTPOST_D = 300;
 // The roads from town stop a little past the outposts. Beyond them lie the mazes.
@@ -153,7 +154,7 @@ export function biomeAt(tx, ty) {
 // Golden Fields of Apollo to the east; the Silver Peaks of Ares to the west; and the Cloudlands
 // of Poseidon below, where Olympus fades into the sea of cloud.
 export function olyZone(tx, ty) {
-  const nx = tx / 480, ny = (ty - OLY.hub) / (ty < OLY.hub ? 320 : 240);
+  const nx = tx / OLY.x1, ny = (ty - OLY.hub) / (ty < OLY.hub ? OLY.hub - OLY.y0 : OLY.y1 - OLY.hub);
   const j = vnoise(tx * 0.015, ty * 0.015, 11) - 0.5;
   if (Math.hypot(nx, ny * 1.15) < 0.34 + j * 0.12) return 6;
   const a = Math.atan2(ny, nx) + j * 0.6, q = Math.PI / 4;
@@ -211,10 +212,29 @@ function townTile(tx, ty) {
 // Olympus: a marble hub, with a passage out of each side into an endless maze of cloud.
 // The four temples lie deep inside it.
 const HUB_W = 60, HUB_H = 16, HUB_EXIT = 78;
+// Halfway to each temple stands a waystation: a little marble hall with a shrine to rest at.
+export const WAYS = [
+  { id: 'way_ares', tx: -400, ty: OLY.hub + 20, name: 'Waystation of War' },
+  { id: 'way_apollo', tx: 400, ty: OLY.hub + 20, name: 'Waystation of the Sun' },
+  { id: 'way_athena', tx: 30, ty: OLY.hub - 330, name: 'Waystation of Wisdom' },
+  { id: 'way_poseidon', tx: -30, ty: OLY.hub + 300, name: 'Waystation of the Tides' },
+];
+const WAY_W = 9, WAY_H = 6;
+function wayTile(tx, ty) {
+  for (const w of WAYS) {
+    const dx = Math.abs(tx - w.tx), dy = ty - w.ty;
+    if (dx > WAY_W + 1 || dy < -WAY_H - 1 || dy > 1) continue;
+    if (dy >= 0 && dx <= WAY_W) return BRICK;
+    if (dy < 0 && dy >= -WAY_H && dx <= WAY_W) return AIR;
+    return undefined;
+  }
+  return undefined;
+}
 // The underworld's tunnels and the cloud-halls of Olympus are both endless cave systems of rooms
 // and winding passages. Anchors are the spots that must open into them: the ends of the roads,
 // the corridors outside every boss's door, and the passages out of the Olympus plaza.
-const doorEnds = list => list.flatMap(s => [-1, 1].map(d => [s.tx + d * (s.w / 2 + 26), s.ty + s.h / 2]));
+// (two tiles past the corridor's end, so a tunnel that heads down is not cut off by the corridor floor)
+const doorEnds = list => list.flatMap(s => [-1, 1].map(d => [s.tx + d * (s.w / 2 + 28), s.ty + s.h / 2]));
 const UNDER = makeCaves(501, {
   anchors: [
     ...doorEnds(SITES.slice(0, 4)),
@@ -224,13 +244,15 @@ const UNDER = makeCaves(501, {
 });
 const SKYM = makeCaves(777, {
   roomW: [9, 22], roomH: [6, 12],
-  anchors: [...doorEnds(GODS), [HUB_EXIT, OLY.hub - 1], [-HUB_EXIT, OLY.hub - 1]],
+  anchors: [...doorEnds(GODS), [HUB_EXIT, OLY.hub - 1], [-HUB_EXIT, OLY.hub - 1],
+    ...WAYS.flatMap(w => [[w.tx - WAY_W - 2, w.ty - 1], [w.tx + WAY_W + 2, w.ty - 1]])],
 });
 
 function olyClear(tx, ty) {
   const ax = Math.abs(tx), H = OLY.hub;
   if (ax <= HUB_EXIT + 2 && ty >= H - HUB_H - 2 && ty <= H + 3) return true;
   for (const s of GODS) if (inRect(tx, ty, s, 10)) return true;
+  for (const w of WAYS) if (Math.abs(tx - w.tx) <= WAY_W + 3 && ty >= w.ty - WAY_H - 3 && ty <= w.ty + 2) return true;
   return approach(tx, ty) !== undefined;
 }
 
@@ -239,6 +261,8 @@ function olyTile(tx, ty) {
   if (ty >= OLY.y1 - 3) return ROCK;
   const a = approach(tx, ty);
   if (a !== undefined) return a;
+  const wt = wayTile(tx, ty);
+  if (wt !== undefined) return wt;
   const ax = Math.abs(tx), H = OLY.hub;
   if (ax <= HUB_EXIT && ty >= H && ty <= H + 2) return BRICK;
   if (ax <= HUB_W && ty >= H - HUB_H && ty < H) return AIR;
@@ -296,6 +320,7 @@ export const LANDMARKS = [
   { type: 'shrine', id: 'town', tx: 18, ty: 0, name: 'Limbo Market' },
   { type: 'sign', id: 'sign_s', tx: 27, ty: 0, text: 'Treachery  ↓' },
   { type: 'sign', id: 'sign_e', tx: 44, ty: 0, text: 'Lust  →' },
+  { type: 'armourer', id: 'armourer', tx: 39, ty: 0, name: "Brontes' Smithy" },
   { type: 'sign', id: 'sign_w', tx: -44, ty: 0, text: '←  Gluttony' },
   { type: 'sign', id: 'sign_n', tx: -9, ty: 0, text: 'Heresy  ↑' },
 ];
@@ -317,10 +342,12 @@ LANDMARKS.push(
   { type: 'gate', id: 'gate_zeus', tx: 28, ty: OLY.hub, oly: 1 },
   { type: 'sign', id: 'sign_ow', tx: -40, ty: OLY.hub, text: '←  Ares' },
   { type: 'sign', id: 'sign_oe', tx: 40, ty: OLY.hub, text: 'Apollo  →' },
+  { type: 'armourer', id: 'armourer_oly', tx: 47, ty: OLY.hub, name: 'The Celestial Forge', oly: 1 },
   { type: 'sign', id: 'sign_ou', tx: 55, ty: OLY.hub, text: 'Athena  ↑' },
   { type: 'sign', id: 'sign_od', tx: -56, ty: OLY.hub, text: 'Poseidon  ↓' },
   // a shrine at the door of each temple
   ...GODS.map(s => ({ type: 'shrine', id: 'oly_' + s.id, tx: s.tx + (s.tx > 0 || s.id === 'poseidon' ? -1 : 1) * (s.w / 2 + 8), ty: s.ty + s.h / 2 + 1, name: 'Temple of ' + s.name })),
+  ...WAYS.map(w => ({ type: 'shrine', id: w.id, tx: w.tx, ty: w.ty, name: w.name })),
   { type: 'portal', id: 'portal_zeus', tx: ZS.tx, ty: ZS.ty + ZS.h / 2 + 1, hidden: 1 },
 );
 for (const l of LANDMARKS) { l.x = (l.tx + 0.5) * T; l.y = l.ty * T; }

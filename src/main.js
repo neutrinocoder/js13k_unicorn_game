@@ -88,14 +88,7 @@ function startGame(save) {
   G.player = makePlayer(sp.x - 15, sp.y - 40);
   G.player.hp = clamp(save.hp || 5, 1, stats().maxHp);
   G.player.armour = stats().armour;
-  // every land you have explored so far counts as visited, so its armour is on sale
-  save.lands = save.lands || {};
   save.armours = save.armours || {};
-  save.lands.limbo = 1;
-  for (const k in save.explored) {
-    const [cx, cy] = k.split(',').map(Number);
-    save.lands[BIOME_LIST[biomeAt(cx * CS + 8, cy * CS + 8)]] = 1;
-  }
   G.cam.x = G.player.x - G.W / G.scale / 2;
   G.cam.y = G.player.y - G.H / G.scale / 2;
   G.biome = biomeAt(Math.floor(G.player.x / T), Math.floor(G.player.y / T));
@@ -149,6 +142,7 @@ export function interactLabel(o) {
     case 'chest': return s.chests[o.id] ? null : 'Open';
     case 'shrine': return s.shrines[o.id] ? (s.spawn.id === o.id ? 'Rest' : 'Bind to shrine') : 'Awaken shrine';
     case 'shop': return 'Trade';
+    case 'armourer': return 'Armour';
     case 'npc': return 'Talk';
     case 'gate':
       if (o.oly) return sigilCount() >= 4 ? (s.bosses.zeus ? 'The throne is empty' : 'Face Zeus') : `Sealed  ${sigilCount()}/4 Sigils`;
@@ -169,7 +163,7 @@ function findNear() {
   for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
     for (const o of getChunk(cx + i, cy + j).objects) {
       if (!interactLabel(o)) continue;
-      const rx = o.type === 'shop' && o.main ? 110 : o.type === 'gate' ? 110 : 46;
+      const rx = o.type === 'shop' && o.main ? 110 : o.type === 'gate' ? 110 : o.type === 'armourer' ? 90 : 46;
       const dx = Math.abs(o.x - px), dy = Math.abs(o.y - py);
       if (dx < rx && dy < 70 && dx < bd) { bd = dx; best = o; }
     }
@@ -266,7 +260,7 @@ function interact(o) {
       saveGame();
       break;
     }
-    case 'shop': openShop(o, saveGame); break;
+    case 'shop': case 'armourer': openShop(o, saveGame); break;
     case 'npc':
       if (o.id === 'iris') openDialog('Iris', irisLines(), () => { if (!s.irisTalked) { s.irisTalked = 1; saveGame(); toast('Follow the arrow on your minimap to a god.'); } });
       else openDialog('Virgil', virgilLines(), () => { if (!s.talked) { s.talked = 1; saveGame(); toast('Follow the arrow on your minimap to a Warden.'); } });
@@ -360,6 +354,9 @@ function rewardCard(id, then) {
   // tell the player which new wares the shopkeepers now sell
   const wares = SHOP.filter(it => it.unlock === id).map(it => it.icon + ' ' + it.name);
   const lines = wares.length ? [r.text, 'New wares at every shop: ' + wares.join(', ') + '.'] : [r.text];
+  // and which armour the armourers can now forge
+  const arm = ARMOURS.find(a => a.boss === id);
+  if (arm) lines.push(`The armourers can now forge the ${arm.icon} ${arm.name}: ${arm.pips} armour. ${arm.perk}`);
   if (WEAPON_OF[r.up] != null && G.save.up[r.up] === 1) G.save.weapon = WEAPON_OF[r.up];
   if (r.up === 'fly' && G.player) G.player.wing = stats().flyMax;
   saveGame();
@@ -431,15 +428,6 @@ export function onBossDefeated(b) {
   rewardCard(b.id);
 }
 
-// The first step into a land puts its armour on sale.
-function visitLand(id) {
-  const L = G.save.lands || (G.save.lands = {});
-  if (L[id]) return;
-  L[id] = 1;
-  const A = ARMOURS.find(a => a.land === id);
-  if (A) setTimeout(() => toast(`${A.icon} The shops now sell the ${A.name}, the armour of ${BIOMES[id].name}.`, 5000), 3400);
-}
-
 // ---------- Update ----------
 let spawnT = 0, exploreT = 0, saveT = 0, ambT = 0, lastBiome = -1, lastBiomeT = 0;
 
@@ -459,7 +447,6 @@ function update(dt) {
 
   // Region changes
   const b = biomeAt(ptx, pty);
-  visitLand(BIOME_LIST[b]);
   if (b !== G.biome) {
     G.biome = b;
     if (b !== lastBiome && G.t - lastBiomeT > 4) {

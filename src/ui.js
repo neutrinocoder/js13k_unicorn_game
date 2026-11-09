@@ -28,11 +28,19 @@ const QUOTES = [
 ];
 let shopCtx = null;
 
+const SMITH_QUOTES = [
+  'Bring me the head of a monster and I will forge you its hide.',
+  'Every great foe leaves something behind worth hammering.',
+  'Hold still. No, the other way. Unicorns are hard to measure.',
+  'Steel from the Furies, rivets from the Styx. Very fashionable.',
+];
+
 export function openShop(o, onClose) {
   shopCtx = { o, onClose };
   G.scene = 'shop';
   $('shop-title').textContent = o.name || 'Merchant';
-  $('shop-quote').textContent = '“' + QUOTES[Math.floor(Math.random() * QUOTES.length)] + '”';
+  const Q = o.type === 'armourer' ? SMITH_QUOTES : QUOTES;
+  $('shop-quote').textContent = '“' + Q[Math.floor(Math.random() * Q.length)] + '”';
   renderShop();
   show('shop');
   sfx('ui');
@@ -56,11 +64,8 @@ function renderShop() {
   $('shop-gems').textContent = inf ? '∞' : G.save.gems.toLocaleString();
   const box = $('shop-items');
   box.innerHTML = '';
-  renderArmours(box, inf);
-  const wares = document.createElement('h3');
-  wares.className = 'shop-head';
-  wares.textContent = 'Wares';
-  box.appendChild(wares);
+  // the armourer sells armour and nothing else
+  if (shopCtx.o.type === 'armourer') { renderArmours(box, inf); return; }
   // items still locked behind a boss go to the end of the list, greyed out
   const list = [...SHOP.filter(it => !shopLocked(it)), ...SHOP.filter(shopLocked)];
   for (const it of list) {
@@ -83,18 +88,15 @@ function renderShop() {
   }
 }
 
-// Armour of every land: on sale once you have set foot in its land; bought once, worn one at a time.
+// Armour of every land: on sale once the land's boss has fallen; bought once, worn one at a time.
 function renderArmours(box, inf) {
-  const head = document.createElement('h3');
-  head.className = 'shop-head';
-  head.textContent = 'Armour of the Lands';
-  box.appendChild(head);
   for (const a of ARMOURS) {
     const land = BIOMES[a.land].name, pips = `${a.pips} armour`;
     if (!armourKnown(a)) {
+      const boss = SITES.find(x => x.id === a.boss);
       const card = document.createElement('div');
       card.className = 'item locked';
-      card.innerHTML = `<span class="icon">🔒</span><span class="info"><b>${a.name}</b><small>${pips}. ${a.perk}</small><em>Set foot in ${land} to unlock</em></span><span class="price">${a.icon}</span>`;
+      card.innerHTML = `<span class="icon">🔒</span><span class="info"><b>${a.name}</b><small>${pips}. ${a.perk}</small><em>Defeat ${boss ? boss.name : 'its guardian'} to unlock</em></span><span class="price">${a.icon}</span>`;
       box.appendChild(card);
       continue;
     }

@@ -78,12 +78,12 @@ const COMMANDS = {
     args: '[id|all|off]', desc: 'wear the armour of a land (limbo lust gluttony heresy treachery abyss olympus gold silver mist zeus), unlock all, or take it off',
     run([a]) {
       const s = G.save;
-      s.armours = s.armours || {}; s.lands = s.lands || {};
-      if (a === 'all') { for (const x of ARMOURS) { s.armours[x.id] = 1; s.lands[x.land] = 1; } return 'all armour unlocked'; }
+      s.armours = s.armours || {};
+      if (a === 'all') { for (const x of ARMOURS) s.armours[x.id] = 1; return 'all armour owned'; }
       if (!a || a === 'off') { s.armour = null; return 'armour off'; }
       const x = ARMOURS.find(z => z.id === a);
       if (!x) return 'no such armour: ' + a;
-      s.armours[x.id] = 1; s.lands[x.land] = 1; s.armour = x.id;
+      s.armours[x.id] = 1; s.armour = x.id;
       if (G.player) G.player.armour = stats().armour;
       return 'wearing ' + x.name;
     },
