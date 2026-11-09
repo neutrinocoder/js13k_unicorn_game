@@ -10,7 +10,7 @@ import { spawnBoss, updateBoss } from './bosses.js';
 import { updateProjs, updatePickups, dropGems } from './combat.js';
 import { updateFx, part, burst, ring, floater, shake } from './fx.js';
 import { render, drawMap, mapToScreen, shrinePos } from './render.js';
-import { stats, grantReward, SHOP } from './items.js';
+import { stats, grantReward, SHOP, ARMOURS } from './items.js';
 import { rand, clamp, mix, pick, RAINBOW } from './util.js';
 import { initDev, devOpen } from './dev.js';
 import { show, hide, isShown, toast as uiToast, openShop, closeShop, openDialog, advanceDialog } from './ui.js';
@@ -38,7 +38,7 @@ resize();
 
 function bgTarget(b) {
   const B = BIOMES[BIOME_LIST[b]];
-  return { sky0: B.sky[0], sky1: B.sky[1], far: B.far, mid: B.mid, fog: B.fog, accent: B.accent, dark: B.dark, heaven: B.heaven ? 1 : 0, sun: b === 6 ? 1 : 0, storm: b === 7 ? 1 : 0 };
+  return { sky0: B.sky[0], sky1: B.sky[1], far: B.far, mid: B.mid, fog: B.fog, accent: B.accent, dark: B.dark, heaven: B.heaven ? 1 : 0, sun: B.sun || 0, storm: b === 7 ? 1 : 0, mist: B.mist || 0, moon: B.moon || 0 };
 }
 G.bg = bgTarget(0);
 
@@ -87,6 +87,15 @@ function startGame(save) {
   const sp = save.spawn;
   G.player = makePlayer(sp.x - 15, sp.y - 40);
   G.player.hp = clamp(save.hp || 5, 1, stats().maxHp);
+  G.player.armour = stats().armour;
+  // every land you have explored so far counts as visited, so its armour is on sale
+  save.lands = save.lands || {};
+  save.armours = save.armours || {};
+  save.lands.limbo = 1;
+  for (const k in save.explored) {
+    const [cx, cy] = k.split(',').map(Number);
+    save.lands[BIOME_LIST[biomeAt(cx * CS + 8, cy * CS + 8)]] = 1;
+  }
   G.cam.x = G.player.x - G.W / G.scale / 2;
   G.cam.y = G.player.y - G.H / G.scale / 2;
   G.biome = biomeAt(Math.floor(G.player.x / T), Math.floor(G.player.y / T));
@@ -227,7 +236,7 @@ function arriveOlympus() {
   G.biome = 6;
   G.bg = bgTarget(6);
   announce('Olympus', 'The Halls of the Gods', 4);
-  G.player.hp = stats().maxHp;
+  G.player.hp = stats().maxHp; G.player.armour = stats().armour;
   saveGame();
 }
 
@@ -249,7 +258,7 @@ function interact(o) {
     case 'shrine': {
       s.shrines[o.id] = 1;
       s.spawn = { x: o.x, y: o.y, id: o.id };
-      p.hp = stats().maxHp;
+      p.hp = stats().maxHp; p.armour = stats().armour;
       sfx('shrine');
       ring(o.x, o.y - 70, 200, '#8fe8ff', 0.8, 8);
       burst(o.x, o.y - 70, 40, ['#8fe8ff', '#ffffff'], 300, { add: true, g: -60 });
@@ -263,7 +272,7 @@ function interact(o) {
       else openDialog('Virgil', virgilLines(), () => { if (!s.talked) { s.talked = 1; saveGame(); toast('Follow the arrow on your minimap to a Warden.'); } });
       break;
     case 'fountain':
-      p.hp = stats().maxHp;
+      p.hp = stats().maxHp; p.armour = stats().armour;
       sfx('heal');
       burst(p.x + p.w / 2, p.y, 20, RAINBOW, 160, { add: true, g: -100 });
       toast(o.oly ? 'Nectar of the gods. Health restored.' : 'The water of Lethe is sweet here. Health restored.');
@@ -336,7 +345,7 @@ function respawn() {
   G.enemies = G.enemies.filter(e => !e.summoned);
   teleport(sp.x, sp.y - 6);
   p.dead = false;
-  p.hp = stats().maxHp;
+  p.hp = stats().maxHp; p.armour = stats().armour;
   p.inv = 2;
   G.scene = 'play';
   saveGame();
@@ -408,7 +417,7 @@ export function onBossDefeated(b) {
     announce('Sigil of ' + b.name, b.name + ', ' + b.title + ', is defeated', 4);
     const n = sigilCount();
     toast(n >= 4 ? 'All four Sigils! The Gate of the Thunderer in the hub is open.' : `${n} of 4 Sigils claimed.`, 4000);
-    G.player.hp = stats().maxHp;
+    G.player.hp = stats().maxHp; G.player.armour = stats().armour;
     saveGame();
     rewardCard(b.id);
     return;
@@ -417,9 +426,18 @@ export function onBossDefeated(b) {
   announce('Seal of ' + BIOMES[b.site.biome].name, b.name + ' is defeated', 4);
   const n = sealCount();
   toast(n >= 4 ? 'All four Seals! Return to the Gate in Limbo Market.' : `${n} of 4 Seals claimed.`, 4000);
-  G.player.hp = stats().maxHp;
+  G.player.hp = stats().maxHp; G.player.armour = stats().armour;
   saveGame();
   rewardCard(b.id);
+}
+
+// The first step into a land puts its armour on sale.
+function visitLand(id) {
+  const L = G.save.lands || (G.save.lands = {});
+  if (L[id]) return;
+  L[id] = 1;
+  const A = ARMOURS.find(a => a.land === id);
+  if (A) setTimeout(() => toast(`${A.icon} The shops now sell the ${A.name}, the armour of ${BIOMES[id].name}.`, 5000), 3400);
 }
 
 // ---------- Update ----------
@@ -441,6 +459,7 @@ function update(dt) {
 
   // Region changes
   const b = biomeAt(ptx, pty);
+  visitLand(BIOME_LIST[b]);
   if (b !== G.biome) {
     G.biome = b;
     if (b !== lastBiome && G.t - lastBiomeT > 4) {
@@ -456,7 +475,7 @@ function update(dt) {
   const nearTown = Math.hypot(ptx, pty) < 70 ? 0.55 : 1;
   for (const key of ['sky0', 'sky1', 'far', 'mid', 'fog', 'accent']) G.bg[key] = mix(G.bg[key], tgt[key], k);
   G.bg.dark += (tgt.dark * nearTown - G.bg.dark) * k;
-  for (const key of ['heaven', 'sun', 'storm']) G.bg[key] += (tgt[key] - (G.bg[key] || 0)) * k;
+  for (const key of ['heaven', 'sun', 'storm', 'mist', 'moon']) G.bg[key] += (tgt[key] - (G.bg[key] || 0)) * k;
 
   // Wind gusts in Lust
   const B = BIOMES[BIOME_LIST[G.biome]];
@@ -478,8 +497,18 @@ function update(dt) {
       case 'ember': part({ x, y: vy0 + vh + 10, vx: rand(-20, 20), vy: rand(-120, -50), life: 4, size: rand(1.2, 2.6), color: pick(['#ffb347', '#ff6a1a', '#ffe36b']), add: true }); break;
       case 'snow': part({ x, y: vy0 - 10, vx: rand(-30, 10), vy: rand(40, 90), life: 8, size: rand(1.5, 3), color: '#eaf8ff' }); break;
       case 'feather':
-        part({ x, y, vx: rand(-12, 12), vy: rand(-18, -4), life: 3, size: rand(1, 2.4), color: pick(['#ffe28a', '#fff6d0', '#ffffff']), add: true });
+        part({ x, y, vx: rand(-12, 12), vy: rand(-18, -4), life: 3, size: rand(1, 2.4), color: pick(B.pcol || ['#ffe28a', '#fff6d0', '#ffffff']), add: true });
         if (Math.random() < 0.08) part({ x, y: vy0 - 10, vx: rand(-20, 20), vy: rand(25, 50), life: 9, size: rand(3, 4.5), color: '#ffffff', shape: 'petal', vr: rand(-2, 2) });
+        break;
+      case 'glint':
+        // golden motes and the odd slow-spinning star
+        part({ x, y, vx: rand(-10, 10), vy: rand(-26, -8), life: 3, size: rand(1.2, 2.6), color: pick(B.pcol), add: true });
+        if (Math.random() < 0.12) part({ x, y, vx: rand(-8, 8), vy: rand(-20, -6), life: 2.2, size: rand(2.5, 4), color: '#fff3b0', add: true, shape: 'star', vr: rand(-2, 2) });
+        break;
+      case 'mist':
+        // banks of fog rolling past
+        if (Math.random() < 0.35) part({ x: vx0 - 60, y, vx: rand(30, 70), vy: rand(-4, 4), life: 9, size: rand(26, 48), grow: 0.6, color: 'rgba(235,242,250,.07)' });
+        if (Math.random() < 0.3) part({ x, y, vx: rand(-8, 8), vy: rand(-10, 4), life: 3, size: rand(1, 2), color: pick(B.pcol), add: true });
         break;
     }
     if (G.windForce) part({ x: G.windForce > 0 ? vx0 : vx0 + vw, y: vy0 + rand(0, vh), vx: G.windForce * 0.9, vy: 0, life: 1.2, size: 2.5, color: 'rgba(255,200,240,.35)', shape: 'streak' });

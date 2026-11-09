@@ -4,11 +4,35 @@ import { T, tileAt, setTile, isSolid, ROCK, ORE, CRYSTAL, BRICK, isSpecial } fro
 import { rand, clamp, RAINBOW, overlap, pick } from './util.js';
 import { burst, part, floater, shake, ring } from './fx.js';
 import { sfx } from './audio.js';
-import { stats } from './items.js';
+import { stats, worn } from './items.js';
+import { lightning } from './art.js';
 import { bossDefeated } from './bosses.js';
 import { onPlayerDeath, toast } from './main.js';
 
 const fmt = n => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10).toString();
+
+// Thunderer's Aegis: lightning leaps from your armour to every foe nearby.
+function thunder(cx, cy) {
+  const S = stats(), R = 300, dmg = 6 * S.whipDmg / 2;
+  const list = G.boss && !G.boss.dead && !G.boss.hidden ? [...G.enemies, G.boss] : G.enemies;
+  const hit = list.filter(e => !e.dead && Math.hypot(e.x + e.w / 2 - cx, e.y + e.h / 2 - cy) < R).slice(0, 8);
+  for (const e of hit) damageEnemy(e, dmg, Math.sign(e.x + e.w / 2 - cx));
+  const pts = hit.map(e => [e.x + e.w / 2, e.y + e.h / 2]);
+  if (!pts.length) for (let i = 0; i < 4; i++) { const a = rand(0, Math.PI * 2); pts.push([cx + Math.cos(a) * 140, cy + Math.sin(a) * 140]); }
+  G.effects.push({
+    t: 0, dur: 0.35,
+    draw(ctx) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 1 - this.t / this.dur;
+      for (const [x, y] of pts) lightning(ctx, cx, cy, x, y, '#dfe6ff', 2.5, 7, 16);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    },
+  });
+  ring(cx, cy, 90, '#a8b8ff', 0.3, 5);
+  shake(8);
+  sfx('bolt');
+}
 
 export function hurtPlayer(n, sx, kb = 1) {
   const p = G.player;
@@ -30,6 +54,34 @@ export function hurtPlayer(n, sx, kb = 1) {
     sfx('bubble');
     return false;
   }
+  // Mistweave: now and then a blow passes straight through you
+  if (S.dodge && Math.random() < S.dodge) {
+    p.inv = 0.6;
+    burst(cx, cy, 16, ['#ffffff', '#cfe0ee'], 180, { g: -60, size: 5 });
+    floater(cx, p.y - 6, 'MIST', '#cfe8ff', 18);
+    return false;
+  }
+  // Armour takes what it can before your hearts do
+  if (p.armour >= 1) {
+    const soak = Math.min(n, Math.floor(p.armour)), A = worn(), col = A ? A.look.metal : ['#ffffff', '#cccccc'];
+    p.armour -= soak;
+    n -= soak;
+    p.armT = 4 + S.armourRegen;
+    burst(cx, cy, 12, [col[0], col[1], '#ffffff'], 240);
+    if (S.zap) thunder(cx, cy);
+    if (n <= 0) {
+      p.inv = 1.1;
+      p.vy = -300 * kb;
+      p.vx = (cx < sx ? -1 : 1) * 220 * kb;
+      p.ctrlLock = 0.12;
+      shake(6);
+      G.hitstop = 0.04;
+      sfx('clang');
+      floater(cx, p.y - 6, p.armour < 1 ? 'ARMOUR BROKEN' : '-' + soak + ' ⛨', p.armour < 1 ? '#ffb3c0' : col[0], 18);
+      return true;
+    }
+  }
+  p.armT = 4 + S.armourRegen;
   p.hp -= n;
   p.inv = 1.5;
   p.vy = -380 * kb;

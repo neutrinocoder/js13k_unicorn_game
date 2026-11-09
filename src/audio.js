@@ -139,6 +139,10 @@ export function sfx(name, v = 1) {
       tone({ type: 'triangle', f: 620 * p, f2: 1240, d: 0.15, g: 0.07, verb: 0.3 });
       noise({ f: 1300, f2: 300, d: 0.25, g: 0.11 });
       break;
+    case 'clang':
+      tone({ type: 'square', f: 1250 * p, f2: 900, d: 0.16, g: 0.04, verb: 0.4, filter: 3200 });
+      noise({ f: 2600, d: 0.07, g: 0.09, type: 'bandpass' });
+      break;
     case 'hurt': tone({ type: 'sawtooth', f: 330, f2: 90, d: 0.3, g: 0.15, filter: 1400 }); break;
     case 'gem':
       tone({ f: 1320 * p * v, d: 0.08, g: 0.06 });
@@ -193,6 +197,9 @@ const THEMES = {
   boss: { root: 45, scale: 'harm', tempo: 132, prog: [0, 5, 1, 4], arp: 'sawtooth', pad: 'sawtooth', bass: 1, drums: 2, mel: 0.2 },
   victory: { root: 55, scale: 'lyd', tempo: 84, prog: [0, 4, 5, 3], arp: 'sine', pad: 'triangle', bass: 1, drums: 0, mel: 0.5 },
   olympus: { root: 57, scale: 'lyd', tempo: 92, prog: [0, 4, 1, 5], arp: 'triangle', pad: 'triangle', bass: 1, drums: 1, mel: 0.45 },
+  gold: { root: 59, scale: 'lyd', tempo: 100, prog: [0, 4, 5, 1], arp: 'triangle', pad: 'triangle', bass: 1, drums: 1, mel: 0.5 },
+  silver: { root: 55, scale: 'dor', tempo: 96, prog: [0, 6, 3, 4], arp: 'square', pad: 'triangle', bass: 1, drums: 2, mel: 0.35 },
+  mist: { root: 54, scale: 'lyd', tempo: 72, prog: [0, 3, 1, 4], arp: 'sine', pad: 'triangle', bass: 1, drums: 0, mel: 0.4 },
   zeus: { root: 50, scale: 'harm', tempo: 140, prog: [0, 6, 5, 1], arp: 'sawtooth', pad: 'sawtooth', bass: 1, drums: 2, mel: 0.25 },
   prelude: { root: 52, scale: 'lyd', tempo: 70, prog: [0, 4, 3, 5], arp: 'sine', pad: 'triangle', bass: 1, drums: 0, mel: 0.45 },
   fall: { root: 45, scale: 'phryg', tempo: 64, prog: [0, 1, 6, 0], arp: 'sine', pad: 'sawtooth', bass: 1, drums: 0, mel: 0.3 },

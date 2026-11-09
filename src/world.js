@@ -9,7 +9,7 @@ export const T = 32, CS = 16, CPX = T * CS;
 export const AIR = 0, ROCK = 1, PLAT = 2, HAZ = 3, BRICK = 4, CRYSTAL = 5, ORE = 6, HAZC = 7;
 export const isSolid = t => t === ROCK || t === BRICK || t === CRYSTAL || t === ORE;
 
-export const BIOME_LIST = ['limbo', 'lust', 'gluttony', 'heresy', 'treachery', 'abyss', 'olympus', 'zeus'];
+export const BIOME_LIST = ['limbo', 'lust', 'gluttony', 'heresy', 'treachery', 'abyss', 'olympus', 'zeus', 'gold', 'silver', 'mist'];
 export const BIOMES = {
   limbo: {
     name: 'Limbo', sub: 'The First Circle', rock: ['#433c5e', '#5d5484', '#231e36'], top: '#b4a6ee',
@@ -42,14 +42,36 @@ export const BIOMES = {
     haz: 'lava', part: 'ember', thr: 0.5, tint: '#ff2a3a', enemies: {},
   },
   olympus: {
-    name: 'Olympus', sub: 'The Halls of the Gods', rock: ['#c3cde6', '#f4f7ff', '#97a5ca'], top: '#ffe9a8',
+    name: 'The White Citadel', sub: 'Heart of Olympus', rock: ['#d3d9e8', '#ffffff', '#a4aec8'], top: '#ffe9a8',
     sky: ['#4f86d8', '#ffd9a8'], far: '#cfdcf5', mid: '#e6ecf9', fog: '#fff2d0', dark: 0.05, accent: '#ffe28a',
-    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, enemies: { angel: 3, cherub: 3, seraph: 2, ophan: 2 },
+    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, sun: 1, enemies: { angel: 3, cherub: 3, seraph: 2, ophan: 2 },
   },
   zeus: {
     name: 'The Summit of Olympus', sub: 'Throne of the Thunderer', rock: ['#9aa4c8', '#d2d9f0', '#5e668e'], top: '#fff27a',
     sky: ['#111633', '#463b7c'], far: '#272c56', mid: '#1b1f45', fog: '#8a9aff', dark: 0.2, accent: '#fff27a',
     haz: 'none', part: 'feather', thr: 0.5, tint: '#ffe14a', heaven: 1, cloud: 1, enemies: {},
+  },
+  // The outer realms of Olympus, each around one god's temple.
+  gold: {
+    name: 'The Golden Fields', sub: 'Where the Sun Chariot Rests', rock: ['#d8ae4e', '#ffe592', '#9c7322'], top: '#fff6c0',
+    sky: ['#d9762a', '#ffe7a6'], far: '#f2c46e', mid: '#f8dc96', fog: '#ffe3a0', dark: 0.03, accent: '#fff09a',
+    haz: 'none', part: 'glint', thr: 0.5, tint: '#ffb020', heaven: 1, cloud: 1, sun: 1.25,
+    brick: ['#e6c062', '#fff0b8', '#b08832'], trim: '#fff7d0', pcol: ['#ffe36b', '#fff3b0', '#ffc531'],
+    enemies: { angel: 4, cherub: 2, seraph: 2, ophan: 2 },
+  },
+  silver: {
+    name: 'The Silver Peaks', sub: 'Forge-Halls of War', rock: ['#a3aec4', '#f4f7fd', '#55617e'], top: '#eef4ff',
+    sky: ['#0e1430', '#4a5a86'], far: '#3a4668', mid: '#55638a', fog: '#b8c6e6', dark: 0.2, moon: 1, accent: '#e8f0ff',
+    haz: 'none', part: 'feather', thr: 0.5, tint: '#aebad4', heaven: 1, cloud: 1,
+    brick: ['#aeb6c4', '#f0f3f8', '#767f92'], trim: '#dfe6f4', pcol: ['#e8eef8', '#c3cde0', '#ffffff'],
+    enemies: { angel: 3, ophan: 3, seraph: 2, cherub: 1 },
+  },
+  mist: {
+    name: 'The Cloudlands', sub: 'Mists of the Sea-King', rock: ['#9ea8b8', '#cdd6e2', '#6f7a8e'], top: '#d6e8f8',
+    sky: ['#77849a', '#c9d2dc'], far: '#a4aebd', mid: '#b6bfcc', fog: '#d8dee6', dark: 0.12, accent: '#c4e6ff',
+    haz: 'none', part: 'mist', thr: 0.5, tint: '#88b0d4', heaven: 1, cloud: 1, mist: 1,
+    brick: ['#bcc4d0', '#e8ecf1', '#87909f'], trim: '#cfe2f2', pcol: ['#e6eef6', '#cfe0ee', '#ffffff'],
+    enemies: { cherub: 3, seraph: 3, ophan: 2, angel: 2 },
   },
 };
 
@@ -110,7 +132,7 @@ export function roadTile(tx, ty) {
 
 export function biomeAt(tx, ty) {
   if (nearZeus(tx, ty, 60)) return 7;
-  if (inOly(tx, ty, 12)) return 6;
+  if (inOly(tx, ty, 12)) return olyZone(tx, ty);
   if (ty < STORM_Y) return 7;
   if (ty < SKY_Y) return 6;
   if (Math.abs(tx - HS.tx) < 140 && Math.abs(ty - HS.ty) < 110) return 5;
@@ -125,6 +147,20 @@ export function biomeAt(tx, ty) {
   if (a > q && a <= 3 * q) return 4;
   if (a > -3 * q && a <= -q) return 3;
   return 2;
+}
+
+// Olympus is four realms: the White Citadel at its heart, rising north to Athena's temple; the
+// Golden Fields of Apollo to the east; the Silver Peaks of Ares to the west; and the Cloudlands
+// of Poseidon below, where Olympus fades into the sea of cloud.
+export function olyZone(tx, ty) {
+  const nx = tx / 480, ny = (ty - OLY.hub) / (ty < OLY.hub ? 320 : 240);
+  const j = vnoise(tx * 0.015, ty * 0.015, 11) - 0.5;
+  if (Math.hypot(nx, ny * 1.15) < 0.34 + j * 0.12) return 6;
+  const a = Math.atan2(ny, nx) + j * 0.6, q = Math.PI / 4;
+  if (a > -3 * q && a <= -q) return 6;
+  if (a > -q && a <= q) return 8;
+  if (a > q && a <= 3 * q) return 10;
+  return 9;
 }
 
 export const levelAt = (tx, ty) => 1 + Math.floor(Math.hypot(tx, ty) / 90);
@@ -458,7 +494,7 @@ function renderChunk(c) {
         const edge = up || dn || lf || rt;
         const deep = !edge && isSolid(get(i - 1, j - 1)) && isSolid(get(i + 1, j - 1)) && isSolid(get(i - 1, j + 1)) && isSolid(get(i + 1, j + 1)) &&
           isSolid(get(i, j - 2)) && isSolid(get(i, j + 2)) && isSolid(get(i - 2, j)) && isSolid(get(i + 2, j));
-        const pal = t === BRICK ? (c.bio[j * CS + i] === 0 ? TOWN_BRICK : B.cloud ? MARBLE : [shade(B.rock[0], -0.1), B.rock[1], B.rock[2]]) : B.rock;
+        const pal = t === BRICK ? (c.bio[j * CS + i] === 0 ? TOWN_BRICK : B.cloud ? B.brick || MARBLE : [shade(B.rock[0], -0.1), B.rock[1], B.rock[2]]) : B.rock;
         let col = deep ? pal[2] : edge ? pal[1] : mix(pal[0], pal[2], 0.35);
         x.fillStyle = shade(col, (h - 0.5) * 0.14);
         x.fillRect(px, py, T, T);
@@ -647,7 +683,7 @@ export function drawLiquids(ctx, runs, t, emit) {
 function drawSurface(x, B, px, py, h, h2, lf, rt, brick) {
   const a = lf ? 6 : 0, b = rt ? 6 : 0, w = T - a - b;
   if (brick) {
-    x.fillStyle = B.cloud ? '#e8c25a' : 'rgba(255,255,255,.12)';
+    x.fillStyle = B.cloud ? B.trim || '#e8c25a' : 'rgba(255,255,255,.12)';
     x.fillRect(px + a, py, w, 3);
     return;
   }

@@ -3,10 +3,10 @@ import { G } from './state.js';
 import { T, tileAt, ORE, CRYSTAL, BIOMES, BIOME_LIST } from './world.js';
 import { moveBody, touchWall, onPlatform, hazardTouch, rayLength } from './physics.js';
 import { held, tapped, mouse } from './input.js';
-import { clamp, rand, angDiff, RAINBOW, pick } from './util.js';
+import { clamp, rand, angDiff, RAINBOW, pick, rgba } from './util.js';
 import { burst, part, ring, shake, floater } from './fx.js';
 import { sfx } from './audio.js';
-import { stats, ownsWeapon, WEAPONS } from './items.js';
+import { stats, ownsWeapon, WEAPONS, worn } from './items.js';
 import { hurtPlayer, damageEnemy, shoot, breakTile } from './combat.js';
 
 export function makePlayer(x, y) {
@@ -14,7 +14,7 @@ export function makePlayer(x, y) {
     x, y, w: 30, h: 34, vx: 0, vy: 0, face: 1, ground: false, jumps: 0, coyote: 0, jbuf: 0, rising: false,
     dashT: 0, dashCd: 0, dashDir: 1, inv: 0, hp: 5, shield: 0, ctrlLock: 0, wallDir: 0, dropT: 0,
     whipT: 0, whipAng: 0, whipCd: 0, whipSide: 1, combo: 0, lastWhip: -9, blastCd: 0, starCd: 0, atkBuf: 0, altBuf: 0,
-    energy: 100, beaming: false, beamLen: 0, beamTick: 0, aegis: 0, wing: 200, flying: false, flapT: 0, bombCd: 0,
+    armour: 0, armT: 0, healT: 0, energy: 100, beaming: false, beamLen: 0, beamTick: 0, aegis: 0, wing: 200, flying: false, flapT: 0, bombCd: 0,
     charge: 0, slow: 0, gliding: false, runPhase: 0, sx: 1, sy: 1, ax: 1, ay: 0, stepT: 0, dead: false, tail: [],
   };
   for (let i = 0; i < 12; i++) p.tail.push({ x: x, y: y + 10, px: x, py: y + 10 });
@@ -36,6 +36,26 @@ export function updatePlayer(dt) {
   // the Aegis recharges after blocking a hit
   if (S.aegis && p.aegis > 0) { p.aegis -= dt; if (p.aegis <= 0) { sfx('bubble', 0.5); ring(p.x + p.w / 2, p.y + p.h / 2, 50, '#ffe14a', 0.4, 5); } }
   if (p.hp > S.maxHp) p.hp = S.maxHp;
+  // armour refills a pip at a time once you have kept out of harm's way for a while
+  if (p.armour > S.armour) p.armour = S.armour;
+  p.armT -= dt;
+  if (S.armour && p.armour < S.armour && p.armT <= 0) {
+    p.armour = Math.min(S.armour, Math.floor(p.armour) + 1);
+    p.armT = S.armourRegen;
+    const A = worn();
+    ring(p.x + p.w / 2, p.y + p.h / 2 - 10, 40, A ? A.look.trim : '#ffffff', 0.35, 3);
+    sfx('clang', 0.4);
+  }
+  // White Marble Raiment: slow healing
+  if (S.heal && p.hp < S.maxHp) {
+    p.healT += dt;
+    if (p.healT >= S.heal) {
+      p.healT = 0;
+      p.hp++;
+      floater(p.x + p.w / 2, p.y - 10, '+1 ♥', '#ff8aa6', 16);
+      sfx('heal', 0.5);
+    }
+  } else p.healT = 0;
 
   const L = held('KeyA', 'ArrowLeft'), R = held('KeyD', 'ArrowRight'), U = held('KeyW', 'ArrowUp'), D = held('KeyS', 'ArrowDown');
   const jumpP = tapped('KeyW', 'ArrowUp', 'Space'), jumpH = held('KeyW', 'ArrowUp', 'Space');
@@ -72,7 +92,7 @@ export function updatePlayer(dt) {
     if (Math.random() < 0.5) part({ x: cx - p.face * 16, y: cy + 4, vx: -p.vx * 0.2, vy: -p.vy * 0.2, life: 0.5, size: 3, color: pick(RAINBOW), add: true });
   } else {
     // Horizontal movement
-    const ice = B.ice && p.ground;
+    const ice = B.ice && p.ground && !S.grip;
     const top = (p.slow > 0 ? 300 : 540) * S.speed * ((G.save.dev && G.save.dev.speed) || 1);
     if (p.dashT > 0) {
       p.dashT -= dt;
@@ -81,7 +101,7 @@ export function updatePlayer(dt) {
       if (Math.random() < 0.9) part({ x: cx - p.dashDir * 10, y: cy + rand(-10, 10), vx: -p.dashDir * 60, life: 0.3, size: 5, color: pick(RAINBOW), add: true });
     } else {
       const acc = p.ground ? (ice ? 2.5 : 16) : 9;
-      const wind = B.wind ? G.windForce * 0.3 : 0;
+      const wind = B.wind && !S.noWind ? G.windForce * 0.3 : 0;
       p.vx += (dir * top + wind - p.vx) * Math.min(1, acc * dt);
     }
 
@@ -171,7 +191,7 @@ export function updatePlayer(dt) {
 
     // Hazards
     const hz = hazardTouch(p);
-    if (hz && p.inv <= 0) {
+    if (hz && p.inv <= 0 && !S.hazSafe(B.haz)) {
       hurtPlayer(1, cx + p.vx * 0.1);
       p.vy = -620;
     }
@@ -214,10 +234,10 @@ export function updatePlayer(dt) {
   if (tapped('KeyH')) {
     if (G.save.potions > 0 && p.hp < S.maxHp) {
       G.save.potions--;
-      p.hp = Math.min(S.maxHp, p.hp + 3);
+      p.hp = Math.min(S.maxHp, p.hp + S.potion);
       sfx('heal');
       burst(cx, cy, 20, ['#ffe28a', '#ffffff'], 160, { add: true, g: -100 });
-      floater(cx, p.y - 10, '+3 ♥', '#ff8aa6', 20);
+      floater(cx, p.y - 10, '+' + S.potion + ' ♥', '#ff8aa6', 20);
     } else sfx('deny');
   }
 
@@ -431,6 +451,113 @@ function goldGrad(ctx, x0, y0, x1, y1) {
   return g;
 }
 
+// The worn armour's metal (gold when wearing none).
+let METAL = GOLD;
+function metalGrad(ctx, x0, y0, x1, y1) {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0, METAL[0]);
+  g.addColorStop(0.5, METAL[1]);
+  g.addColorStop(1, METAL[2]);
+  return g;
+}
+
+// The emblem of each land, embossed on the armour's barding.
+function motif(ctx, kind, x, y, col, dark) {
+  ctx.fillStyle = col;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  switch (kind) {
+    case 'moon': case 'crescent':
+      ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.moveTo(x + 4.1, y - 0.9); ctx.arc(x + 1.5, y - 0.9, 2.6, 0, Math.PI * 2);
+      ctx.fill('evenodd');
+      return;
+    case 'heart':
+      ctx.moveTo(x, y + 3); ctx.bezierCurveTo(x - 4.5, y - 0.5, x - 2, y - 4, x, y - 1.5); ctx.bezierCurveTo(x + 2, y - 4, x + 4.5, y - 0.5, x, y + 3);
+      ctx.fill();
+      return;
+    case 'scales':
+      for (let i = 0; i < 3; i++) { ctx.moveTo(x - 4 + i * 3 + 1.6, y + (i % 2) * 2); ctx.arc(x - 4 + i * 3, y + (i % 2) * 2, 1.6, 0, Math.PI); }
+      ctx.stroke();
+      return;
+    case 'flame':
+      ctx.moveTo(x, y - 4.5); ctx.quadraticCurveTo(x + 3.5, y, x + 2, y + 2.5); ctx.quadraticCurveTo(x, y + 4, x - 2, y + 2.5); ctx.quadraticCurveTo(x - 3, y, x, y - 4.5);
+      ctx.fill();
+      return;
+    case 'flake':
+      for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3; ctx.moveTo(x - Math.cos(a) * 3.6, y - Math.sin(a) * 3.6); ctx.lineTo(x + Math.cos(a) * 3.6, y + Math.sin(a) * 3.6); }
+      ctx.stroke();
+      return;
+    case 'skull':
+      ctx.arc(x, y - 0.6, 3, 0, Math.PI * 2); ctx.rect(x - 1.8, y + 1, 3.6, 2.2); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(x - 1.1, y - 0.6, 0.9, 0, Math.PI * 2); ctx.arc(x + 1.1, y - 0.6, 0.9, 0, Math.PI * 2); ctx.fill();
+      return;
+    case 'laurel':
+      ctx.arc(x, y + 1, 3.6, Math.PI * 0.95, Math.PI * 0.2, true); ctx.stroke();
+      for (let i = 0; i < 4; i++) { const a = Math.PI * (0.95 - i * 0.25); ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 3.6, y + 1 + Math.sin(a) * 3.6, 1.4, 0.7, a + 1.2, 0, Math.PI * 2); ctx.fill(); }
+      return;
+    case 'sun':
+      ctx.arc(x, y, 2.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.moveTo(x + Math.cos(a) * 3, y + Math.sin(a) * 3); ctx.lineTo(x + Math.cos(a) * 4.6, y + Math.sin(a) * 4.6); }
+      ctx.stroke();
+      return;
+    case 'cloud':
+      ctx.arc(x - 2, y + 0.8, 1.9, 0, Math.PI * 2); ctx.arc(x + 0.4, y - 0.6, 2.4, 0, Math.PI * 2); ctx.arc(x + 2.6, y + 1, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    case 'bolt':
+      ctx.moveTo(x + 1.2, y - 4.5); ctx.lineTo(x - 2.2, y + 0.6); ctx.lineTo(x, y + 0.6); ctx.lineTo(x - 1.2, y + 4.5); ctx.lineTo(x + 2.4, y - 0.8); ctx.lineTo(x + 0.2, y - 0.8); ctx.closePath();
+      ctx.fill();
+      return;
+  }
+}
+
+// Barding: a plate over the back, in the colours and emblem of the armour's land.
+function barding(ctx, L) {
+  const plate = new Path2D();
+  plate.moveTo(-18.6, -24);
+  plate.bezierCurveTo(-19.8, -34.5, -9, -36, 0, -34);
+  plate.bezierCurveTo(4, -33.4, 7, -35.6, 10.4, -35.6);
+  plate.lineTo(11.2, -27.5);
+  plate.bezierCurveTo(4, -21, -6, -20, -13, -21);
+  plate.bezierCurveTo(-16, -21.4, -18, -22.4, -18.6, -24);
+  plate.closePath();
+  if (L.spikes) {
+    // a ridge of spikes along the spine
+    ctx.fillStyle = metalGrad(ctx, 0, -41, 0, -33);
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 1.2;
+    for (const [x, y] of [[-13, -32], [-6.5, -34.6], [0.5, -34.2]]) {
+      ctx.beginPath(); ctx.moveTo(x - 2.4, y + 1); ctx.lineTo(x - 0.6, y - 5.5); ctx.lineTo(x + 2.4, y + 0.6); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 2.2;
+  ctx.stroke(plate);
+  ctx.fillStyle = metalGrad(ctx, 0, -36, 0, -20);
+  ctx.fill(plate);
+  // plate seams and a shine along the top
+  ctx.save();
+  ctx.clip(plate);
+  ctx.strokeStyle = 'rgba(0,0,0,.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-9, -36); ctx.lineTo(-10.5, -20); ctx.moveTo(3.5, -36); ctx.lineTo(2.5, -20); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(-17, -28); ctx.bezierCurveTo(-16, -33, -8, -34.5, 0, -32.6); ctx.stroke();
+  ctx.restore();
+  // trim and rivets along the lower edge
+  ctx.strokeStyle = L.trim;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(11, -27.8); ctx.bezierCurveTo(4, -21.6, -6, -20.6, -13, -21.6); ctx.bezierCurveTo(-16, -22, -17.6, -22.8, -18, -24); ctx.stroke();
+  ctx.fillStyle = L.trim;
+  for (const [x, y] of [[-14, -23.4], [-7, -22.4], [0, -22.7], [6.4, -24.6]]) { ctx.beginPath(); ctx.arc(x, y, 0.85, 0, Math.PI * 2); ctx.fill(); }
+  motif(ctx, L.motif, -3.2, -28.4, L.trim, L.metal[2]);
+}
+
 // A stroke that tapers from w0 to w1 along a polyline.
 function taper(ctx, pts, w0, w1, color) {
   ctx.strokeStyle = color;
@@ -516,6 +643,8 @@ export function drawUnicorn(ctx, p, t) {
   const f = p.face, run = Math.min(1, Math.abs(p.vx) / 420), air = !p.ground;
   const up = (G.save && G.save.up) || {};
   const blink = p.inv > 0 && !p.dashT && Math.floor(t * 20) % 2;
+  const A = G.save ? worn() : null, L = A && A.look;
+  METAL = L ? L.metal : GOLD;
 
   // Soft aura
   const acx = p.x + p.w / 2, acy = p.y + p.h - 34;
@@ -525,6 +654,14 @@ export function drawUnicorn(ctx, p, t) {
   ag.addColorStop(1, 'rgba(255,200,255,0)');
   ctx.fillStyle = ag;
   ctx.fillRect(acx - 70, acy - 70, 140, 140);
+  if (L && L.glow) {
+    // enchanted armour glows with the light of its land
+    const gg = ctx.createRadialGradient(acx, acy + 4, 4, acx, acy + 4, 56);
+    gg.addColorStop(0, rgba(L.glow, 0.22 + Math.sin(t * 3) * 0.06));
+    gg.addColorStop(1, rgba(L.glow, 0));
+    ctx.fillStyle = gg;
+    ctx.fillRect(acx - 60, acy - 56, 120, 120);
+  }
   ctx.globalCompositeOperation = 'source-over';
 
   if (blink) ctx.globalAlpha = 0.45;
@@ -560,8 +697,20 @@ export function drawUnicorn(ctx, p, t) {
     ctx.strokeStyle = col;
     ctx.lineWidth = near ? 5 : 4.4;
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy - 2); ctx.stroke();
-    // gold hoof
-    ctx.fillStyle = goldGrad(ctx, fx, fy - 5, fx, fy);
+    if (L) {
+      // greaves from the knee down
+      const gx = kx + (fx - kx) * 0.62, gy = ky + (fy - 2 - ky) * 0.62;
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = near ? 7.2 : 6.4;
+      ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(gx, gy); ctx.stroke();
+      ctx.strokeStyle = near ? L.metal[1] : L.metal[2];
+      ctx.lineWidth = near ? 5 : 4.4;
+      ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(gx, gy); ctx.stroke();
+      ctx.fillStyle = L.trim;
+      ctx.beginPath(); ctx.arc(kx, ky, near ? 2.2 : 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+    // hoof
+    ctx.fillStyle = metalGrad(ctx, fx, fy - 5, fx, fy);
     ctx.strokeStyle = OUT;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
@@ -623,8 +772,10 @@ export function drawUnicorn(ctx, p, t) {
   ctx.fillStyle = 'rgba(110,80,170,.16)';
   ctx.beginPath(); ctx.ellipse(-1, -14.5, 14, 3.2, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Olympian breastplate
-  ctx.fillStyle = goldGrad(ctx, 12, -34, 22, -16);
+  if (L) barding(ctx, L);
+
+  // Breastplate (Olympian gold, or the worn armour's metal)
+  ctx.fillStyle = metalGrad(ctx, 12, -34, 22, -16);
   ctx.strokeStyle = OUT;
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -633,7 +784,7 @@ export function drawUnicorn(ctx, p, t) {
   ctx.fill(); ctx.stroke();
   const gem = ctx.createRadialGradient(16.5, -25.5, 0.5, 16.5, -25, 3);
   gem.addColorStop(0, '#ffffff');
-  gem.addColorStop(0.4, RAINBOW[((Math.floor(t * 2) % 7) + 7) % 7]);
+  gem.addColorStop(0.4, L ? L.gem : RAINBOW[((Math.floor(t * 2) % 7) + 7) % 7]);
   gem.addColorStop(1, '#3a1a6a');
   ctx.fillStyle = gem;
   ctx.beginPath(); ctx.arc(16.5, -25, 2.6, 0, Math.PI * 2); ctx.fill();
@@ -671,7 +822,7 @@ export function drawUnicorn(ctx, p, t) {
   ctx.strokeStyle = OUT;
   ctx.lineWidth = 4.6;
   ctx.beginPath(); ctx.moveTo(20, -58.5); ctx.quadraticCurveTo(27, -57.5, 31.5, -50.5); ctx.stroke();
-  ctx.strokeStyle = goldGrad(ctx, 20, -60, 30, -50);
+  ctx.strokeStyle = metalGrad(ctx, 20, -60, 30, -50);
   ctx.lineWidth = 2.8;
   ctx.beginPath(); ctx.moveTo(20, -58.5); ctx.quadraticCurveTo(27, -57.5, 31.5, -50.5); ctx.stroke();
 
@@ -723,6 +874,15 @@ export function drawUnicorn(ctx, p, t) {
   for (let i = 0; i < 2; i++) {
     const pts = [[19, -58], [23, -59 + i * 2], [27 - i * 2, -56 + i * 2 + Math.sin(t * 5 + i) * 0.8]];
     taper(ctx, pts, 3.4, 1, RAINBOW[i * 5]);
+  }
+
+  // The armour's plume streams back from the helm
+  if (L) {
+    for (let i = 0; i < 3; i++) {
+      const w = Math.sin(t * 7 + i * 1.3) * 1.2 - run * 1.5, lift = air ? clamp(-p.vy / 600, -1, 1) * 2 : 0;
+      const pts = [[19.5, -59.5], [15 - i, -65 + i * 1.5 + w * 0.4 - lift], [9 - i * 2 - run * 3, -67 + i * 2.4 + w - lift], [3 - i * 2.5 - run * 6, -65 + i * 3 + w * 1.6 - lift * 1.5]];
+      taper(ctx, pts, 4.6 - i * 0.8, 0.8, i === 1 ? L.trim : L.plume);
+    }
   }
 
   // Horn: spiralled gold with a glowing tip

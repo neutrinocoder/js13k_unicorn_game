@@ -20,7 +20,7 @@ import { drawProjs, drawPickups, heartPath, starPath } from './combat.js';
 import { drawUnicorn, drawBubbles, hornTip } from './player.js';
 import { drawEnemy } from './enemies.js';
 import { drawBoss, drawBossBar } from './bosses.js';
-import { stats, WEAPONS, ownsWeapon } from './items.js';
+import { stats, WEAPONS, ownsWeapon, worn } from './items.js';
 import { devLabel } from './dev.js';
 import { objective, sealCount, sigilCount, interactLabel } from './main.js';
 import { lightning } from './art.js';
@@ -169,7 +169,7 @@ function drawHeaven(ctx, bg, hv) {
   ctx.fillRect(0, 0, W, H);
   const sun = bg.sun || 0, storm = bg.storm || 0;
   if (sun > 0.01) {
-    const sx = W * 0.78 - G.cam.x * 0.01, sy = H * 0.2 - G.cam.y * 0.01;
+    const sx = W * 0.78, sy = H * 0.2;
     ctx.globalCompositeOperation = 'lighter';
     ctx.save();
     ctx.translate(sx, sy);
@@ -190,6 +190,17 @@ function drawHeaven(ctx, bg, hv) {
     ctx.fillStyle = sg;
     ctx.fillRect(sx - H * 0.35, sy - H * 0.35, H * 0.7, H * 0.7);
     ctx.globalCompositeOperation = 'source-over';
+  }
+  const moon = bg.moon || 0;
+  if (moon > 0.01) {
+    // the Silver Peaks lie under a night of stars and a silver crescent
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 90; i++) {
+      const x = ((hash2(i, 0, 401) * W - G.cam.x * 0.005) % W + W) % W, y = hash2(i, 1, 402) * H * 0.75;
+      ctx.globalAlpha = hv * moon * (0.35 + 0.5 * Math.abs(Math.sin(G.t * (0.6 + hash2(i, 2, 403)) + i)));
+      ctx.fillRect(x, y, 1.6, 1.6);
+    }
+    ctx.globalAlpha = hv;
   }
   if (storm > 0.01 && Math.random() < 0.012 * storm) {
     G.skyFlash = 1;
@@ -243,6 +254,32 @@ function cloudPath(seed, i, j, cell) {
   return path;
 }
 
+// The silver crescent of the Silver Peaks, drawn in front of the far clouds so it shines through.
+function drawMoon(ctx, bg, hv) {
+  const { W, H } = G, moon = (bg.moon || 0) * hv;
+  if (moon < 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = moon;
+  const mx = W * 0.24, my = H * 0.2, mr = H * 0.07;
+  ctx.globalCompositeOperation = 'lighter';
+  const mg = ctx.createRadialGradient(mx, my, 0, mx, my, mr * 4);
+  mg.addColorStop(0, 'rgba(200,215,255,.35)');
+  mg.addColorStop(1, 'rgba(200,215,255,0)');
+  ctx.fillStyle = mg;
+  ctx.fillRect(mx - mr * 4, my - mr * 4, mr * 8, mr * 8);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#f4f7ff';
+  ctx.shadowColor = 'rgba(210,225,255,.9)';
+  ctx.shadowBlur = mr * 0.6;
+  ctx.beginPath();
+  ctx.arc(mx, my, mr, 0, TAU);
+  ctx.moveTo(mx + mr * 0.5 + mr * 0.82, my - mr * 0.28);
+  ctx.arc(mx + mr * 0.5, my - mr * 0.28, mr * 0.82, 0, TAU);
+  ctx.fill('evenodd');
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
 function drawHeavenClouds(ctx, bg, hv) {
   const { W, H, scale } = G;
   const layers = [
@@ -267,6 +304,17 @@ function drawHeavenClouds(ctx, bg, hv) {
       ctx.fill(path);
     }
     ctx.restore();
+  }
+  drawMoon(ctx, bg, hv);
+  // the Cloudlands: a soft veil of mist over everything far away
+  const mist = (bg.mist || 0) * hv;
+  if (mist > 0.01) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, rgba(bg.fog, 0.18 * mist));
+    g.addColorStop(0.6, rgba(bg.fog, 0.32 * mist));
+    g.addColorStop(1, rgba('#ffffff', 0.45 * mist));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
   }
 }
 
@@ -846,6 +894,36 @@ function drawHUD(ctx) {
     ctx.strokeStyle = 'rgba(255,255,255,.75)';
     ctx.stroke();
     ctx.restore();
+  }
+  // armour pips, after the hearts; the next one fills in as it recharges
+  const A = worn();
+  if (A && S.armour) {
+    const x0 = 30 + S.maxHp * 30 + 6, [c0, c1, c2] = A.look.metal;
+    for (let i = 0; i < S.armour; i++) {
+      ctx.save();
+      ctx.translate(x0 + i * 26, 30);
+      const sh = new Path2D('M0 -11 L10 -7 L9 3 Q6 10 0 12 Q-6 10 -9 3 L-10 -7 Z');
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fill(sh);
+      const full = i < Math.floor(p.armour), next = i === Math.floor(p.armour) && p.armT < S.armourRegen;
+      if (full || next) {
+        const g = ctx.createLinearGradient(0, -11, 0, 12);
+        g.addColorStop(0, c0); g.addColorStop(0.5, c1); g.addColorStop(1, c2);
+        ctx.fillStyle = g;
+        if (next) {
+          ctx.save();
+          ctx.globalAlpha = 0.6;
+          const k = clamp(1 - p.armT / S.armourRegen, 0, 1);
+          ctx.beginPath(); ctx.rect(-12, 12 - 24 * k, 24, 24 * k); ctx.clip();
+          ctx.fill(sh);
+          ctx.restore();
+        } else ctx.fill(sh);
+      }
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = full ? A.look.trim : 'rgba(255,255,255,.45)';
+      ctx.stroke(sh);
+      ctx.restore();
+    }
   }
   // gems and potions
   ctx.font = '800 20px Nunito, sans-serif';

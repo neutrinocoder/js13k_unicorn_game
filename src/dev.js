@@ -2,7 +2,7 @@
 import { G } from './state.js';
 import { T, CS, SITES, getChunk, GODS, ZS, OLY } from './world.js';
 import { playCutscene } from './cutscene.js';
-import { SHOP, stats } from './items.js';
+import { SHOP, stats, ARMOURS } from './items.js';
 import { keys } from './input.js';
 import { sfx } from './audio.js';
 import { killEnemy, damageEnemy } from './combat.js';
@@ -41,6 +41,11 @@ const PLACES = {
   zeus: [ZS.tx - 34, ZS.ty + ZS.h / 2 + 1],
 };
 for (const g of GODS) PLACES[g.id] = [g.tx, g.ty + g.h / 2 + 1];
+// the four realms of Olympus
+PLACES.white = PLACES.olympus;
+PLACES.gold = PLACES.apollo;
+PLACES.silver = PLACES.ares;
+PLACES.mist = PLACES.cloudlands = PLACES.cloudy = PLACES.poseidon;
 
 const COMMANDS = {
   help: {
@@ -67,6 +72,20 @@ const COMMANDS = {
       }
       f.infGems = a === 'off' ? 0 : 1;
       return 'infinite gems ' + (f.infGems ? 'ON' : 'OFF');
+    },
+  },
+  armour: {
+    args: '[id|all|off]', desc: 'wear the armour of a land (limbo lust gluttony heresy treachery abyss olympus gold silver mist zeus), unlock all, or take it off',
+    run([a]) {
+      const s = G.save;
+      s.armours = s.armours || {}; s.lands = s.lands || {};
+      if (a === 'all') { for (const x of ARMOURS) { s.armours[x.id] = 1; s.lands[x.land] = 1; } return 'all armour unlocked'; }
+      if (!a || a === 'off') { s.armour = null; return 'armour off'; }
+      const x = ARMOURS.find(z => z.id === a);
+      if (!x) return 'no such armour: ' + a;
+      s.armours[x.id] = 1; s.lands[x.land] = 1; s.armour = x.id;
+      if (G.player) G.player.armour = stats().armour;
+      return 'wearing ' + x.name;
     },
   },
   speed: {

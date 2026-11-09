@@ -1,7 +1,7 @@
 // HTML overlays: shop, dialogue, toasts and screens.
 import { G } from './state.js';
-import { SHOP, stats, shopLocked } from './items.js';
-import { SITES } from './world.js';
+import { SHOP, stats, shopLocked, ARMOURS, armourKnown, armourOwned } from './items.js';
+import { SITES, BIOMES } from './world.js';
 import { sfx } from './audio.js';
 
 const $ = id => document.getElementById(id);
@@ -56,6 +56,11 @@ function renderShop() {
   $('shop-gems').textContent = inf ? '∞' : G.save.gems.toLocaleString();
   const box = $('shop-items');
   box.innerHTML = '';
+  renderArmours(box, inf);
+  const wares = document.createElement('h3');
+  wares.className = 'shop-head';
+  wares.textContent = 'Wares';
+  box.appendChild(wares);
   // items still locked behind a boss go to the end of the list, greyed out
   const list = [...SHOP.filter(it => !shopLocked(it)), ...SHOP.filter(shopLocked)];
   for (const it of list) {
@@ -76,6 +81,48 @@ function renderShop() {
     card.onclick = () => buy(it);
     box.appendChild(card);
   }
+}
+
+// Armour of every land: on sale once you have set foot in its land; bought once, worn one at a time.
+function renderArmours(box, inf) {
+  const head = document.createElement('h3');
+  head.className = 'shop-head';
+  head.textContent = 'Armour of the Lands';
+  box.appendChild(head);
+  for (const a of ARMOURS) {
+    const land = BIOMES[a.land].name, pips = `${a.pips} armour`;
+    if (!armourKnown(a)) {
+      const card = document.createElement('div');
+      card.className = 'item locked';
+      card.innerHTML = `<span class="icon">🔒</span><span class="info"><b>${a.name}</b><small>${pips}. ${a.perk}</small><em>Set foot in ${land} to unlock</em></span><span class="price">${a.icon}</span>`;
+      box.appendChild(card);
+      continue;
+    }
+    const owned = armourOwned(a), on = G.save.armour === a.id, afford = inf || G.save.gems >= a.cost;
+    const card = document.createElement('button');
+    card.className = 'item armour' + (on ? ' worn' : '') + (owned || afford ? '' : ' poor');
+    const note = on ? 'Wearing it · click to take off' : owned ? 'Owned · click to wear' : 'Armour of ' + land;
+    card.innerHTML = `<span class="icon">${a.icon}</span><span class="info"><b>${a.name}</b><small>${pips}. ${a.perk}</small><em>${note}</em></span><span class="price">${on ? 'Worn' : owned ? 'Wear' : '<i></i>' + a.cost}</span>`;
+    card.onclick = () => armourClick(a);
+    box.appendChild(card);
+  }
+}
+
+function armourClick(a) {
+  const s = G.save, inf = s.dev && s.dev.infGems;
+  s.armours = s.armours || {};
+  if (!s.armours[a.id]) {
+    if (!inf && s.gems < a.cost) { sfx('deny'); toast('Not enough gems.'); return; }
+    if (!inf) s.gems -= a.cost;
+    s.armours[a.id] = 1;
+    sfx('buy');
+    toast(`${a.icon} You put on the ${a.name}.`);
+  } else sfx('ui');
+  s.armour = s.armour === a.id ? null : a.id;
+  G.player.armour = stats().armour;
+  G.player.armT = 0;
+  renderShop();
+  shopCtx.o.bought = true;
 }
 
 function buy(it) {
