@@ -207,6 +207,7 @@ function angel(ctx, x, y, sc, o = {}) {
   p.ground = !o.air;
   p.runPhase += (o.run ? 0.25 : 0);
   p.inv = 0; p.dashT = o.dash ? 0.1 : 0; p.sx = 1; p.sy = 1;
+  p.holy = o.holy || 0;
   ctx.save();
   ctx.translate(x, y);
   if (o.rot) ctx.rotate(o.rot);
@@ -255,9 +256,9 @@ const SCENES = {
         cloudFloor(ctx, 730, '#ffffff', '#d4def2');
         temple(ctx, 560, 700, 520, 220);
         cloud(ctx, 220, 740, 460, '#ffffff', '#cfd9ef', 1, 5);
-        angel(ctx, 1180, 700, 2.2, { face: -1, alpha: 0.65 });
-        angel(ctx, 1380, 712, 1.8, { face: -1, alpha: 0.5 });
-        angel(ctx, 760 + k * 220, 730, 3.4, { face: 1, run: true });
+        angel(ctx, 1180, 700, 2.2, { face: -1, alpha: 0.65, holy: 1 });
+        angel(ctx, 1380, 712, 1.8, { face: -1, alpha: 0.5, holy: 1 });
+        angel(ctx, 760 + k * 220, 730, 3.4, { face: 1, run: true, holy: 1 });
         if (Math.random() < 0.3) sparkle(rand(0, VW), rand(100, 600), 1, ['#ffe28a', '#ffffff']);
       },
     },
@@ -276,9 +277,9 @@ const SCENES = {
           const a = t * 1.6 + (i / 6) * TAU, r = 120 + Math.sin(t * 2 + i) * 20;
           glow(ctx, x + Math.cos(a) * r, y - 70 + Math.sin(a) * r * 0.5, 30, RAINBOW[i], 0.4 + b * 0.4);
         }
-        angel(ctx, x, y, 3.6, { face: 1, dash: true });
+        angel(ctx, x, y, 3.6, { face: 1, dash: true, holy: 1 });
         // the other angels shrink away from the glare
-        angel(ctx, 1260 + b * 120, 720, 1.8, { face: 1, run: b > 0.2, alpha: 0.6 * (1 - b) });
+        angel(ctx, 1260 + b * 120, 720, 1.8, { face: 1, run: b > 0.2, alpha: 0.6 * (1 - b), holy: 1 });
         if (Math.random() < 0.7) sparkle(x, y - 80, 2, RAINBOW, 90);
       },
     },
@@ -292,7 +293,7 @@ const SCENES = {
         if (Math.random() < 0.06 * s) { lightning(ctx, rand(200, 1400), 0, rand(200, 1400), 500, '#e8eeff', 3, 10, 40); sfx('bolt'); }
         zeus(ctx, 1080, 640 + (1 - s) * 200, 3.2, 'idle', k, t, { alpha: s, lx: -400, ly: 260 });
         cloudFloor(ctx, 770, '#8a8ab0', '#4a4a70');
-        angel(ctx, 360, 790, 2.4, { face: 1, alpha: 1 });
+        angel(ctx, 360, 790, 2.4, { face: 1, alpha: 1, holy: 1 });
         glow(ctx, 360, 720, 160, '#fff6d0', 0.5);
       },
     },
@@ -305,7 +306,7 @@ const SCENES = {
         zeus(ctx, 1080, 640, 3.2, k > 0.3 ? 'bolts' : 'idle', k > 0.3 ? (k - 0.3) / 0.7 : k, t, { lx: -400, ly: 260, roar: strike && k < 0.7 ? 0.6 : 0 });
         cloudFloor(ctx, 770, '#8a8ab0', '#4a4a70');
         if (!strike) {
-          angel(ctx, 360, 790, 2.4, { face: 1 });
+          angel(ctx, 360, 790, 2.4, { face: 1, holy: 1 });
           glow(ctx, 360, 720, 160, '#fff6d0', 0.5);
         } else {
           const f = (k - 0.45) / 0.55;
@@ -313,7 +314,7 @@ const SCENES = {
             for (let i = 0; i < 3; i++) lightning(ctx, 1000, 260, 360 + rand(-20, 20), 760, i ? '#bfd8ff' : '#ffffff', 6 - i * 2, 14, 60);
             if (!cs.boom) { cs.boom = 1; sfx('boom'); for (let i = 0; i < 60; i++) sparkle(360, 740, 1, RAINBOW, 60); }
           }
-          angel(ctx, 360 - f * 120, 790 + f * f * 200, 2.4, { face: 1, air: true, rot: -f * 2.4, alpha: 1 - f * 0.4 });
+          angel(ctx, 360 - f * 120, 790 + f * f * 200, 2.4, { face: 1, air: true, rot: -f * 2.4, alpha: 1 - f * 0.4, holy: 1 - f * 0.35 });
           if (f < 0.2) { ctx.fillStyle = `rgba(255,255,255,${1 - f / 0.2})`; ctx.fillRect(0, 0, VW, VH); }
         }
       },
@@ -341,8 +342,11 @@ const SCENES = {
           const x = (i * 53 + Math.sin(i) * 40) % VW, y = (t * 1600 + i * 97) % VH;
           ctx.beginPath(); ctx.moveTo(x, VH - y); ctx.lineTo(x, VH - y - 80); ctx.stroke();
         }
-        angel(ctx, 800 + Math.sin(t * 1.3) * 60, 420, 2.6, { face: 1, air: true, vy: 800, rot: t * 2.2, alpha: 0.9 });
-        if (Math.random() < 0.5) part({ x: 800 + rand(-30, 30), y: 400, vx: rand(-40, 40), vy: rand(-500, -300), life: 0.6, size: rand(2, 4), color: pick(RAINBOW), add: true });
+        const holy = 0.65 * (1 - sm(Math.min(1, k * 1.4)));
+        angel(ctx, 800 + Math.sin(t * 1.3) * 60, 420, 2.6, { face: 1, air: true, vy: 800, rot: t * 2.2, alpha: 0.9, holy });
+        // the last of its light streams away, and shadow-fire takes its place
+        if (Math.random() < 0.6) part({ x: 800 + rand(-30, 30), y: 400, vx: rand(-40, 40), vy: rand(-500, -300), life: 0.6, size: rand(2, 4), color: Math.random() < holy * 1.4 ? pick(['#fff6d0', '#ffe28a']) : pick(['#7a2ad0', '#a64dff', '#d07aff', '#2a0b45']), add: true });
+        if (k > 0.3 && Math.random() < 0.35) part({ x: 800 + rand(-50, 50), y: 420 + rand(-40, 40), vx: rand(-60, 60), vy: rand(-700, -400), life: 0.8, size: rand(3, 5), color: '#140a1e', shape: 'petal', rot: rand(0, 6), vr: rand(-10, 10) });
       },
     },
     {

@@ -3,7 +3,7 @@ import { G } from './state.js';
 import { T, tileAt, ORE, CRYSTAL, BIOMES, BIOME_LIST } from './world.js';
 import { moveBody, touchWall, onPlatform, hazardTouch, rayLength } from './physics.js';
 import { held, tapped, mouse } from './input.js';
-import { clamp, rand, angDiff, pick, rgba } from './util.js';
+import { clamp, rand, angDiff, pick, rgba, mix } from './util.js';
 import { eye } from './art.js';
 
 // The dark angel's shadow-fire, used where the unicorn had its rainbow.
@@ -438,7 +438,7 @@ export function updateTail(p, dt) {
     pt.x = prev.x + (dx / d) * seg;
     pt.y = prev.y + (dy / d) * seg;
   }
-  if (Math.random() < 0.2) {
+  if (Math.random() < 0.2 && !(p.holy > 0.5)) {
     const tip = p.tail[N - 1];
     part({ x: tip.x, y: tip.y, vx: rand(-20, 20), vy: rand(-20, 20), life: 0.6, size: rand(1.4, 2.4), color: pick(RAINBOW), add: true, shape: 'star', vr: 3 });
   }
@@ -601,6 +601,31 @@ export function drawTail(ctx, p) {
 }
 
 // ---------- The dark angel ----------
+// Colours of the angel: dark (k = 0, fallen) through to holy (k = 1, as it was in Olympus).
+const DARK_C = {
+  wDark: '#120a1c', wDarkF: '#08050e', wMid: '#3a2456', wMidF: '#24163a', wEdge: '#a676ff', wEdgeF: '#6a4a9a',
+  cov: '#2a1a40', covF: '#170e26', coat: '#140c1e', coatL: '#3a2a52', cloth: '#2a1e3c', clothF: '#160f22',
+  armF: '#120c1c', arm: '#241932', boot: '#1a1224', bootF: '#0e0a16', belt: '#0c0812',
+  hair: '#efeaf8', hair2: '#bdb3d6', eye: '#c45cff', socket: '#1a0c2e', trim: '#b06aff', spark: '#a64dff',
+};
+const HOLY_C = {
+  wDark: '#d6cfe8', wDarkF: '#b4accb', wMid: '#ffffff', wMidF: '#e4def0', wEdge: '#ffe9a8', wEdgeF: '#e2cd92',
+  cov: '#f6f2fc', covF: '#cfc7df', coat: '#f2eefa', coatL: '#ffffff', cloth: '#ece6f6', clothF: '#c6bed8',
+  armF: '#cdc4de', arm: '#efe9f8', boot: '#c89a3a', bootF: '#9a7428', belt: '#c89a3a',
+  hair: '#fff3c4', hair2: '#f0c25a', eye: '#5ab8ff', socket: '#1a2a4e', trim: '#f4c24a', spark: '#ffe28a',
+};
+function angelColours(k) {
+  const c = { k };
+  for (const key in DARK_C) c[key] = k <= 0 ? DARK_C[key] : k >= 1 ? HOLY_C[key] : mix(DARK_C[key], HOLY_C[key], k);
+  c.quill = rgba(mix('#a676ff', '#e8c870', k), 0.35);
+  c.gleam = rgba(mix('#be82ff', '#fff6d0', k), 0.6);
+  c.gleamF = rgba(mix('#9664dc', '#f0e0b0', k), 0.35);
+  c.lining = rgba(mix('#6e28aa', '#f4c24a', k), 0.5);
+  c.hairGlow = rgba(mix('#b06aff', '#ffe28a', k), 0.45);
+  return c;
+}
+let HC = angelColours(0);
+
 // Where the shoulder and the lash hand are, in the angel's own space (facing right, feet at 0, 0).
 // Shared by the drawing and by the lash, so the lash always leaves the hand.
 function pose(p, t) {
@@ -646,7 +671,21 @@ function halo(ctx, x, y, t) {
   ctx.translate(x, y);
   ctx.rotate(-0.28);
   ctx.scale(1, 0.32);
-  glowDot(ctx, 0, 0, 16, '#a64dff', 0.35 + Math.sin(t * 2.5) * 0.08);
+  const k = HC.k, a0 = ctx.globalAlpha;
+  if (k > 0) {
+    // the golden halo of an angel in good standing
+    glowDot(ctx, 0, 0, 18, '#ffe28a', 0.5 * k);
+    ctx.globalAlpha = a0 * k;
+    ctx.strokeStyle = '#c8901a';
+    ctx.lineWidth = 3.4;
+    ctx.beginPath(); ctx.arc(0, 0, 8.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#fff3b0';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(0, 0, 8.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = a0 * (1 - k);
+  }
+  if (k >= 1) { ctx.restore(); return; }
+  glowDot(ctx, 0, 0, 16, HC.spark, 0.35 + Math.sin(t * 2.5) * 0.08);
   const spin = t * 0.8;
   for (let k = 0; k < 5; k++) {
     const a0 = spin + (k / 5) * Math.PI * 2, a1 = a0 + 0.95;
@@ -676,7 +715,7 @@ function angelWing(ctx, x, y, ang, len, spread, near, t) {
   ctx.rotate(ang);
   const fold = 1 - spread, n = 9;
   const armY = u => -Math.sin(u * Math.PI) * len * 0.16;
-  const dark = near ? '#120a1c' : '#08050e', mid = near ? '#3a2456' : '#24163a', edge = near ? '#a676ff' : '#6a4a9a';
+  const dark = near ? HC.wDark : HC.wDarkF, mid = near ? HC.wMid : HC.wMidF, edge = near ? HC.wEdge : HC.wEdgeF;
   // primaries and secondaries, drawn tip first so the inner ones lie on top
   for (let k = n - 1; k >= 0; k--) {
     const u = k / (n - 1), bx = -len * (0.12 + u * 0.88), by = armY(0.12 + u * 0.88);
@@ -699,7 +738,7 @@ function angelWing(ctx, x, y, ang, len, spread, near, t) {
     ctx.fill();
     ctx.stroke();
     // a quill down the middle
-    ctx.strokeStyle = 'rgba(166,118,255,.35)';
+    ctx.strokeStyle = HC.quill;
     ctx.lineWidth = 0.6;
     ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + (ex - bx) * 0.85, by + (ey - by) * 0.85); ctx.stroke();
   }
@@ -716,14 +755,14 @@ function angelWing(ctx, x, y, ang, len, spread, near, t) {
   ctx.lineWidth = 1.6;
   ctx.stroke(cov);
   const cg = ctx.createLinearGradient(0, -6, -len, 6);
-  cg.addColorStop(0, near ? '#2a1a40' : '#170e26');
+  cg.addColorStop(0, near ? HC.cov : HC.covF);
   cg.addColorStop(1, dark);
   ctx.fillStyle = cg;
   ctx.fill(cov);
   // a violet gleam along the leading edge
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = near ? 'rgba(190,130,255,.6)' : 'rgba(150,100,220,.35)';
+  ctx.strokeStyle = near ? HC.gleam : HC.gleamF;
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   for (let s = 0; s <= 10; s++) { const u = s / 10; if (s) ctx.lineTo(-len * u, armY(u) - 1.6); else ctx.moveTo(0, -1.6); }
@@ -737,14 +776,16 @@ export function drawAngel(ctx, p, t) {
   const up = (G.save && G.save.up) || {};
   const blink = p.inv > 0 && !p.dashT && Math.floor(t * 20) % 2;
   const A = G.save ? worn() : null, L = A && A.look;
-  METAL = L ? L.metal : STEEL;
+  const holy = clamp(p.holy || 0, 0, 1);
+  HC = angelColours(holy);
+  METAL = L ? L.metal : holy > 0.5 ? GOLD : STEEL;
 
   // Soft aura
   const acx = p.x + p.w / 2, acy = p.y + p.h - 34;
   ctx.globalCompositeOperation = 'lighter';
   const ag = ctx.createRadialGradient(acx, acy, 4, acx, acy, 70);
-  ag.addColorStop(0, `rgba(170,90,255,${p.dashT > 0 ? 0.5 : 0.16})`);
-  ag.addColorStop(1, 'rgba(120,40,200,0)');
+  ag.addColorStop(0, rgba(mix('#aa5aff', '#ffe6a0', holy), p.dashT > 0 ? 0.5 : 0.16 + holy * 0.14));
+  ag.addColorStop(1, rgba(mix('#7828c8', '#ffd890', holy), 0));
   ctx.fillStyle = ag;
   ctx.fillRect(acx - 70, acy - 70, 140, 140);
   if (L && L.glow) {
@@ -758,7 +799,7 @@ export function drawAngel(ctx, p, t) {
   ctx.globalCompositeOperation = 'source-over';
 
   if (blink) ctx.globalAlpha = 0.45;
-  drawTail(ctx, p);
+  if (holy < 1) { const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * (1 - holy); drawTail(ctx, p); ctx.globalAlpha = a0; }
 
   ctx.save();
   ctx.translate(p.x + p.w / 2, p.y + p.h);
@@ -766,7 +807,7 @@ export function drawAngel(ctx, p, t) {
   const Q = pose(p, t), { sh, hand } = Q, bob = Q.bob;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const trim = L ? L.trim : '#b06aff', gemC = L ? L.gem : '#c45cff';
+  const trim = L ? L.trim : HC.trim, gemC = L ? L.gem : HC.eye;
   const ph = p.runPhase, wave = t * (run > 0.1 ? 11 : 3);
   const fall = air ? clamp(p.vy / 900, -0.5, 0.9) : 0;
 
@@ -779,13 +820,13 @@ export function drawAngel(ctx, p, t) {
   // the far arm, swinging opposite the near one
   const fa = Math.sin(ph) * run;
   const fe = [sh[0] - 1 - fa * 3, sh[1] + 8], fh = [sh[0] + 1 - fa * 7, sh[1] + 15];
-  limb2(ctx, [[sh[0] - 1, sh[1] + 1], fe, fh], 3.6, '#120c1c');
+  limb2(ctx, [[sh[0] - 1, sh[1] + 1], fe, fh], 3.6, HC.armF);
   ctx.fillStyle = metalGrad(ctx, fh[0] - 2, fh[1] - 2, fh[0] + 2, fh[1] + 2);
   ctx.beginPath(); ctx.arc(fh[0], fh[1], 2, 0, Math.PI * 2); ctx.fill();
 
   // the long coat behind, tattered and streaming
   const flow = run * 7 + (air ? 3 : 0);
-  ctx.fillStyle = '#140c1e';
+  ctx.fillStyle = HC.coat;
   ctx.strokeStyle = OUT;
   ctx.lineWidth = 1.4;
   ctx.beginPath();
@@ -797,7 +838,7 @@ export function drawAngel(ctx, p, t) {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = L ? rgba(L.plume, 0.55) : 'rgba(110,40,170,.5)';
+  ctx.fillStyle = L ? rgba(L.plume, 0.55) : HC.lining;
   ctx.beginPath();
   ctx.moveTo(-4, -19 - bob);
   ctx.quadraticCurveTo(-7 - flow * 0.4, -13, -8.5 - flow, -4.5 - fall * 4);
@@ -817,20 +858,20 @@ export function drawAngel(ctx, p, t) {
       fx = hx + s * 9 * run; fy = -c * 6 * run;
       kx = hx + s * 5 * run + 2.5 * run + 1; ky = -10 - c * 3 * run;
     } else { fx = hx + (near ? 1.5 : -1.5); fy = 0; kx = hx + (near ? 2 : 0); ky = -10; }
-    const cloth = near ? '#2a1e3c' : '#160f22';
+    const cloth = near ? HC.cloth : HC.clothF;
     limb2(ctx, [[hx, hy], [kx, ky]], near ? 5 : 4.4, cloth);
     // greave and boot in the armour's metal
     limb2(ctx, [[kx, ky], [fx, fy - 2]], near ? 4.2 : 3.8, near ? METAL[1] : METAL[2]);
     ctx.fillStyle = trim;
     ctx.beginPath(); ctx.arc(kx, ky, near ? 1.8 : 1.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = near ? '#1a1224' : '#0e0a16';
+    ctx.fillStyle = near ? HC.boot : HC.bootF;
     ctx.strokeStyle = OUT;
     ctx.lineWidth = 1.1;
     ctx.beginPath(); ctx.moveTo(fx - 2.6, fy - 3.6); ctx.lineTo(fx + 2, fy - 3.6); ctx.lineTo(fx + 5, fy - 0.6); ctx.lineTo(fx + 5, fy); ctx.lineTo(fx - 2.8, fy); ctx.closePath();
     ctx.fill(); ctx.stroke();
     ctx.fillStyle = metalGrad(ctx, fx, fy - 4, fx + 5, fy);
     ctx.beginPath(); ctx.moveTo(fx + 1.5, fy - 3.4); ctx.lineTo(fx + 5, fy - 0.6); ctx.lineTo(fx + 5, fy); ctx.lineTo(fx + 1.5, fy); ctx.closePath(); ctx.fill();
-    if (up.hooves) glowDot(ctx, fx + 1, fy - 1.5, 6, '#c45cff', 0.4);
+    if (up.hooves) glowDot(ctx, fx + 1, fy - 1.5, 6, HC.eye, 0.4);
   };
   leg(-1.5, ph + Math.PI, false);
 
@@ -846,8 +887,8 @@ export function drawAngel(ctx, p, t) {
   ctx.lineWidth = 2.6;
   ctx.stroke(torso);
   const cg = ctx.createLinearGradient(-6, -38, 6, -19);
-  cg.addColorStop(0, '#3a2a52');
-  cg.addColorStop(1, '#140c1e');
+  cg.addColorStop(0, HC.coatL);
+  cg.addColorStop(1, HC.coat);
   ctx.fillStyle = cg;
   ctx.fill(torso);
   const plate = new Path2D();
@@ -877,7 +918,7 @@ export function drawAngel(ctx, p, t) {
   ctx.beginPath(); ctx.arc(gx, gy, L ? 1.7 : 2.2, 0, Math.PI * 2); ctx.fill();
   glowDot(ctx, gx, gy, 6, gemC, 0.35 + Math.sin(t * 3) * 0.1);
   // belt
-  ctx.fillStyle = '#0c0812';
+  ctx.fillStyle = HC.belt;
   ctx.fillRect(-5.4, -22.5 - bob, 10.6, 2.4);
   ctx.fillStyle = metalGrad(ctx, 0, -23, 0, -20);
   ctx.fillRect(-0.6, -23 - bob, 3, 3.2);
@@ -906,9 +947,9 @@ export function drawAngel(ctx, p, t) {
     }
     locks.push(pts);
   }
-  locks.forEach((l, i) => taper(ctx, l, 4.6, 1, i % 2 ? '#bdb3d6' : '#efeaf8'));
+  locks.forEach((l, i) => taper(ctx, l, 4.6, 1, i % 2 ? HC.hair2 : HC.hair));
   ctx.globalCompositeOperation = 'lighter';
-  locks.forEach(l => taper(ctx, l.slice(3), 1.6, 0.6, 'rgba(176,106,255,.45)'));
+  locks.forEach(l => taper(ctx, l.slice(3), 1.6, 0.6, HC.hairGlow));
   ctx.globalCompositeOperation = 'source-over';
 
   const face = new Path2D();
@@ -928,7 +969,7 @@ export function drawAngel(ctx, p, t) {
   ctx.fillStyle = sk;
   ctx.fill(face);
   // fringe over the brow
-  ctx.fillStyle = '#efeaf8';
+  ctx.fillStyle = HC.hair;
   ctx.strokeStyle = 'rgba(51,38,77,.6)';
   ctx.lineWidth = 0.8;
   ctx.beginPath();
@@ -954,9 +995,9 @@ export function drawAngel(ctx, p, t) {
   if (t % 4.3 < 0.12) {
     ctx.beginPath(); ctx.moveTo(hc[0] + 1.2, hc[1] - 0.2); ctx.lineTo(hc[0] + 3.8, hc[1] + 0.2); ctx.stroke();
   } else {
-    ctx.fillStyle = '#1a0c2e';
+    ctx.fillStyle = HC.socket;
     ctx.beginPath(); ctx.ellipse(hc[0] + 2.6, hc[1] - 0.1, 1.5, 1.1, 0.1, 0, Math.PI * 2); ctx.fill();
-    eye(ctx, hc[0] + 2.9, hc[1] - 0.1, 0.85, '#c45cff', '#ffffff', 3.2);
+    eye(ctx, hc[0] + 2.9, hc[1] - 0.1, 0.85, HC.eye, '#ffffff', 3.2);
   }
   ctx.strokeStyle = 'rgba(80,50,110,.6)';
   ctx.lineWidth = 0.8;
@@ -994,13 +1035,13 @@ export function drawAngel(ctx, p, t) {
 
   // the near arm, wielding the lash of shadow-fire
   const el = [(sh[0] + hand[0]) / 2 - 1.5, (sh[1] + hand[1]) / 2 + 2.5];
-  limb2(ctx, [[sh[0], sh[1] + 1], el, hand], 3.9, '#241932');
+  limb2(ctx, [[sh[0], sh[1] + 1], el, hand], 3.9, HC.arm);
   limb2(ctx, [el, hand], 3.4, METAL[1]);
   ctx.fillStyle = metalGrad(ctx, hand[0] - 2.5, hand[1] - 2.5, hand[0] + 2.5, hand[1] + 2.5);
   ctx.strokeStyle = OUT;
   ctx.lineWidth = 1.1;
   ctx.beginPath(); ctx.arc(hand[0], hand[1], 2.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  glowDot(ctx, hand[0], hand[1], 7, '#a64dff', 0.35 + Math.sin(t * 5) * 0.1);
+  glowDot(ctx, hand[0], hand[1], 7, HC.spark, 0.35 + Math.sin(t * 5) * 0.1);
   ctx.restore();
   ctx.globalAlpha = 1;
 
