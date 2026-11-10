@@ -732,7 +732,7 @@ function angelWing(ctx, x, y, ang, len, spread, near, t) {
   ctx.restore();
 }
 
-export function drawUnicorn(ctx, p, t) {
+export function drawAngel(ctx, p, t) {
   const f = p.face, run = Math.min(1, Math.abs(p.vx) / 420), air = !p.ground;
   const up = (G.save && G.save.up) || {};
   const blink = p.inv > 0 && !p.dashT && Math.floor(t * 20) % 2;

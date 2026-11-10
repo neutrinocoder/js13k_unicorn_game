@@ -18,7 +18,7 @@ canvas { display: block; position: fixed; inset: 0; cursor: crosshair; touch-act
 .title-wrap { text-align: center; animation: rise 1.4s ease-out both; }
 h1 { margin: 0; line-height: 0.9; font-family: 'Cinzel Decorative', Cinzel, serif; font-weight: 900; }
 h1 .t1 { display: block; font-size: clamp(42px, 8vw, 96px); color: #fff; text-shadow: 0 4px 30px rgba(180, 150, 255, 0.6); }
-h1 .t2 { display: block; font-size: clamp(56px, 12vw, 150px); background: var(--rainbow); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 30px rgba(255, 120, 200, 0.45)); }
+h1 .t2 { display: block; font-size: clamp(56px, 12vw, 150px); background: linear-gradient(90deg, #7a2ad0, #c45cff, #ff6ad5, #f2d6ff, #a64dff); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 30px rgba(166, 77, 255, 0.5)); }
 .tag { font-family: Cinzel, serif; color: var(--muted); letter-spacing: 0.08em; margin: 14px 0 34px; font-size: clamp(14px, 2vw, 19px); }
 .menu { display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .foot { margin-top: 30px; font-size: 14px; }

@@ -1,7 +1,7 @@
-// Story cutscenes, drawn straight onto the game canvas: the prelude (the unicorn cast out of
+// Story cutscenes, drawn straight onto the game canvas: the prelude (the angel cast out of
 // Olympus by Zeus), the ascent back up after Hades falls, and the finale after Zeus is beaten.
 import { G } from './state.js';
-import { makePlayer, drawUnicorn, updateTail } from './player.js';
+import { makePlayer, drawAngel, updateTail } from './player.js';
 import { updateFx, drawParts, part } from './fx.js';
 import { glow, lightning } from './art.js';
 import { mood } from './bossart.js';
@@ -198,7 +198,7 @@ function temple(ctx, x, y, w, h, col = '#f4efe2', a = 1) {
 }
 
 // The angel as a puppet: the real in-game sprite, posed for the camera.
-function unicorn(ctx, x, y, sc, o = {}) {
+function angel(ctx, x, y, sc, o = {}) {
   const p = cs.pup;
   p.x = -p.w / 2; p.y = -p.h;
   p.face = o.face || 1;
@@ -213,7 +213,7 @@ function unicorn(ctx, x, y, sc, o = {}) {
   ctx.scale(sc, sc);
   if (o.alpha != null) ctx.globalAlpha = o.alpha;
   updateTail(p, 1 / 60);
-  drawUnicorn(ctx, p, cs.total);
+  drawAngel(ctx, p, cs.total);
   ctx.restore();
 }
 
@@ -255,9 +255,9 @@ const SCENES = {
         cloudFloor(ctx, 730, '#ffffff', '#d4def2');
         temple(ctx, 560, 700, 520, 220);
         cloud(ctx, 220, 740, 460, '#ffffff', '#cfd9ef', 1, 5);
-        unicorn(ctx, 1180, 700, 2.2, { face: -1, alpha: 0.65 });
-        unicorn(ctx, 1380, 712, 1.8, { face: -1, alpha: 0.5 });
-        unicorn(ctx, 760 + k * 220, 730, 3.4, { face: 1, run: true });
+        angel(ctx, 1180, 700, 2.2, { face: -1, alpha: 0.65 });
+        angel(ctx, 1380, 712, 1.8, { face: -1, alpha: 0.5 });
+        angel(ctx, 760 + k * 220, 730, 3.4, { face: 1, run: true });
         if (Math.random() < 0.3) sparkle(rand(0, VW), rand(100, 600), 1, ['#ffe28a', '#ffffff']);
       },
     },
@@ -276,9 +276,9 @@ const SCENES = {
           const a = t * 1.6 + (i / 6) * TAU, r = 120 + Math.sin(t * 2 + i) * 20;
           glow(ctx, x + Math.cos(a) * r, y - 70 + Math.sin(a) * r * 0.5, 30, RAINBOW[i], 0.4 + b * 0.4);
         }
-        unicorn(ctx, x, y, 3.6, { face: 1, dash: true });
+        angel(ctx, x, y, 3.6, { face: 1, dash: true });
         // the other angels shrink away from the glare
-        unicorn(ctx, 1260 + b * 120, 720, 1.8, { face: 1, run: b > 0.2, alpha: 0.6 * (1 - b) });
+        angel(ctx, 1260 + b * 120, 720, 1.8, { face: 1, run: b > 0.2, alpha: 0.6 * (1 - b) });
         if (Math.random() < 0.7) sparkle(x, y - 80, 2, RAINBOW, 90);
       },
     },
@@ -292,7 +292,7 @@ const SCENES = {
         if (Math.random() < 0.06 * s) { lightning(ctx, rand(200, 1400), 0, rand(200, 1400), 500, '#e8eeff', 3, 10, 40); sfx('bolt'); }
         zeus(ctx, 1080, 640 + (1 - s) * 200, 3.2, 'idle', k, t, { alpha: s, lx: -400, ly: 260 });
         cloudFloor(ctx, 770, '#8a8ab0', '#4a4a70');
-        unicorn(ctx, 360, 790, 2.4, { face: 1, alpha: 1 });
+        angel(ctx, 360, 790, 2.4, { face: 1, alpha: 1 });
         glow(ctx, 360, 720, 160, '#fff6d0', 0.5);
       },
     },
@@ -305,7 +305,7 @@ const SCENES = {
         zeus(ctx, 1080, 640, 3.2, k > 0.3 ? 'bolts' : 'idle', k > 0.3 ? (k - 0.3) / 0.7 : k, t, { lx: -400, ly: 260, roar: strike && k < 0.7 ? 0.6 : 0 });
         cloudFloor(ctx, 770, '#8a8ab0', '#4a4a70');
         if (!strike) {
-          unicorn(ctx, 360, 790, 2.4, { face: 1 });
+          angel(ctx, 360, 790, 2.4, { face: 1 });
           glow(ctx, 360, 720, 160, '#fff6d0', 0.5);
         } else {
           const f = (k - 0.45) / 0.55;
@@ -313,7 +313,7 @@ const SCENES = {
             for (let i = 0; i < 3; i++) lightning(ctx, 1000, 260, 360 + rand(-20, 20), 760, i ? '#bfd8ff' : '#ffffff', 6 - i * 2, 14, 60);
             if (!cs.boom) { cs.boom = 1; sfx('boom'); for (let i = 0; i < 60; i++) sparkle(360, 740, 1, RAINBOW, 60); }
           }
-          unicorn(ctx, 360 - f * 120, 790 + f * f * 200, 2.4, { face: 1, air: true, rot: -f * 2.4, alpha: 1 - f * 0.4 });
+          angel(ctx, 360 - f * 120, 790 + f * f * 200, 2.4, { face: 1, air: true, rot: -f * 2.4, alpha: 1 - f * 0.4 });
           if (f < 0.2) { ctx.fillStyle = `rgba(255,255,255,${1 - f / 0.2})`; ctx.fillRect(0, 0, VW, VH); }
         }
       },
@@ -325,7 +325,7 @@ const SCENES = {
         const c1 = k < 0.5 ? mix('#2a2458', '#0a0818', k * 2) : mix('#0a0818', '#3a0608', (k - 0.5) * 2);
         const c2 = k < 0.5 ? mix('#6a5a8a', '#140c20', k * 2) : mix('#140c20', '#8a1a0a', (k - 0.5) * 2);
         sky(ctx, [[0, c1], [1, c2]]);
-        // clouds and rock rushing upward past the falling unicorn
+        // clouds and rock rushing upward past the falling angel
         for (let i = 0; i < 14; i++) {
           const y = VH + 200 - ((t * 900 + i * 260) % (VH + 600));
           const x = (i * 397) % VW;
@@ -341,7 +341,7 @@ const SCENES = {
           const x = (i * 53 + Math.sin(i) * 40) % VW, y = (t * 1600 + i * 97) % VH;
           ctx.beginPath(); ctx.moveTo(x, VH - y); ctx.lineTo(x, VH - y - 80); ctx.stroke();
         }
-        unicorn(ctx, 800 + Math.sin(t * 1.3) * 60, 420, 2.6, { face: 1, air: true, vy: 800, rot: t * 2.2, alpha: 0.9 });
+        angel(ctx, 800 + Math.sin(t * 1.3) * 60, 420, 2.6, { face: 1, air: true, vy: 800, rot: t * 2.2, alpha: 0.9 });
         if (Math.random() < 0.5) part({ x: 800 + rand(-30, 30), y: 400, vx: rand(-40, 40), vy: rand(-500, -300), life: 0.6, size: rand(2, 4), color: pick(RAINBOW), add: true });
       },
     },
@@ -368,7 +368,7 @@ const SCENES = {
         ctx.fillStyle = '#120e1c';
         ctx.fillRect(0, 740, VW, 160);
         const up = sm((k - 0.25) / 0.4);
-        unicorn(ctx, 520, 742, 2.6, { face: 1, rot: (1 - up) * -1.4, air: up < 1 });
+        angel(ctx, 520, 742, 2.6, { face: 1, rot: (1 - up) * -1.4, air: up < 1 });
         glow(ctx, 520, 690, 140, '#fff4d0', 0.25 + up * 0.25);
         if (Math.random() < 0.4) part({ x: rand(0, VW), y: VH, vx: rand(-20, 20), vy: rand(-120, -50), life: 4, size: rand(1.2, 2.6), color: pick(['#ffb347', '#ff6a1a', '#c9baff']), add: true });
       },
@@ -387,7 +387,7 @@ const SCENES = {
         ctx.beginPath(); ctx.moveTo(760, 0); ctx.lineTo(840, 0); ctx.lineTo(980, 760); ctx.lineTo(620, 760); ctx.fill();
         ctx.fillStyle = '#12040a';
         ctx.fillRect(0, 760, VW, 140);
-        unicorn(ctx, 380 + sm(k) * 420, 762, 2.6, { face: 1, run: k < 0.95 });
+        angel(ctx, 380 + sm(k) * 420, 762, 2.6, { face: 1, run: k < 0.95 });
         if (Math.random() < 0.6) sparkle(800 + rand(-120, 120), rand(80, 740), 1, ['#fff6d0', '#ffe28a', '#ffffff'], 10);
       },
     },
@@ -407,7 +407,7 @@ const SCENES = {
           }
         }
         glow(ctx, 800, 470, 240, '#fff6d0', 0.6);
-        unicorn(ctx, 800 + Math.sin(t * 1.5) * 30, 500, 2.8, { face: 1, air: true, vy: -800, dash: true });
+        angel(ctx, 800 + Math.sin(t * 1.5) * 30, 500, 2.8, { face: 1, air: true, vy: -800, dash: true });
         if (Math.random() < 0.8) part({ x: 800 + rand(-30, 30), y: 520, vx: rand(-40, 40), vy: rand(300, 500), life: 0.8, size: rand(2, 4), color: pick(RAINBOW), add: true });
       },
     },
@@ -423,7 +423,7 @@ const SCENES = {
         temple(ctx, 820, 740, 700, 260);
         // four watchful glows on the temple roof: the gods
         ['#ff5a3a', '#ffd34a', '#9fd0ff', '#3ad8ff'].forEach((c, i) => glow(ctx, 560 + i * 175, 330, 46, c, 0.55 + Math.sin(t * 3 + i) * 0.2));
-        unicorn(ctx, 300 + sm(k) * 200, 770, 2.8, { face: 1, run: k < 0.6 });
+        angel(ctx, 300 + sm(k) * 200, 770, 2.8, { face: 1, run: k < 0.6 });
       },
     },
   ],
@@ -438,7 +438,7 @@ const SCENES = {
         if (cs.t0 == null) cs.t0 = t;
         zeus(ctx, 1000, 700, 3, 'idle', 0, t, { dieAt: cs.t0 + 0.3 });
         cloudFloor(ctx, 780, '#ffffff', '#d4def2');
-        unicorn(ctx, 420, 800, 2.6, { face: 1 });
+        angel(ctx, 420, 800, 2.6, { face: 1 });
       },
     },
     {
@@ -455,7 +455,7 @@ const SCENES = {
           const a = t * 1.2 + (i / 7) * TAU;
           glow(ctx, 800 + Math.cos(a) * 200, 560 + Math.sin(a) * 90, 40, RAINBOW[i], 0.5);
         }
-        unicorn(ctx, 800, 640, 3.2, { face: 1, dash: true });
+        angel(ctx, 800, 640, 3.2, { face: 1, dash: true });
         if (Math.random() < 0.8) sparkle(800, 560, 2, RAINBOW, 160);
       },
     },

@@ -17,7 +17,7 @@ function liquidFx(kind, x, y) {
 import { hash2, rand, mix, rgba, shade, RAINBOW, clamp, TAU, pick } from './util.js';
 import { drawParts, drawFloaters } from './fx.js';
 import { drawProjs, drawPickups, heartPath, starPath } from './combat.js';
-import { drawUnicorn, drawBubbles, hornTip } from './player.js';
+import { drawAngel, drawBubbles, hornTip } from './player.js';
 import { drawEnemy } from './enemies.js';
 import { drawBoss, drawBossBar } from './bosses.js';
 import { stats, WEAPONS, ownsWeapon, worn, ARMOURS, armourKnown } from './items.js';
@@ -75,7 +75,7 @@ export function render(ctx) {
   if (G.boss && !G.boss.dead) lights.push({ x: G.boss.x + G.boss.w / 2, y: G.boss.y + G.boss.h / 2, r: 420, c: G.boss.accent, a: 0.6 });
   const p = G.player;
   if (p && !p.dead) {
-    drawUnicorn(ctx, p, G.t);
+    drawAngel(ctx, p, G.t);
     const S = stats();
     lights.push({ x: p.x + p.w / 2, y: p.y + p.h / 2 - 10, r: S.light, c: '#fff4d0', a: 1 });
     const h = hornTip(p);
