@@ -767,3 +767,4 @@ document.addEventListener('pointerdown', () => initAudio(), { once: true });
 setTheme('title');
 requestAnimationFrame(frame);
 addEventListener('beforeunload', saveGame);
+window.__gameReady = 1;
