@@ -1,9 +1,13 @@
-// The unicorn: movement, weapons and drawing.
+// The hero, a fallen dark angel: movement, weapons and drawing.
 import { G } from './state.js';
 import { T, tileAt, ORE, CRYSTAL, BIOMES, BIOME_LIST } from './world.js';
 import { moveBody, touchWall, onPlatform, hazardTouch, rayLength } from './physics.js';
 import { held, tapped, mouse } from './input.js';
-import { clamp, rand, angDiff, RAINBOW, pick, rgba } from './util.js';
+import { clamp, rand, angDiff, pick, rgba } from './util.js';
+import { eye } from './art.js';
+
+// The dark angel's shadow-fire, used where the unicorn had its rainbow.
+const RAINBOW = ['#2a0b45', '#4a1580', '#7a2ad0', '#a64dff', '#d07aff', '#ff6ad5', '#f2d6ff'];
 import { burst, part, ring, shake, floater } from './fx.js';
 import { sfx } from './audio.js';
 import { stats, ownsWeapon, WEAPONS, worn } from './items.js';
@@ -21,11 +25,12 @@ export function makePlayer(x, y) {
   return p;
 }
 
-const WHIP_T = 0.17, WHIP_CD = 0.2, SCALE = 1.1;
+const WHIP_T = 0.17, WHIP_CD = 0.2, SCALE = 1.25;
 
-// World position of the horn tip, used for the beam and the horn light.
+// World position of the angel's lash hand, where the beam and the lash come from.
 export function hornTip(p) {
-  return { x: p.x + p.w / 2 + p.face * 32 * SCALE * p.sx, y: p.y + p.h - 80 * SCALE * p.sy };
+  const [hx, hy] = pose(p, G.t).hand;
+  return { x: p.x + p.w / 2 + p.face * hx * SCALE * p.sx, y: p.y + p.h + hy * SCALE * p.sy };
 }
 
 export function updatePlayer(dt) {
@@ -402,7 +407,7 @@ export function updateBubbles(dt) {
 
 // ---------- Tail chain ----------
 function tailAnchor(p) {
-  return { x: p.x + p.w / 2 - p.face * 19 * p.sx, y: p.y + p.h - 27 * p.sy };
+  return hornTip(p);
 }
 
 export function updateTail(p, dt) {
@@ -427,8 +432,8 @@ export function updateTail(p, dt) {
     const pt = p.tail[i];
     const vx = (pt.x - pt.px) * 0.82, vy = (pt.y - pt.py) * 0.82;
     pt.px = pt.x; pt.py = pt.y;
-    pt.x += vx - f * 30 * dt + Math.sin(G.t * 6 - i * 0.7) * 0.5;
-    pt.y += vy + 0.3 - (p.vy < 0 ? 0 : 0);
+    pt.x += vx - f * 26 * dt + Math.sin(G.t * 6 - i * 0.7) * 0.5;
+    pt.y += vy - 0.12 + Math.cos(G.t * 4 - i * 0.6) * 0.25;
     const prev = p.tail[i - 1], dx = pt.x - prev.x, dy = pt.y - prev.y, d = Math.hypot(dx, dy) || 1;
     pt.x = prev.x + (dx / d) * seg;
     pt.y = prev.y + (dy / d) * seg;
@@ -452,7 +457,8 @@ function goldGrad(ctx, x0, y0, x1, y1) {
 }
 
 // The worn armour's metal (gold when wearing none).
-let METAL = GOLD;
+const STEEL = ['#d6d0e6', '#6a6282', '#221d30'];
+let METAL = STEEL;
 function metalGrad(ctx, x0, y0, x1, y1) {
   const g = ctx.createLinearGradient(x0, y0, x1, y1);
   g.addColorStop(0, METAL[0]);
@@ -514,50 +520,6 @@ function motif(ctx, kind, x, y, col, dark) {
   }
 }
 
-// Barding: a plate over the back, in the colours and emblem of the armour's land.
-function barding(ctx, L) {
-  const plate = new Path2D();
-  plate.moveTo(-18.6, -24);
-  plate.bezierCurveTo(-19.8, -34.5, -9, -36, 0, -34);
-  plate.bezierCurveTo(4, -33.4, 7, -35.6, 10.4, -35.6);
-  plate.lineTo(11.2, -27.5);
-  plate.bezierCurveTo(4, -21, -6, -20, -13, -21);
-  plate.bezierCurveTo(-16, -21.4, -18, -22.4, -18.6, -24);
-  plate.closePath();
-  if (L.spikes) {
-    // a ridge of spikes along the spine
-    ctx.fillStyle = metalGrad(ctx, 0, -41, 0, -33);
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = 1.2;
-    for (const [x, y] of [[-13, -32], [-6.5, -34.6], [0.5, -34.2]]) {
-      ctx.beginPath(); ctx.moveTo(x - 2.4, y + 1); ctx.lineTo(x - 0.6, y - 5.5); ctx.lineTo(x + 2.4, y + 0.6); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-    }
-  }
-  ctx.strokeStyle = OUT;
-  ctx.lineWidth = 2.2;
-  ctx.stroke(plate);
-  ctx.fillStyle = metalGrad(ctx, 0, -36, 0, -20);
-  ctx.fill(plate);
-  // plate seams and a shine along the top
-  ctx.save();
-  ctx.clip(plate);
-  ctx.strokeStyle = 'rgba(0,0,0,.25)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(-9, -36); ctx.lineTo(-10.5, -20); ctx.moveTo(3.5, -36); ctx.lineTo(2.5, -20); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,.55)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(-17, -28); ctx.bezierCurveTo(-16, -33, -8, -34.5, 0, -32.6); ctx.stroke();
-  ctx.restore();
-  // trim and rivets along the lower edge
-  ctx.strokeStyle = L.trim;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(11, -27.8); ctx.bezierCurveTo(4, -21.6, -6, -20.6, -13, -21.6); ctx.bezierCurveTo(-16, -22, -17.6, -22.8, -18, -24); ctx.stroke();
-  ctx.fillStyle = L.trim;
-  for (const [x, y] of [[-14, -23.4], [-7, -22.4], [0, -22.7], [6.4, -24.6]]) { ctx.beginPath(); ctx.arc(x, y, 0.85, 0, Math.PI * 2); ctx.fill(); }
-  motif(ctx, L.motif, -3.2, -28.4, L.trim, L.metal[2]);
-}
-
 // A stroke that tapers from w0 to w1 along a polyline.
 function taper(ctx, pts, w0, w1, color) {
   ctx.strokeStyle = color;
@@ -596,7 +558,7 @@ export function drawTail(ctx, p) {
     const line = [];
     for (let i = 0; i < N; i++) {
       const a = pts[Math.max(0, i - 1)], b = pts[Math.min(N - 1, i + 1)], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
-      const k = i / (N - 1), off = (c - 3) * (whip ? 2.1 : 1.75) * (1 - k * 0.5) + Math.sin(G.t * 7 + k * 5 + c) * k * k * 1.2;
+      const k = i / (N - 1), off = (c - 3) * (whip ? 2.1 : 0.9) * (1 - k * 0.5) + Math.sin(G.t * 7 + k * 5 + c) * k * k * 1.2;
       line.push([pts[i].x - (dy / d) * off, pts[i].y + (dx / d) * off]);
     }
     ribbons.push(line);
@@ -604,10 +566,10 @@ export function drawTail(ctx, p) {
   // soft glow underneath
   ctx.globalCompositeOperation = 'lighter';
   ctx.globalAlpha = whip ? 0.45 : 0.22;
-  ribbons.forEach((l, c) => taper(ctx, l, 7, 2.5, RAINBOW[c]));
+  ribbons.forEach((l, c) => taper(ctx, l, whip ? 7 : 4.5, 2, RAINBOW[c]));
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
-  ribbons.forEach((l, c) => taper(ctx, l, whip ? 3.6 : 3.1, 1.1, RAINBOW[c]));
+  ribbons.forEach((l, c) => taper(ctx, l, whip ? 3.6 : 1.9, 0.6, RAINBOW[c]));
   // white sheen on the top ribbon
   ctx.globalAlpha = 0.5;
   taper(ctx, ribbons[0].map(([x, y]) => [x, y - 0.6]), 1.1, 0.3, '#ffffff');
@@ -638,20 +600,151 @@ export function drawTail(ctx, p) {
   }
 }
 
-// ---------- The unicorn ----------
+// ---------- The dark angel ----------
+// Where the shoulder and the lash hand are, in the angel's own space (facing right, feet at 0, 0).
+// Shared by the drawing and by the lash, so the lash always leaves the hand.
+function pose(p, t) {
+  const run = Math.min(1, Math.abs(p.vx) / 420), air = !p.ground;
+  const bob = air ? 0 : run > 0.08 ? Math.abs(Math.sin(p.runPhase)) * 1.8 * run : Math.sin(t * 2.2) * 0.5;
+  const lean = run * 2.5, sh = [0.5 + lean, -37 - bob];
+  let hand;
+  if (p.whipT > 0) {
+    const la = p.face > 0 ? p.whipAng : Math.PI - p.whipAng;
+    hand = [sh[0] + Math.cos(la) * 11, sh[1] + 2 + Math.sin(la) * 11];
+  } else {
+    const a = -Math.sin(p.runPhase) * run;
+    hand = [sh[0] + 6.5 + a * 5, sh[1] + 10 - Math.abs(a) * 2 - (air ? 3 : 0)];
+  }
+  return { run, air, bob, lean, sh, hand };
+}
+
+function limb2(ctx, pts, w, col) {
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = w + 2.2;
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.stroke();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = w;
+  ctx.stroke();
+}
+
+function glowDot(ctx, x, y, r, col, a) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, rgba(col, a));
+  g.addColorStop(1, rgba(col, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.restore();
+}
+
+// A broken ring of black thorns, burning violet, turning slowly over the head.
+function halo(ctx, x, y, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-0.28);
+  ctx.scale(1, 0.32);
+  glowDot(ctx, 0, 0, 16, '#a64dff', 0.35 + Math.sin(t * 2.5) * 0.08);
+  const spin = t * 0.8;
+  for (let k = 0; k < 5; k++) {
+    const a0 = spin + (k / 5) * Math.PI * 2, a1 = a0 + 0.95;
+    ctx.strokeStyle = 'rgba(166,77,255,.55)';
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(0, 0, 8.5, a0, a1); ctx.stroke();
+    ctx.strokeStyle = '#1a0a26';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath(); ctx.arc(0, 0, 8.5, a0, a1); ctx.stroke();
+    // a thorn at the end of each piece
+    const tx = Math.cos(a1) * 8.5, ty = Math.sin(a1) * 8.5;
+    ctx.fillStyle = '#1a0a26';
+    ctx.beginPath(); ctx.moveTo(tx - 1.4, ty); ctx.lineTo(Math.cos(a1) * 13, Math.sin(a1) * 13); ctx.lineTo(tx + 1.4, ty); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = 'rgba(230,190,255,.8)';
+  ctx.lineWidth = 0.9;
+  for (let k = 0; k < 5; k++) { const a0 = spin + (k / 5) * Math.PI * 2; ctx.beginPath(); ctx.arc(0, 0, 8.5, a0 + 0.1, a0 + 0.8); ctx.stroke(); }
+  ctx.restore();
+}
+
+// A great feathered wing, black shading to violet. Its arm runs along -x from the root and its
+// feathers hang towards +y, sweeping back towards the tip; `ang` turns the whole wing.
+function angelWing(ctx, x, y, ang, len, spread, near, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  const fold = 1 - spread, n = 9;
+  const armY = u => -Math.sin(u * Math.PI) * len * 0.16;
+  const dark = near ? '#120a1c' : '#08050e', mid = near ? '#3a2456' : '#24163a', edge = near ? '#a676ff' : '#6a4a9a';
+  // primaries and secondaries, drawn tip first so the inner ones lie on top
+  for (let k = n - 1; k >= 0; k--) {
+    const u = k / (n - 1), bx = -len * (0.12 + u * 0.88), by = armY(0.12 + u * 0.88);
+    // spread, the feathers fan back from the arm; folded, they hang straight down the back
+    const d = (Math.PI / 2 + 0.35 + u * 1.05) * spread + (0.45 + u * 0.25) * fold + Math.sin(t * 3 + k) * 0.02;
+    const fl = len * ((0.42 + u * 0.42) * spread + (0.7 + u * 0.95) * fold), fw = len * (0.075 + fold * 0.015);
+    const ex = bx + Math.cos(d) * fl, ey = by + Math.sin(d) * fl, nx = -Math.sin(d) * fw, ny = Math.cos(d) * fw;
+    const g = ctx.createLinearGradient(bx, by, ex, ey);
+    g.addColorStop(0, dark);
+    g.addColorStop(0.7, mid);
+    g.addColorStop(1, edge);
+    ctx.fillStyle = g;
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx + nx, by + ny);
+    ctx.quadraticCurveTo(bx + (ex - bx) * 0.6 + nx * 1.3, by + (ey - by) * 0.6 + ny * 1.3, ex, ey);
+    ctx.quadraticCurveTo(bx + (ex - bx) * 0.6 - nx * 0.8, by + (ey - by) * 0.6 - ny * 0.8, bx - nx, by - ny);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // a quill down the middle
+    ctx.strokeStyle = 'rgba(166,118,255,.35)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + (ex - bx) * 0.85, by + (ey - by) * 0.85); ctx.stroke();
+  }
+  // coverts over the arm, scalloped
+  const cov = new Path2D();
+  cov.moveTo(2, -1);
+  for (let s = 0; s <= 10; s++) { const u = s / 10; cov.lineTo(-len * u, armY(u) - 1.8); }
+  for (let s = 10; s >= 0; s--) {
+    const u = s / 10, depth = len * (0.12 + 0.12 * Math.sin(u * Math.PI)) * (1 - u * 0.5);
+    cov.quadraticCurveTo(-len * (u + 0.05), armY(u) + depth * 1.25, -len * u, armY(u) + depth);
+  }
+  cov.closePath();
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.6;
+  ctx.stroke(cov);
+  const cg = ctx.createLinearGradient(0, -6, -len, 6);
+  cg.addColorStop(0, near ? '#2a1a40' : '#170e26');
+  cg.addColorStop(1, dark);
+  ctx.fillStyle = cg;
+  ctx.fill(cov);
+  // a violet gleam along the leading edge
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = near ? 'rgba(190,130,255,.6)' : 'rgba(150,100,220,.35)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (let s = 0; s <= 10; s++) { const u = s / 10; if (s) ctx.lineTo(-len * u, armY(u) - 1.6); else ctx.moveTo(0, -1.6); }
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
 export function drawUnicorn(ctx, p, t) {
   const f = p.face, run = Math.min(1, Math.abs(p.vx) / 420), air = !p.ground;
   const up = (G.save && G.save.up) || {};
   const blink = p.inv > 0 && !p.dashT && Math.floor(t * 20) % 2;
   const A = G.save ? worn() : null, L = A && A.look;
-  METAL = L ? L.metal : GOLD;
+  METAL = L ? L.metal : STEEL;
 
   // Soft aura
   const acx = p.x + p.w / 2, acy = p.y + p.h - 34;
   ctx.globalCompositeOperation = 'lighter';
   const ag = ctx.createRadialGradient(acx, acy, 4, acx, acy, 70);
-  ag.addColorStop(0, `rgba(255,215,250,${p.dashT > 0 ? 0.5 : 0.16})`);
-  ag.addColorStop(1, 'rgba(255,200,255,0)');
+  ag.addColorStop(0, `rgba(170,90,255,${p.dashT > 0 ? 0.5 : 0.16})`);
+  ag.addColorStop(1, 'rgba(120,40,200,0)');
   ctx.fillStyle = ag;
   ctx.fillRect(acx - 70, acy - 70, 140, 140);
   if (L && L.glow) {
@@ -670,246 +763,244 @@ export function drawUnicorn(ctx, p, t) {
   ctx.save();
   ctx.translate(p.x + p.w / 2, p.y + p.h);
   ctx.scale(f * p.sx * SCALE, p.sy * SCALE);
-  const bob = air ? 0 : run > 0.08 ? Math.abs(Math.sin(p.runPhase)) * 2.2 * run : Math.sin(t * 2.2) * 0.5;
-  ctx.translate(0, -bob);
-  if (air) ctx.rotate(clamp(p.vy / 1500, -0.2, 0.22));
+  const Q = pose(p, t), { sh, hand } = Q, bob = Q.bob;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  const trim = L ? L.trim : '#b06aff', gemC = L ? L.gem : '#c45cff';
+  const ph = p.runPhase, wave = t * (run > 0.1 ? 11 : 3);
+  const fall = air ? clamp(p.vy / 900, -0.5, 0.9) : 0;
 
-  // Legs: a four-beat gallop, tucked on the way up, reaching on the way down.
-  const leg = (hx, ph, front, near) => {
-    const hy = -17;
+  // Wings: folded down the back on the ground, half open in the air, spread wide in flight
+  const spread = p.flying ? 1 : p.gliding ? 0.9 : air ? 0.45 : 0;
+  const flap = p.flying ? Math.sin(t * 22) * 0.55 : p.gliding ? Math.sin(t * 8) * 0.1 : air ? Math.sin(t * 12) * 0.15 : Math.sin(t * 2) * 0.03;
+  const wx = sh[0] - 3, wy = sh[1] + 2;
+  angelWing(ctx, wx - 2, wy - 0.5, 1.27 - spread * 0.12 - flap * 0.8, 20 + spread * 16, spread, false, t);
+
+  // the far arm, swinging opposite the near one
+  const fa = Math.sin(ph) * run;
+  const fe = [sh[0] - 1 - fa * 3, sh[1] + 8], fh = [sh[0] + 1 - fa * 7, sh[1] + 15];
+  limb2(ctx, [[sh[0] - 1, sh[1] + 1], fe, fh], 3.6, '#120c1c');
+  ctx.fillStyle = metalGrad(ctx, fh[0] - 2, fh[1] - 2, fh[0] + 2, fh[1] + 2);
+  ctx.beginPath(); ctx.arc(fh[0], fh[1], 2, 0, Math.PI * 2); ctx.fill();
+
+  // the long coat behind, tattered and streaming
+  const flow = run * 7 + (air ? 3 : 0);
+  ctx.fillStyle = '#140c1e';
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(-4.5, -21 - bob);
+  ctx.quadraticCurveTo(-8 - flow * 0.4, -14, -10 - flow + Math.sin(wave) * 1.2, -3 - fall * 4);
+  for (let k = 0; k <= 4; k++) ctx.lineTo(-10 - flow + Math.sin(wave + k) * 1.2 + k * (6 + flow * 0.2), (k % 2 ? -6 : -1) - fall * 4 * (1 - k / 4) + Math.sin(wave * 1.3 + k) * 0.8);
+  ctx.lineTo(3, -8);
+  ctx.lineTo(3, -21 - bob);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = L ? rgba(L.plume, 0.55) : 'rgba(110,40,170,.5)';
+  ctx.beginPath();
+  ctx.moveTo(-4, -19 - bob);
+  ctx.quadraticCurveTo(-7 - flow * 0.4, -13, -8.5 - flow, -4.5 - fall * 4);
+  ctx.lineTo(-5 - flow * 0.6, -5);
+  ctx.quadraticCurveTo(-4, -12, -2, -19 - bob);
+  ctx.fill();
+
+  // legs: a striding run, knees up when rising
+  const leg = (hx, lph, near) => {
+    const hy = -19 - bob;
     let kx, ky, fx, fy;
     if (air) {
-      if (p.vy < 0) { kx = hx + (front ? 8 : -5); ky = hy + 6; fx = hx + (front ? 3 : -13); fy = hy + 12; }
-      else { kx = hx + (front ? 5 : -4); ky = hy + 8; fx = hx + (front ? 10 : -8); fy = hy + 16; }
+      if (p.vy < 0) { kx = hx + (near ? 6 : 3); ky = -13; fx = hx + (near ? 2 : -3); fy = -5; }
+      else { kx = hx + (near ? 4 : 1); ky = -10; fx = hx + (near ? 1 : -3); fy = -1.5; }
     } else if (run > 0.08) {
-      const s = Math.sin(ph), c = Math.max(0, Math.cos(ph)), st = 9 * run;
-      fx = hx + s * st; fy = -c * 7 * run;
-      kx = hx + s * st * 0.45 + (front ? 4 : -4) * c * run; ky = hy * 0.5 - c * 3 * run;
-    } else {
-      fx = hx + (front ? 1 : -1); fy = 0; kx = hx + (front ? 1.8 : -1.8); ky = hy * 0.5;
-    }
-    const col = near ? '#ffffff' : '#c8bce3';
+      const s = Math.sin(lph), c = Math.max(0, Math.cos(lph));
+      fx = hx + s * 9 * run; fy = -c * 6 * run;
+      kx = hx + s * 5 * run + 2.5 * run + 1; ky = -10 - c * 3 * run;
+    } else { fx = hx + (near ? 1.5 : -1.5); fy = 0; kx = hx + (near ? 2 : 0); ky = -10; }
+    const cloth = near ? '#2a1e3c' : '#160f22';
+    limb2(ctx, [[hx, hy], [kx, ky]], near ? 5 : 4.4, cloth);
+    // greave and boot in the armour's metal
+    limb2(ctx, [[kx, ky], [fx, fy - 2]], near ? 4.2 : 3.8, near ? METAL[1] : METAL[2]);
+    ctx.fillStyle = trim;
+    ctx.beginPath(); ctx.arc(kx, ky, near ? 1.8 : 1.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = near ? '#1a1224' : '#0e0a16';
     ctx.strokeStyle = OUT;
-    ctx.lineWidth = near ? 7.4 : 6.8;
-    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy - 2); ctx.stroke();
-    ctx.strokeStyle = col;
-    ctx.lineWidth = near ? 5 : 4.4;
-    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy - 2); ctx.stroke();
-    if (L) {
-      // greaves from the knee down
-      const gx = kx + (fx - kx) * 0.62, gy = ky + (fy - 2 - ky) * 0.62;
-      ctx.strokeStyle = OUT;
-      ctx.lineWidth = near ? 7.2 : 6.4;
-      ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(gx, gy); ctx.stroke();
-      ctx.strokeStyle = near ? L.metal[1] : L.metal[2];
-      ctx.lineWidth = near ? 5 : 4.4;
-      ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(gx, gy); ctx.stroke();
-      ctx.fillStyle = L.trim;
-      ctx.beginPath(); ctx.arc(kx, ky, near ? 2.2 : 1.8, 0, Math.PI * 2); ctx.fill();
-    }
-    // hoof
-    ctx.fillStyle = metalGrad(ctx, fx, fy - 5, fx, fy);
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(fx - 3.2, fy - 4.5); ctx.lineTo(fx + 3.4, fy - 4.5); ctx.lineTo(fx + 4.2, fy); ctx.lineTo(fx - 3.6, fy); ctx.closePath();
+    ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(fx - 2.6, fy - 3.6); ctx.lineTo(fx + 2, fy - 3.6); ctx.lineTo(fx + 5, fy - 0.6); ctx.lineTo(fx + 5, fy); ctx.lineTo(fx - 2.8, fy); ctx.closePath();
     ctx.fill(); ctx.stroke();
-    if (up.hooves) {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = 'rgba(255,200,80,.35)';
-      ctx.beginPath(); ctx.arc(fx, fy - 2, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
-    }
+    ctx.fillStyle = metalGrad(ctx, fx, fy - 4, fx + 5, fy);
+    ctx.beginPath(); ctx.moveTo(fx + 1.5, fy - 3.4); ctx.lineTo(fx + 5, fy - 0.6); ctx.lineTo(fx + 5, fy); ctx.lineTo(fx + 1.5, fy); ctx.closePath(); ctx.fill();
+    if (up.hooves) glowDot(ctx, fx + 1, fy - 1.5, 6, '#c45cff', 0.4);
   };
-  const ph = p.runPhase;
-  leg(-8, ph + 0.55, false, false);
-  leg(14, ph + Math.PI + 0.55, true, false);
+  leg(-1.5, ph + Math.PI, false);
 
-  // Far wing
-  if (up.wings || up.fly) wing(ctx, p, t, false);
-
-  // Body, neck and head share one outline so the joins are seamless.
-  const body = new Path2D();
-  body.moveTo(-18, -24);
-  body.bezierCurveTo(-19, -33, -9, -34, 0, -32);
-  body.bezierCurveTo(6, -31, 10, -34, 13, -34);
-  body.bezierCurveTo(21, -33, 23, -21, 18, -15);
-  body.bezierCurveTo(11, -11, -6, -11, -12, -14);
-  body.bezierCurveTo(-17, -15, -20, -19, -18, -24);
-  body.closePath();
-  const neck = new Path2D();
-  neck.moveTo(7, -31);
-  neck.bezierCurveTo(9, -42, 12, -50, 17, -55);
-  neck.lineTo(25, -48);
-  neck.bezierCurveTo(22, -40, 22, -30, 20, -19);
-  neck.closePath();
-  const head = new Path2D();
-  head.moveTo(16, -56);
-  head.bezierCurveTo(20, -60, 27, -58, 30, -53);
-  head.bezierCurveTo(33, -49, 36, -46, 36.5, -42.5);
-  head.bezierCurveTo(37, -38.5, 32, -37, 28.5, -38);
-  head.bezierCurveTo(25, -39, 23, -42, 21, -44);
-  head.bezierCurveTo(18, -46, 15, -51, 16, -56);
-  head.closePath();
+  // torso: a dark coat with a breastplate in the worn armour's metal
+  const tx = Q.lean;
+  const torso = new Path2D();
+  torso.moveTo(-5, -19 - bob);
+  torso.bezierCurveTo(-6.8, -25, -6.8 + tx * 0.5, -33, -5.2 + tx, -38.5 - bob);
+  torso.lineTo(5.6 + tx, -38.8 - bob);
+  torso.bezierCurveTo(7.2 + tx, -33, 6.5, -25, 4.8, -19 - bob);
+  torso.closePath();
   ctx.strokeStyle = OUT;
-  ctx.lineWidth = 3.2;
-  ctx.stroke(body); ctx.stroke(neck); ctx.stroke(head);
-  const coat = ctx.createLinearGradient(0, -60, 0, -11);
-  coat.addColorStop(0, '#ffffff');
-  coat.addColorStop(0.55, '#f7f3ff');
-  coat.addColorStop(1, '#d4c6f0');
-  ctx.fillStyle = coat;
-  ctx.fill(body); ctx.fill(neck); ctx.fill(head);
-  // pearly sheen
-  const sheen = ctx.createLinearGradient(-18, -34, 22, -14);
-  sheen.addColorStop(0, 'rgba(255,190,235,.22)');
-  sheen.addColorStop(0.5, 'rgba(255,255,255,0)');
-  sheen.addColorStop(1, 'rgba(160,215,255,.25)');
-  ctx.fillStyle = sheen;
-  ctx.fill(body);
-  ctx.fillStyle = 'rgba(110,80,170,.16)';
-  ctx.beginPath(); ctx.ellipse(-1, -14.5, 14, 3.2, 0, 0, Math.PI * 2); ctx.fill();
-
-  if (L) barding(ctx, L);
-
-  // Breastplate (Olympian gold, or the worn armour's metal)
-  ctx.fillStyle = metalGrad(ctx, 12, -34, 22, -16);
-  ctx.strokeStyle = OUT;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(11, -33); ctx.bezierCurveTo(16, -33, 20.5, -28, 19.5, -18); ctx.lineTo(15, -17);
-  ctx.bezierCurveTo(16, -24, 14, -29, 9, -30.5); ctx.closePath();
-  ctx.fill(); ctx.stroke();
-  const gem = ctx.createRadialGradient(16.5, -25.5, 0.5, 16.5, -25, 3);
-  gem.addColorStop(0, '#ffffff');
-  gem.addColorStop(0.4, L ? L.gem : RAINBOW[((Math.floor(t * 2) % 7) + 7) % 7]);
-  gem.addColorStop(1, '#3a1a6a');
-  ctx.fillStyle = gem;
-  ctx.beginPath(); ctx.arc(16.5, -25, 2.6, 0, Math.PI * 2); ctx.fill();
-
-  // Near legs
-  leg(-12, ph, false, true);
-  leg(10, ph + Math.PI, true, true);
-
-  // Muzzle, nostril, mouth
-  ctx.fillStyle = 'rgba(255,200,225,.75)';
-  ctx.beginPath(); ctx.ellipse(33.2, -40.8, 3.6, 2.4, 0.2, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#6a4a7a';
-  ctx.beginPath(); ctx.ellipse(34.8, -42.2, 1, 0.7, 0.4, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#8a6a8a';
-  ctx.lineWidth = 0.9;
-  ctx.beginPath(); ctx.moveTo(30.5, -38.6); ctx.quadraticCurveTo(32, -38, 33.5, -38.8); ctx.stroke();
-  // Cheek blush
-  ctx.fillStyle = 'rgba(255,150,200,.35)';
-  ctx.beginPath(); ctx.arc(26, -44, 2.6, 0, Math.PI * 2); ctx.fill();
-
-  // Ear (flicks now and then)
+  ctx.lineWidth = 2.6;
+  ctx.stroke(torso);
+  const cg = ctx.createLinearGradient(-6, -38, 6, -19);
+  cg.addColorStop(0, '#3a2a52');
+  cg.addColorStop(1, '#140c1e');
+  ctx.fillStyle = cg;
+  ctx.fill(torso);
+  const plate = new Path2D();
+  plate.moveTo(-4.4 + tx, -37.8 - bob);
+  plate.lineTo(5.4 + tx, -37.8 - bob);
+  plate.bezierCurveTo(6.4 + tx * 0.6, -32, 5.6, -28, 0.8 + tx * 0.3, -24.8 - bob);
+  plate.bezierCurveTo(-3.4, -27.5, -4.8, -31, -4.4 + tx, -37.8 - bob);
+  plate.closePath();
+  ctx.fillStyle = metalGrad(ctx, -4, -38, 6, -25);
+  ctx.fill(plate);
+  ctx.strokeStyle = trim;
+  ctx.lineWidth = 1.1;
+  ctx.stroke(plate);
   ctx.save();
-  ctx.translate(19, -56);
-  ctx.rotate(t % 5.3 < 0.18 ? -0.35 : 0);
-  ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = OUT;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(-2.5, 1); ctx.quadraticCurveTo(-2, -7, 0, -10); ctx.quadraticCurveTo(3, -5, 3.5, 1); ctx.closePath();
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#ffc1dc';
-  ctx.beginPath(); ctx.moveTo(-1, 0); ctx.quadraticCurveTo(-0.6, -5, 0.2, -7); ctx.quadraticCurveTo(1.8, -4, 2, 0); ctx.closePath(); ctx.fill();
+  ctx.clip(plate);
+  ctx.strokeStyle = 'rgba(255,255,255,.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-3.5 + tx, -36.5 - bob); ctx.quadraticCurveTo(0 + tx, -35 - bob, 4.5 + tx, -36.6 - bob); ctx.stroke();
   ctx.restore();
+  if (L) motif(ctx, L.motif, 0.8 + tx * 0.6, -30.5 - bob, L.trim, L.metal[2]);
+  const gx = 0.6 + tx, gy = L ? -35.2 - bob : -31.5 - bob;
+  const gem = ctx.createRadialGradient(gx - 0.5, gy - 0.6, 0.3, gx, gy, 2.2);
+  gem.addColorStop(0, '#ffffff');
+  gem.addColorStop(0.45, gemC);
+  gem.addColorStop(1, '#1a0a2a');
+  ctx.fillStyle = gem;
+  ctx.beginPath(); ctx.arc(gx, gy, L ? 1.7 : 2.2, 0, Math.PI * 2); ctx.fill();
+  glowDot(ctx, gx, gy, 6, gemC, 0.35 + Math.sin(t * 3) * 0.1);
+  // belt
+  ctx.fillStyle = '#0c0812';
+  ctx.fillRect(-5.4, -22.5 - bob, 10.6, 2.4);
+  ctx.fillStyle = metalGrad(ctx, 0, -23, 0, -20);
+  ctx.fillRect(-0.6, -23 - bob, 3, 3.2);
 
-  // Golden head guard
+  leg(1.5, ph, true);
+
+  // head: pale, sharp-featured, with burning violet eyes
+  const hc = [sh[0] + 1.6, -45.2 - bob];
+  ctx.fillStyle = '#d9cfe6';
   ctx.strokeStyle = OUT;
-  ctx.lineWidth = 4.6;
-  ctx.beginPath(); ctx.moveTo(20, -58.5); ctx.quadraticCurveTo(27, -57.5, 31.5, -50.5); ctx.stroke();
-  ctx.strokeStyle = metalGrad(ctx, 20, -60, 30, -50);
-  ctx.lineWidth = 2.8;
-  ctx.beginPath(); ctx.moveTo(20, -58.5); ctx.quadraticCurveTo(27, -57.5, 31.5, -50.5); ctx.stroke();
+  ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.moveTo(sh[0] - 1, sh[1] - 1); ctx.lineTo(hc[0] - 1, hc[1] + 3); ctx.lineTo(hc[0] + 2, hc[1] + 3); ctx.lineTo(sh[0] + 3, sh[1] - 1); ctx.closePath(); ctx.stroke(); ctx.fill();
 
-  // Eye: big, bright, with a blink every few seconds
-  const shut = t % 4.3 < 0.12;
-  if (shut) {
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.moveTo(23.2, -49.5); ctx.quadraticCurveTo(25.5, -48, 28, -49.6); ctx.stroke();
-  } else {
-    const ig = ctx.createLinearGradient(0, -53, 0, -46.5);
-    ig.addColorStop(0, '#1a0c2e');
-    ig.addColorStop(0.6, '#5b2d9a');
-    ig.addColorStop(1, '#c58cff');
-    ctx.fillStyle = ig;
-    ctx.beginPath(); ctx.ellipse(25.6, -49.8, 2.6, 3.3, -0.15, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath(); ctx.arc(26.4, -51.2, 1.1, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(24.8, -48.4, 0.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = 1.3;
-    ctx.beginPath(); ctx.moveTo(22.6, -52.2); ctx.quadraticCurveTo(25.5, -54.2, 28.6, -52.2); ctx.lineTo(29.6, -53.4); ctx.stroke();
-  }
+  // the dark halo, a broken crown of thorns and violet fire
+  halo(ctx, hc[0] - 2.5, hc[1] - 8.5, t);
 
-  // Mane: tapered rainbow locks that stream with speed and fall
-  const fall = air ? clamp(p.vy / 900, -0.4, 0.9) : 0;
+  // hair: long silver locks streaming back with speed and fall
   const locks = [];
-  const sweep = 0.5 + run * 0.6 + (air ? 0.2 : 0), droop = 0.8 - run * 0.5;
-  for (let i = 0; i < 7; i++) {
-    const k = i / 6, rx = 17.5 - k * 10, ry = -56.5 + k * 22;
-    const L = 15 + (i % 2) * 3 - i * 0.3 + run * 6;
+  for (let i = 0; i < 6; i++) {
+    const k = i / 5, rx = hc[0] - 1 - k * 2.5, ry = hc[1] - 4.5 + k * 6.5;
+    const len = 13 + (i % 2) * 3 + run * 7 - k * 2, sweep = 0.75 + run * 0.4, droop = 0.65 - run * 0.4;
     const pts = [];
-    for (let s = 0; s <= 6; s++) {
-      const u = s / 6;
-      pts.push([
-        rx - u * L * sweep - u * u * 2.5,
-        ry + u * L * droop + Math.sin(t * 6 + i * 0.9 - u * 4) * u * 2.2 - u * L * fall * 0.8,
-      ]);
+    for (let s = 0; s <= 5; s++) {
+      const u = s / 5;
+      pts.push([rx - u * len * sweep, ry + u * len * droop + Math.sin(t * 6 + i * 1.1 - u * 4) * u * 1.8 - u * len * fall * 0.7]);
     }
     locks.push(pts);
   }
+  locks.forEach((l, i) => taper(ctx, l, 4.6, 1, i % 2 ? '#bdb3d6' : '#efeaf8'));
   ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = (blink ? 0.45 : 1) * 0.3;
-  locks.forEach((l, i) => taper(ctx, l, 8, 2, RAINBOW[i]));
-  ctx.globalAlpha = blink ? 0.45 : 1;
+  locks.forEach(l => taper(ctx, l.slice(3), 1.6, 0.6, 'rgba(176,106,255,.45)'));
   ctx.globalCompositeOperation = 'source-over';
-  locks.forEach((l, i) => taper(ctx, l, 4.4, 0.9, RAINBOW[i]));
-  // forelock
-  for (let i = 0; i < 2; i++) {
-    const pts = [[19, -58], [23, -59 + i * 2], [27 - i * 2, -56 + i * 2 + Math.sin(t * 5 + i) * 0.8]];
-    taper(ctx, pts, 3.4, 1, RAINBOW[i * 5]);
-  }
 
-  // The armour's plume streams back from the helm
+  const face = new Path2D();
+  face.moveTo(hc[0] - 4.6, hc[1] - 1);
+  face.bezierCurveTo(hc[0] - 4.8, hc[1] - 6.4, hc[0] + 3.4, hc[1] - 7, hc[0] + 4.8, hc[1] - 2.2);
+  face.lineTo(hc[0] + 5.6, hc[1] + 0.4);
+  face.lineTo(hc[0] + 4.6, hc[1] + 1.2);
+  face.bezierCurveTo(hc[0] + 4.4, hc[1] + 3.6, hc[0] + 2.2, hc[1] + 5.4, hc[0] + 0.6, hc[1] + 5.2);
+  face.bezierCurveTo(hc[0] - 2.6, hc[1] + 4.6, hc[0] - 4.4, hc[1] + 2.6, hc[0] - 4.6, hc[1] - 1);
+  face.closePath();
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 2.2;
+  ctx.stroke(face);
+  const sk = ctx.createLinearGradient(hc[0] - 4, hc[1] - 6, hc[0] + 4, hc[1] + 5);
+  sk.addColorStop(0, '#f4eefa');
+  sk.addColorStop(1, '#b9abd0');
+  ctx.fillStyle = sk;
+  ctx.fill(face);
+  // fringe over the brow
+  ctx.fillStyle = '#efeaf8';
+  ctx.strokeStyle = 'rgba(51,38,77,.6)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(hc[0] - 5, hc[1] - 0.5);
+  ctx.bezierCurveTo(hc[0] - 5.4, hc[1] - 7.4, hc[0] + 3.6, hc[1] - 8.4, hc[0] + 5.2, hc[1] - 2.6);
+  ctx.lineTo(hc[0] + 2.2, hc[1] - 3.6);
+  ctx.lineTo(hc[0] + 1, hc[1] - 1.8);
+  ctx.lineTo(hc[0] - 0.6, hc[1] - 3.8);
+  ctx.lineTo(hc[0] - 2.6, hc[1] + 0.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // circlet in the armour's metal, with its gem
+  ctx.strokeStyle = metalGrad(ctx, hc[0] - 4, hc[1] - 4, hc[0] + 4, hc[1] - 2);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(hc[0] - 4.8, hc[1] - 2.2); ctx.quadraticCurveTo(hc[0], hc[1] - 5.6, hc[0] + 4.6, hc[1] - 3.4); ctx.stroke();
+  ctx.fillStyle = gemC;
+  ctx.beginPath(); ctx.moveTo(hc[0] + 2.6, hc[1] - 6.2); ctx.lineTo(hc[0] + 3.6, hc[1] - 4.4); ctx.lineTo(hc[0] + 2.6, hc[1] - 3.2); ctx.lineTo(hc[0] + 1.6, hc[1] - 4.4); ctx.closePath(); ctx.fill();
+  // eye: a stern brow and a burning iris (closed for a blink now and then)
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(hc[0] + 0.6, hc[1] - 2); ctx.lineTo(hc[0] + 4.4, hc[1] - 1.2); ctx.stroke();
+  if (t % 4.3 < 0.12) {
+    ctx.beginPath(); ctx.moveTo(hc[0] + 1.2, hc[1] - 0.2); ctx.lineTo(hc[0] + 3.8, hc[1] + 0.2); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#1a0c2e';
+    ctx.beginPath(); ctx.ellipse(hc[0] + 2.6, hc[1] - 0.1, 1.5, 1.1, 0.1, 0, Math.PI * 2); ctx.fill();
+    eye(ctx, hc[0] + 2.9, hc[1] - 0.1, 0.85, '#c45cff', '#ffffff', 3.2);
+  }
+  ctx.strokeStyle = 'rgba(80,50,110,.6)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.moveTo(hc[0] + 1.8, hc[1] + 3.4); ctx.lineTo(hc[0] + 3.6, hc[1] + 3.1); ctx.stroke();
+  // the armour's plume streams back from the circlet
   if (L) {
     for (let i = 0; i < 3; i++) {
       const w = Math.sin(t * 7 + i * 1.3) * 1.2 - run * 1.5, lift = air ? clamp(-p.vy / 600, -1, 1) * 2 : 0;
-      const pts = [[19.5, -59.5], [15 - i, -65 + i * 1.5 + w * 0.4 - lift], [9 - i * 2 - run * 3, -67 + i * 2.4 + w - lift], [3 - i * 2.5 - run * 6, -65 + i * 3 + w * 1.6 - lift * 1.5]];
-      taper(ctx, pts, 4.6 - i * 0.8, 0.8, i === 1 ? L.trim : L.plume);
+      const pts = [[hc[0] - 1, hc[1] - 6], [hc[0] - 5 - i, hc[1] - 10 + i * 1.5 + w * 0.4 - lift], [hc[0] - 10 - i * 2 - run * 3, hc[1] - 11 + i * 2.4 + w - lift], [hc[0] - 16 - i * 2.5 - run * 6, hc[1] - 9 + i * 3 + w * 1.6 - lift * 1.5]];
+      taper(ctx, pts, 3.8 - i * 0.7, 0.7, i === 1 ? L.trim : L.plume);
     }
   }
 
-  // Horn: spiralled gold with a glowing tip
-  ctx.fillStyle = goldGrad(ctx, 21, -58, 32, -80);
+  // the near wing, over the back
+  angelWing(ctx, wx, wy, 1.12 - spread * 0.12 - flap, 22 + spread * 17, spread, true, t);
+
+  // pauldron, spiked when the armour is
+  ctx.save();
+  ctx.translate(sh[0] - 0.5, sh[1] + 1.5);
+  ctx.rotate(-0.2);
+  if (L && L.spikes) {
+    ctx.fillStyle = metalGrad(ctx, 0, -9, 0, 0);
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 1;
+    for (const x of [-3, 0.5, 4]) { ctx.beginPath(); ctx.moveTo(x - 1.6, -2.5); ctx.lineTo(x - 0.4, -8.5 + Math.abs(x) * 0.4); ctx.lineTo(x + 1.6, -2.5); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  }
+  ctx.fillStyle = metalGrad(ctx, -5, -4, 5, 4);
   ctx.strokeStyle = OUT;
   ctx.lineWidth = 1.4;
-  ctx.beginPath(); ctx.moveTo(20.6, -58); ctx.lineTo(32, -80); ctx.lineTo(25.4, -59.2); ctx.closePath();
-  ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = 'rgba(140,80,10,.65)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 6, 4, 0, Math.PI, Math.PI * 2.1); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = trim;
   ctx.lineWidth = 1;
-  for (let k = 0; k < 4; k++) {
-    const u = 0.15 + k * 0.2, x0 = 20.6 + (32 - 20.6) * u, y0 = -58 + (-80 + 58) * u, x1 = 25.4 + (32 - 25.4) * u, y1 = -59.2 + (-80 + 59.2) * u;
-    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1 + 1.5); ctx.stroke();
-  }
-  const pulse = 0.7 + Math.sin(t * 4) * 0.3;
-  ctx.globalCompositeOperation = 'lighter';
-  const hg = ctx.createRadialGradient(32, -80, 0, 32, -80, 14 * pulse + 4);
-  hg.addColorStop(0, 'rgba(255,255,230,.95)');
-  hg.addColorStop(0.35, 'rgba(255,210,120,.45)');
-  hg.addColorStop(1, 'rgba(255,180,220,0)');
-  ctx.fillStyle = hg;
-  ctx.beginPath(); ctx.arc(32, -80, 14 * pulse + 4, 0, Math.PI * 2); ctx.fill();
-  ctx.globalCompositeOperation = 'source-over';
-  sparkle(ctx, 32, -80, 4 + pulse * 2.5, t * 1.5);
+  ctx.beginPath(); ctx.ellipse(0, 0.3, 5.4, 3.2, 0, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+  ctx.restore();
 
-  // Near wing
-  if (up.wings || up.fly) wing(ctx, p, t, true);
+  // the near arm, wielding the lash of shadow-fire
+  const el = [(sh[0] + hand[0]) / 2 - 1.5, (sh[1] + hand[1]) / 2 + 2.5];
+  limb2(ctx, [[sh[0], sh[1] + 1], el, hand], 3.9, '#241932');
+  limb2(ctx, [el, hand], 3.4, METAL[1]);
+  ctx.fillStyle = metalGrad(ctx, hand[0] - 2.5, hand[1] - 2.5, hand[0] + 2.5, hand[1] + 2.5);
+  ctx.strokeStyle = OUT;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.arc(hand[0], hand[1], 2.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  glowDot(ctx, hand[0], hand[1], 7, '#a64dff', 0.35 + Math.sin(t * 5) * 0.1);
   ctx.restore();
   ctx.globalAlpha = 1;
 
@@ -954,43 +1045,6 @@ export function drawUnicorn(ctx, p, t) {
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
-}
-
-function wing(ctx, p, t, near) {
-  if (!near) return;
-  const spread = p.flying ? 1.05 : p.gliding ? 1 : !p.ground ? 0.6 : 0;
-  const flap = p.flying ? Math.sin(t * 24) * 0.6 : p.gliding ? Math.sin(t * 9) * 0.18 : !p.ground ? Math.sin(t * 14) * 0.25 : Math.sin(t * 2) * 0.03;
-  ctx.save();
-  ctx.translate(4, -31);
-  ctx.rotate(-0.12 - spread * 1.1 + flap);
-  const L = 21 + spread * 15, n = 5;
-  const path = new Path2D();
-  path.moveTo(2, 1);
-  path.quadraticCurveTo(-L * 0.35, -10 - spread * 4, -L, -5 - spread * 3);
-  for (let k = 0; k < n; k++) {
-    const x0 = -L + (k / n) * (L + 2), x1 = -L + ((k + 1) / n) * (L + 2);
-    path.quadraticCurveTo((x0 + x1) / 2 - 1.5, 5 + (n - k) * 0.5, x1, 1);
-  }
-  path.closePath();
-  const g = ctx.createLinearGradient(0, -8, -L, 4);
-  g.addColorStop(0, '#ffffff');
-  g.addColorStop(0.6, '#e6deff');
-  g.addColorStop(1, '#bfe3ff');
-  ctx.strokeStyle = OUT;
-  ctx.lineWidth = 2.6;
-  ctx.stroke(path);
-  ctx.fillStyle = g;
-  ctx.fill(path);
-  ctx.strokeStyle = 'rgba(110,90,170,.35)';
-  ctx.lineWidth = 0.9;
-  for (let k = 1; k < n; k++) {
-    const x = -L + (k / n) * (L + 2);
-    ctx.beginPath(); ctx.moveTo(x, 1); ctx.lineTo(x + 4, -4 - spread * 2); ctx.stroke();
-  }
-  ctx.strokeStyle = 'rgba(255,255,255,.9)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(0, -1); ctx.quadraticCurveTo(-L * 0.35, -8 - spread * 4, -L * 0.85, -5 - spread * 3); ctx.stroke();
-  ctx.restore();
 }
 
 export function drawBubbles(ctx) {

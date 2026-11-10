@@ -2,6 +2,9 @@
 import { G } from './state.js';
 import { rand, pick } from './util.js';
 
+// Late-bound callbacks, so low-level modules can trigger effects defined higher up.
+export const HOOKS = { kill: null };
+
 export function part(o) {
   if (G.parts.length > 2200) return;
   const p = { x: 0, y: 0, vx: 0, vy: 0, life: 0.6, size: 3, color: '#fff', g: 0, drag: 0, add: false, shape: 'c', rot: 0, vr: 0, grow: 0, ...o };
@@ -113,7 +116,8 @@ export function drawFloaters(ctx) {
   for (const f of G.floaters) {
     const k = f.t / 0.9;
     ctx.globalAlpha = 1 - k * k;
-    ctx.font = `800 ${f.size}px Nunito, sans-serif`;
+    const pop = f.t < 0.12 ? 1 + (1 - f.t / 0.12) * 0.55 : 1;
+    ctx.font = `800 ${Math.round(f.size * pop)}px Nunito, sans-serif`;
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0,0,0,.7)';
     ctx.strokeText(f.text, f.x, f.y);

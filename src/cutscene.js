@@ -197,7 +197,7 @@ function temple(ctx, x, y, w, h, col = '#f4efe2', a = 1) {
   ctx.restore();
 }
 
-// The unicorn as a puppet: the real in-game sprite, posed for the camera.
+// The angel as a puppet: the real in-game sprite, posed for the camera.
 function unicorn(ctx, x, y, sc, o = {}) {
   const p = cs.pup;
   p.x = -p.w / 2; p.y = -p.h;
@@ -247,7 +247,7 @@ const SCENES = {
   prelude: [
     {
       dur: 6.5, music: 'prelude',
-      text: 'Long ago, on the golden heights of Olympus, the gods kept a herd of unicorns.',
+      text: 'Long ago, on the golden heights of Olympus, a host of angels served the gods.',
       draw(ctx, k, t) {
         sky(ctx, [[0, '#4f86d8'], [0.55, '#a6c6f0'], [1, '#ffd9a8']]);
         sun(ctx, 1250, 180, 60, t);
@@ -277,7 +277,7 @@ const SCENES = {
           glow(ctx, x + Math.cos(a) * r, y - 70 + Math.sin(a) * r * 0.5, 30, RAINBOW[i], 0.4 + b * 0.4);
         }
         unicorn(ctx, x, y, 3.6, { face: 1, dash: true });
-        // the other unicorns shrink away from the glare
+        // the other angels shrink away from the glare
         unicorn(ctx, 1260 + b * 120, 720, 1.8, { face: 1, run: b > 0.2, alpha: 0.6 * (1 - b) });
         if (Math.random() < 0.7) sparkle(x, y - 80, 2, RAINBOW, 90);
       },
@@ -298,7 +298,7 @@ const SCENES = {
     },
     {
       dur: 5.5,
-      text: '"No creature shall outshine Olympus," he thundered, and he struck the unicorn down.',
+      text: '"No creature shall outshine Olympus," he thundered, and he struck the angel down.',
       draw(ctx, k, t) {
         stormSky(ctx, 1, t);
         const strike = k > 0.45;

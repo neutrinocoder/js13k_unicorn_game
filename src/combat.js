@@ -2,7 +2,7 @@
 import { G } from './state.js';
 import { T, tileAt, setTile, isSolid, ROCK, ORE, CRYSTAL, BRICK, isSpecial } from './world.js';
 import { rand, clamp, RAINBOW, overlap, pick } from './util.js';
-import { burst, part, floater, shake, ring } from './fx.js';
+import { burst, part, floater, shake, ring, HOOKS } from './fx.js';
 import { sfx } from './audio.js';
 import { stats, worn } from './items.js';
 import { lightning } from './art.js';
@@ -121,6 +121,11 @@ export function damageEnemy(e, n, dir = 0, kb = 220) {
   }
   floater(cx, e.y - 4, fmt(n), n >= 6 ? '#ffe14a' : '#ffffff', n >= 6 ? 20 : 16);
   burst(cx, cy, 6, [e.tint || '#fff', '#ffffff'], 200);
+  // bright sparks thrown the way the blow travelled
+  for (let i = 0; i < 5; i++) {
+    const a = (dir ? (dir > 0 ? 0 : Math.PI) : rand(0, Math.PI * 2)) + rand(-0.7, 0.7), sp = rand(260, 520);
+    part({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 4, life: rand(0.12, 0.22), size: rand(2.5, 4), color: '#fff3c8', shape: 'streak', add: true });
+  }
   sfx('hit');
   if (e.hp <= 0) {
     if (e.boss) bossDefeated(e);
@@ -133,7 +138,9 @@ export function killEnemy(e) {
   const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
   burst(cx, cy, 26, [e.tint, e.accent, '#ffffff'], 340, { add: true });
   ring(cx, cy, 60, e.accent || '#fff');
-  shake(4);
+  ring(cx, cy, 34, '#ffffff', 0.25, 6);
+  if (HOOKS.kill) HOOKS.kill(e);
+  shake(5);
   sfx('kill');
   const S = stats();
   dropGems(cx, cy, Math.round(e.gem * (0.6 + e.level * 0.5) * rand(1, 1.5) * S.gemK));

@@ -27,8 +27,34 @@ export function flame(ctx, x, y, w, h, t, cols = ['#ff3a0a', '#ff9a1a', '#fff2a0
   ctx.restore();
 }
 
+// Glowing bits (eyes) seen while the world is drawn, remembered in screen pixels so they can be
+// drawn again on top of the darkness: eyes shine out of a dark cave.
+export const EMIT = { on: false, list: [] };
+
+export function drawEmissive(ctx, k = 1) {
+  const L = EMIT.list;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < L.length; i += 4) {
+    const x = L[i], y = L[i + 1], r = L[i + 2], c = L[i + 3];
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgba(c, 0.6 * k));
+    g.addColorStop(0.25, rgba(c, 0.3 * k));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  ctx.restore();
+  L.length = 0;
+}
+
 // A glowing eye: soft halo plus a bright core.
 export function eye(ctx, x, y, r, color, core = '#ffffff', halo = 3) {
+  if (EMIT.on && EMIT.list.length < 1200 && color[0] === '#' && color !== '#ffffff') {
+    const m = ctx.getTransform();
+    EMIT.list.push(m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f, Math.max(2.5, r * halo * 0.75 * Math.hypot(m.a, m.b)), color);
+  }
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const g = ctx.createRadialGradient(x, y, 0, x, y, r * halo);

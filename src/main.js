@@ -176,7 +176,7 @@ function virgilLines() {
   const s = G.save, n = sealCount();
   if (!s.talked) {
     return [
-      'A unicorn, fallen out of the sky? So the thunder last night was Zeus casting you down. They say you shone too brightly for the gods to bear.',
+      'An angel, fallen out of the sky, with wings burnt black? So the thunder last night was Zeus casting you down. They say you shone too brightly for the gods to bear.',
       'I am Virgil. I have walked these circles before, and I will guide you as far as I can. The only road back to the heavens runs through Hades himself.',
       'Hades sealed the way out with four Seals. Each one is held by a Warden at the far end of a road.',
       'West, in Gluttony, Cerberus gnaws. East, Semiramis rides the storms of Lust. Above burns Farinata in Heresy. Below, Ephialtes lies frozen in Treachery.',
@@ -706,7 +706,7 @@ $('btn-new').onclick = () => {
   sfx('ui');
   hide('title');
   playCutscene('prelude', () => {
-    $('story-text').innerHTML = 'You were the brightest of the unicorns of Olympus, so bright that Zeus himself grew afraid of you. He cast you out of the heavens, and you fell all the way into the underworld.<br><br>Hades has sealed the way out. The circles of Hell stretch in every direction: storms to the east, endless rain to the west, burning tombs above and frozen ice below.<br><br>Find the four Seals. Defeat Hades. Then climb back to Olympus and make the gods answer for what they did.<br><br><i>“Through me the way into the suffering city.”</i> — Dante, <i>Inferno</i>';
+    $('story-text').innerHTML = 'You were the brightest of the angels of Olympus, so bright that Zeus himself grew afraid of you. He cast you out of the heavens, and you fell all the way into the underworld. The fall burnt your wings black and put out the light of your halo. Now it burns with shadow-fire.<br><br>Hades has sealed the way out. The circles of Hell stretch in every direction: storms to the east, endless rain to the west, burning tombs above and frozen ice below.<br><br>Find the four Seals. Defeat Hades. Then climb back to Olympus and make the gods answer for what they did.<br><br><i>“Through me the way into the suffering city.”</i> — Dante, <i>Inferno</i>';
     show('story');
     G.scene = 'story';
     setTheme('title');

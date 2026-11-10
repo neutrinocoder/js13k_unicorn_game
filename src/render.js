@@ -23,7 +23,7 @@ import { drawBoss, drawBossBar } from './bosses.js';
 import { stats, WEAPONS, ownsWeapon, worn, ARMOURS, armourKnown } from './items.js';
 import { devLabel } from './dev.js';
 import { objective, sealCount, sigilCount, interactLabel } from './main.js';
-import { lightning } from './art.js';
+import { lightning, EMIT, drawEmissive } from './art.js';
 
 let lightCv = null, lctx = null;
 const blobCache = new Map();
@@ -44,6 +44,8 @@ export function render(ctx) {
   ctx.save();
   ctx.scale(scale, scale);
   ctx.translate(-G.cam.x + shx / scale, -G.cam.y + shy / scale);
+  EMIT.list.length = 0;
+  EMIT.on = true;
 
   // Tiles
   const c0x = Math.floor(v.x0 / CPX), c1x = Math.floor(v.x1 / CPX), c0y = Math.floor(v.y0 / CPX), c1y = Math.floor(v.y1 / CPX);
@@ -67,6 +69,7 @@ export function render(ctx) {
     if (e.dead || e.x > v.x1 + 60 || e.x + e.w < v.x0 - 60 || e.y > v.y1 + 60 || e.y + e.h < v.y0 - 60) continue;
     drawEnemy(ctx, e, G.t);
     if (e.type === 'wisp' || e.type === 'seraph' || e.type === 'ophan') lights.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, r: 110, c: e.type === 'seraph' ? '#ffb347' : e.accent, a: 0.5 });
+    else lights.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, r: 46 + e.w, c: e.accent, a: 0.3 });
   }
   drawBoss(ctx, G.t);
   if (G.boss && !G.boss.dead) lights.push({ x: G.boss.x + G.boss.w / 2, y: G.boss.y + G.boss.h / 2, r: 420, c: G.boss.accent, a: 0.6 });
@@ -85,11 +88,13 @@ export function render(ctx) {
   for (const b of G.projs) lights.push({ x: b.x, y: b.y, r: b.r * 9, c: b.color, a: 0.45 });
   drawParts(ctx, true);
   drawPrompt(ctx);
+  EMIT.on = false;
   drawFloaters(ctx);
   ctx.restore();
 
   // Lighting
   drawLighting(ctx, lights, bg, shx, shy);
+  drawEmissive(ctx, clamp(bg.dark * 1.7, 0.2, 1));
 
   // Screen effects
   if (G.flash > 0) {
@@ -1164,7 +1169,7 @@ export function weaponIcon(ctx, id, x, y) {
   ctx.translate(x, y);
   ctx.lineCap = 'round';
   if (id === 'whip') {
-    RAINBOW.forEach((c, i) => { ctx.strokeStyle = c; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(-4, 8, 10 + i * 1.8, -1.9, -0.2); ctx.stroke(); });
+    ['#4a1580', '#7a2ad0', '#a64dff', '#d07aff', '#ff6ad5', '#f2d6ff'].forEach((c, i) => { ctx.strokeStyle = c; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(-4, 8, 10 + i * 2, -1.9, -0.2); ctx.stroke(); });
   } else if (id === 'blast') {
     ctx.fillStyle = '#ffffff';
     starPath(ctx, 14, 6);

@@ -23,7 +23,7 @@ export function toast(text, ms = 2600) {
 const QUOTES = [
   'Every soul pays the ferryman. Gems, little horse.',
   'Bright things from the upper world. Mostly unstolen.',
-  'Buy something, or stop dripping rainbow on my floor.',
+  'Buy something, or stop dripping shadow on my floor.',
   'The dead have no use for coin. The dead are wrong.',
 ];
 let shopCtx = null;
@@ -31,7 +31,7 @@ let shopCtx = null;
 const SMITH_QUOTES = [
   'Bring me the head of a monster and I will forge you its hide.',
   'Every great foe leaves something behind worth hammering.',
-  'Hold still. No, the other way. Unicorns are hard to measure.',
+  'Hold still. Fold the wings. No, the other way. Angels are hard to measure.',
   'Steel from the Furies, rivets from the Styx. Very fashionable.',
 ];
 
@@ -140,7 +140,7 @@ function buy(it) {
     if (it.id === 'heart' || it.id === 'apple') G.player.hp = stats().maxHp;
     if (it.id === 'icarus') G.player.wing = stats().flyMax;
     if (it.id === 'stars') { G.save.weapon = 2; toast('Starfall ready — press 3.'); }
-    if (it.id === 'beam') { G.save.weapon = 3; toast('Rainbow Lance ready — press 4.'); }
+    if (it.id === 'beam') { G.save.weapon = 3; toast('Umbral Lance ready — press 4.'); }
   }
   sfx('buy');
   renderShop();
