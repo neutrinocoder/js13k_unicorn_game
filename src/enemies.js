@@ -57,6 +57,8 @@ function chase(e, dx, speed) {
 
 export function updateEnemy(e, dt) {
   const p = G.player;
+  // chilled foes move and think at half speed
+  if (e.chill > 0) { e.chill -= dt; dt *= 0.5; }
   e.t += dt; e.flash -= dt; e.cd -= dt; e.t2 -= dt;
   const cx = e.x + e.w / 2, cy = e.y + e.h / 2, px = p.x + p.w / 2, py = p.y + p.h / 2;
   const dx = px - cx, dy = py - cy, d = Math.hypot(dx, dy) || 1;

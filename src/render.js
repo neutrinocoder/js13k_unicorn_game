@@ -20,7 +20,8 @@ import { drawProjs, drawPickups, heartPath, starPath } from './combat.js';
 import { drawAngel, drawBubbles, hornTip } from './player.js';
 import { drawEnemy } from './enemies.js';
 import { drawBoss, drawBossBar } from './bosses.js';
-import { stats, WEAPONS, ownsWeapon, worn, ARMOURS, armourKnown } from './items.js';
+import { stats, worn, ARMOURS, armourKnown } from './items.js';
+import { arms, slotArm, SLOTS, current, rarityOf, armById, weaponIcon, palOf } from './weapons.js';
 import { devLabel } from './dev.js';
 import { objective, sealCount, sigilCount, interactLabel } from './main.js';
 import { lightning, EMIT, drawEmissive } from './art.js';
@@ -65,6 +66,8 @@ export function render(ctx) {
   // Objects behind actors
   for (const o of objs) drawObject(ctx, o, G.t, lights);
   drawPickups(ctx);
+  // a dropped weapon glows in the dark, in the colour of its rarity
+  for (const g of G.pickups) if (g.kind === 'weapon') lights.push({ x: g.x, y: g.y - 14, r: 130, c: rarityOf(armById(g.wid)).col, a: 0.75 });
   for (const e of G.enemies) {
     if (e.dead || e.x > v.x1 + 60 || e.x + e.w < v.x0 - 60 || e.y > v.y1 + 60 || e.y + e.h < v.y0 - 60) continue;
     drawEnemy(ctx, e, G.t);
@@ -1067,32 +1070,65 @@ function drawHUD(ctx) {
     ctx.stroke();
   });
 
-  // weapons
-  const by = H - 74;
-  WEAPONS.forEach((w, i) => {
-    const x = 24 + i * 58, sel = save.weapon === i, own = ownsWeapon(i);
-    ctx.fillStyle = sel ? 'rgba(255,225,74,.18)' : 'rgba(10,6,20,.6)';
+  // the three weapons you carry, then the blast and the bombs
+  const by = H - 74, AR = arms(), held = current();
+  for (let i = 0; i < SLOTS; i++) {
+    const x = 24 + i * 58, sel = AR.cur === i, w = slotArm(i), col = w ? rarityOf(w.def).col : 'rgba(255,255,255,.2)';
+    ctx.fillStyle = sel ? rgba(w ? rarityOf(w.def).col : '#ffffff', 0.2) : 'rgba(10,6,20,.6)';
     roundRect(ctx, x, by, 50, 50, 10);
     ctx.fill();
-    ctx.strokeStyle = sel ? '#ffe14a' : 'rgba(255,255,255,.2)';
+    ctx.strokeStyle = sel ? '#ffffff' : col;
+    ctx.globalAlpha = sel || !w ? 1 : 0.75;
     ctx.lineWidth = sel ? 2.5 : 1.5;
     ctx.stroke();
-    ctx.globalAlpha = own ? 1 : 0.25;
-    weaponIcon(ctx, w.id, x + 25, by + 25);
     ctx.globalAlpha = 1;
+    if (w) {
+      weaponIcon(ctx, w.def, x + 25, by + 25, 34);
+      // a bar in the colour of its rarity, and its stars
+      ctx.fillStyle = col;
+      ctx.fillRect(x + 8, by + 45, 34, 2.5);
+      if (w.lv > 1) {
+        ctx.font = '900 10px Nunito, sans-serif';
+        ctx.textAlign = 'right';
+        hudText(ctx, '★' + w.lv, x + 46, by + 14);
+      }
+    }
     ctx.font = '800 11px Nunito, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,.7)';
     ctx.textAlign = 'left';
-    ctx.fillText(own ? w.key : '🔒', x + 5, by + 14);
-    const cd = w.id === 'blast' ? p.blastCd / S.blastCd : w.id === 'bomb' && own ? p.bombCd / S.bombCd : 0;
+    ctx.fillText(String(i + 1), x + 5, by + 14);
+  }
+  const extra = [['blast', 'RMB', p.blastCd / S.blastCd]];
+  if (S.hasBombs) extra.push(['bomb', 'G', p.bombCd / S.bombCd]);
+  extra.forEach(([id, key, cd], i) => {
+    const x = 24 + (SLOTS + i) * 58 + 8;
+    ctx.fillStyle = 'rgba(10,6,20,.6)';
+    roundRect(ctx, x, by + 6, 44, 44, 10);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.2)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(x + 22, by + 30);
+    ctx.scale(0.8, 0.8);
+    abilityIcon(ctx, id, 0, 0);
+    ctx.restore();
+    ctx.font = '800 10px Nunito, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.textAlign = 'left';
+    ctx.fillText(key, x + 5, by + 18);
     if (cd > 0) {
       ctx.fillStyle = 'rgba(0,0,0,.55)';
       const k = clamp(cd, 0, 1);
-      ctx.fillRect(x + 2, by + 50 - 48 * k, 46, 48 * k);
+      ctx.fillRect(x + 2, by + 50 - 42 * k, 40, 42 * k);
     }
   });
+  ctx.font = '700 11px Nunito, sans-serif';
+  ctx.textAlign = 'left';
+  hudTextSmall(ctx, 'R — weapons', 26, by + 66, 'rgba(255,255,255,.55)');
+  const NBOX = SLOTS + extra.length, beam = held.def.kind === 'beam';
   // bubble charge
-  const bx = 24 + WEAPONS.length * 58 + 30, byc = by + 25, k = clamp(p.charge / S.bubbleT, 0, 1);
+  const bx = 24 + NBOX * 58 + 36, byc = by + 25, k = clamp(p.charge / S.bubbleT, 0, 1);
   ctx.beginPath(); ctx.arc(bx, byc, 22, 0, TAU);
   ctx.fillStyle = 'rgba(10,6,20,.6)';
   ctx.fill();
@@ -1104,17 +1140,18 @@ function drawHUD(ctx) {
   ctx.textAlign = 'center';
   ctx.fillText('B', bx, byc + 5);
   if (k >= 1 && Math.floor(G.t * 3) % 2) { ctx.strokeStyle = 'rgba(191,243,255,.5)'; ctx.beginPath(); ctx.arc(bx, byc, 26, 0, TAU); ctx.stroke(); }
-  if (save.up.beam) {
+  if (beam) {
+    // energy for a beam weapon
     ctx.fillStyle = 'rgba(10,6,20,.6)';
     ctx.fillRect(24, by - 16, 222, 8);
     const g = ctx.createLinearGradient(24, 0, 246, 0);
-    RAINBOW.forEach((c, i) => g.addColorStop(i / 6, c));
+    palOf(held.def).forEach((c, i) => g.addColorStop(i / 6, c));
     ctx.fillStyle = g;
     ctx.fillRect(24, by - 16, 222 * (p.energy / 100), 8);
   }
   if (S.fly) {
     // wing energy for flight
-    const fy = by - (save.up.beam ? 30 : 16), k = clamp(p.wing / S.flyMax, 0, 1);
+    const fy = by - (beam ? 30 : 16), k = clamp(p.wing / S.flyMax, 0, 1);
     ctx.fillStyle = 'rgba(10,6,20,.6)';
     ctx.fillRect(24, fy, 222, 8);
     const g = ctx.createLinearGradient(24, 0, 246, 0);
@@ -1164,27 +1201,17 @@ function gemIcon(ctx, x, y, s) {
   ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s * 0.35, y - s * 0.2); ctx.lineTo(x, y); ctx.lineTo(x - s * 0.35, y - s * 0.2); ctx.fill();
 }
 
-export function weaponIcon(ctx, id, x, y) {
+function abilityIcon(ctx, id, x, y) {
   ctx.save();
   ctx.translate(x, y);
   ctx.lineCap = 'round';
-  if (id === 'whip') {
-    ['#4a1580', '#7a2ad0', '#a64dff', '#d07aff', '#ff6ad5', '#f2d6ff'].forEach((c, i) => { ctx.strokeStyle = c; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(-4, 8, 10 + i * 2, -1.9, -0.2); ctx.stroke(); });
-  } else if (id === 'blast') {
+  if (id === 'blast') {
     ctx.fillStyle = '#ffffff';
     starPath(ctx, 14, 6);
     ctx.fill();
     ctx.strokeStyle = '#ff9a2e';
     ctx.lineWidth = 2;
     ctx.stroke();
-  } else if (id === 'stars') {
-    ctx.fillStyle = '#ffe14a';
-    starPath(ctx, 12, 5);
-    ctx.fill();
-    ctx.fillStyle = '#ff9ad6';
-    ctx.translate(9, 9);
-    starPath(ctx, 6, 2.5);
-    ctx.fill();
   } else if (id === 'bomb') {
     ctx.fillStyle = '#4a3a5e';
     ctx.strokeStyle = '#ffb347';
@@ -1194,8 +1221,6 @@ export function weaponIcon(ctx, id, x, y) {
     ctx.beginPath(); ctx.moveTo(4, -6); ctx.quadraticCurveTo(10, -12, 8, -15); ctx.stroke();
     ctx.fillStyle = '#ffe36b';
     ctx.beginPath(); ctx.arc(8, -15, 3.5, 0, TAU); ctx.fill();
-  } else if (id === 'beam') {
-    RAINBOW.forEach((c, i) => { ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-14, 10 - i * 1.6 + 5); ctx.lineTo(14, -10 - i * 1.6 + 5); ctx.stroke(); });
   }
   ctx.restore();
 }

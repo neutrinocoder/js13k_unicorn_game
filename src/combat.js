@@ -1,13 +1,14 @@
 // Damage, projectiles, explosions and pickups.
 import { G } from './state.js';
 import { T, tileAt, setTile, isSolid, ROCK, ORE, CRYSTAL, BRICK, isSpecial } from './world.js';
-import { rand, clamp, RAINBOW, overlap, pick } from './util.js';
+import { rand, clamp, RAINBOW, overlap, pick, rgba } from './util.js';
 import { burst, part, floater, shake, ring, HOOKS } from './fx.js';
 import { sfx } from './audio.js';
 import { stats, worn } from './items.js';
 import { lightning } from './art.js';
 import { bossDefeated } from './bosses.js';
 import { onPlayerDeath, toast } from './main.js';
+import { arms, armById, rarityOf, shortName, addWeapon, canMerge, current, rollWeapon, dropChance, weaponIcon } from './weapons.js';
 
 const fmt = n => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10).toString();
 
@@ -108,25 +109,31 @@ export function hurtPlayer(n, sx, kb = 1) {
   return true;
 }
 
-export function damageEnemy(e, n, dir = 0, kb = 220) {
+// o.dot marks the slow damage of burning or poison: no knockback, no noise, a small coloured number.
+export function damageEnemy(e, n, dir = 0, kb = 220, o) {
   if (e.dead) return;
   if (e.trap > 0) n *= 1.5;
   e.hp -= n;
-  e.flash = 0.12;
-  if (e.boss) e.hurtT = 0.35;
   const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
-  if (!e.boss) {
-    e.vx += dir * kb;
-    if (!e.fly) e.vy -= kb * 0.45;
+  if (o && o.dot) {
+    e.flash = Math.max(e.flash || 0, 0.05);
+    floater(cx + rand(-10, 10), e.y - 2, fmt(n), o.col, 12);
+  } else {
+    e.flash = 0.12;
+    if (e.boss) e.hurtT = 0.35;
+    if (!e.boss) {
+      e.vx += dir * kb;
+      if (!e.fly) e.vy -= kb * 0.45;
+    }
+    floater(cx, e.y - 4, fmt(n), n >= 6 ? '#ffe14a' : '#ffffff', n >= 6 ? 20 : 16);
+    burst(cx, cy, 6, [e.tint || '#fff', '#ffffff'], 200);
+    // bright sparks thrown the way the blow travelled
+    for (let i = 0; i < 5; i++) {
+      const a = (dir ? (dir > 0 ? 0 : Math.PI) : rand(0, Math.PI * 2)) + rand(-0.7, 0.7), sp = rand(260, 520);
+      part({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 4, life: rand(0.12, 0.22), size: rand(2.5, 4), color: '#fff3c8', shape: 'streak', add: true });
+    }
+    sfx('hit');
   }
-  floater(cx, e.y - 4, fmt(n), n >= 6 ? '#ffe14a' : '#ffffff', n >= 6 ? 20 : 16);
-  burst(cx, cy, 6, [e.tint || '#fff', '#ffffff'], 200);
-  // bright sparks thrown the way the blow travelled
-  for (let i = 0; i < 5; i++) {
-    const a = (dir ? (dir > 0 ? 0 : Math.PI) : rand(0, Math.PI * 2)) + rand(-0.7, 0.7), sp = rand(260, 520);
-    part({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 4, life: rand(0.12, 0.22), size: rand(2.5, 4), color: '#fff3c8', shape: 'streak', add: true });
-  }
-  sfx('hit');
   if (e.hp <= 0) {
     if (e.boss) bossDefeated(e);
     else killEnemy(e);
@@ -154,8 +161,101 @@ export function killEnemy(e) {
     }
   }
   if (Math.random() < 0.16) G.pickups.push({ kind: 'heart', x: cx, y: cy, vx: rand(-80, 80), vy: -300, t: 0 });
+  // Sometimes a weapon is left behind. The more dangerous the land, the finer it is likely to be.
+  // A long run of bad luck always ends in a drop.
+  const A = arms();
+  if (!e.summoned) {
+    A.dry = (A.dry || 0) + 1;
+    if (Math.random() < dropChance(e) * S.luck || A.dry >= 12) {
+      A.dry = 0;
+      dropWeapon(cx, cy, rollWeapon(e.biome, e.level + S.fortune).id);
+    }
+  }
+  // The Devourer feeds its wielder
+  const W = current(), p = G.player;
+  if (W.def.leech && p && !p.dead) {
+    A.leech = (A.leech || 0) + 1;
+    if (A.leech >= W.def.leech) {
+      A.leech = 0;
+      if (p.hp < S.maxHp) { p.hp++; floater(p.x + p.w / 2, p.y - 10, '+1 ♥', '#9dff4a', 18); sfx('heal'); }
+    }
+  }
   if (e.spawn) { e.spawn.deadAt = G.t; e.spawn.ent = null; }
   G.save.stats.kills++;
+}
+
+// Leave a weapon lying where something fell.
+export function dropWeapon(x, y, id) {
+  const def = armById(id), R = rarityOf(def);
+  G.pickups.push({ kind: 'weapon', wid: id, x, y, vx: rand(-70, 70), vy: -420, t: 0, spin: rand(0, 6) });
+  ring(x, y, 40 + def.rar * 18, R.col, 0.45, 5);
+  if (def.rar >= 3) {
+    sfx('chest');
+    shake(6);
+    floater(x, y - 44, R.name.toUpperCase() + '!', R.col, 22);
+    burst(x, y, 24, [R.col, '#ffffff'], 300, { add: true, g: -60 });
+  }
+}
+
+// ---------- Burning, poison and cold ----------
+const targets = () => (G.boss && !G.boss.dead && !G.boss.hidden ? [...G.enemies, G.boss] : G.enemies);
+const DOT = { burn: ['#ff9a2e', ['#ff5a1f', '#ffb347', '#fff2a0'], 3], venom: ['#9dff4a', ['#4f8a35', '#9dff4a', '#d8f5b0'], 4] };
+
+// What a weapon leaves on a foe it has hit. mul is the wielder's damage bonus.
+export function afflict(e, fx, mul = 1) {
+  if (!fx || e.dead) return;
+  for (const k in DOT) {
+    if (!fx[k]) continue;
+    const old = e[k];
+    e[k] = { dps: Math.max(fx[k] * mul, old ? old.dps : 0), t: DOT[k][2], tick: old ? old.tick : 0.5 };
+  }
+  // the great foes are too strong to be slowed
+  if (fx.chill && !e.boss) e.chill = Math.max(e.chill || 0, fx.chill);
+}
+
+export function updateAfflictions(dt) {
+  for (const e of targets()) {
+    if (e.dead) continue;
+    for (const k in DOT) {
+      const d = e[k];
+      if (!d) continue;
+      d.t -= dt;
+      d.tick -= dt;
+      if (Math.random() < dt * 16) part({ x: e.x + rand(0, e.w), y: e.y + rand(0, e.h), vx: rand(-20, 20), vy: k === 'burn' ? rand(-150, -60) : rand(-50, -10), life: rand(0.3, 0.6), size: rand(2, 4), color: pick(DOT[k][1]), add: true });
+      if (d.tick <= 0) {
+        d.tick += 0.5;
+        damageEnemy(e, d.dps * 0.5, 0, 0, { dot: 1, col: DOT[k][0] });
+        if (e.dead) break;
+      }
+      if (d.t <= 0) e[k] = null;
+    }
+    if (e.chill > 0 && !e.dead && Math.random() < dt * 10) part({ x: e.x + rand(0, e.w), y: e.y + rand(0, e.h), vx: rand(-15, 15), vy: rand(10, 40), life: 0.5, size: rand(1.5, 3), color: pick(['#ffffff', '#a8ecff']), add: true });
+  }
+}
+
+// Lightning that leaps from one foe to the nearest others.
+export function chain(from, n, dmg, col = '#fff27a') {
+  const x0 = from.x + from.w / 2, y0 = from.y + from.h / 2;
+  const near = targets()
+    .filter(e => e !== from && !e.dead)
+    .map(e => [Math.hypot(e.x + e.w / 2 - x0, e.y + e.h / 2 - y0), e])
+    .filter(v => v[0] < 250)
+    .sort((a, b) => a[0] - b[0])
+    .slice(0, n)
+    .map(v => v[1]);
+  if (!near.length) return;
+  const pts = near.map(e => [e.x + e.w / 2, e.y + e.h / 2]);
+  for (const e of near) damageEnemy(e, dmg, 0, 60);
+  G.effects.push({
+    t: 0, dur: 0.22,
+    draw(ctx) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 1 - this.t / this.dur;
+      for (const [x, y] of pts) lightning(ctx, x0, y0, x, y, col, 2.2, 6, 14);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    },
+  });
 }
 
 export function dropGems(x, y, total) {
@@ -191,19 +291,19 @@ export function breakTile(tx, ty, quiet) {
   return true;
 }
 
-export function explode(x, y, r, dmg, team, dig) {
-  shake(team === 'player' ? 7 : 9);
-  sfx('boom', 0.7);
-  burst(x, y, 30, team === 'player' ? RAINBOW : ['#ffb347', '#ff5a1f', '#ffe36b'], 380, { add: true, g: 100 });
+export function explode(x, y, r, dmg, team, dig, o = {}) {
+  shake(o.soft ? 3 : team === 'player' ? 7 : 9);
+  sfx('boom', o.soft ? 0.4 : 0.7);
+  burst(x, y, o.soft ? 16 : 30, o.cols || (team === 'player' ? RAINBOW : ['#ffb347', '#ff5a1f', '#ffe36b']), 380, { add: true, g: 100 });
   for (let i = 0; i < 8; i++) part({ x, y, vx: rand(-60, 60), vy: rand(-60, 60), life: rand(0.5, 0.9), size: rand(8, 14), color: 'rgba(60,50,70,.5)', grow: 2, drag: 2 });
   ring(x, y, r * 1.2, team === 'player' ? '#ffffff' : '#ffb347', 0.35, 8);
   if (team === 'player') {
     for (const e of G.enemies) {
       const d = Math.hypot(e.x + e.w / 2 - x, e.y + e.h / 2 - y);
-      if (!e.dead && d < r + e.w / 2) damageEnemy(e, dmg * (d < r * 0.5 ? 1 : 0.7), Math.sign(e.x + e.w / 2 - x), 380);
+      if (!e.dead && d < r + e.w / 2) { damageEnemy(e, dmg * (d < r * 0.5 ? 1 : 0.7), Math.sign(e.x + e.w / 2 - x), o.soft ? 200 : 380); afflict(e, o.fx, o.mul); }
     }
     const B = G.boss;
-    if (B && !B.dead && Math.hypot(B.x + B.w / 2 - x, B.y + B.h / 2 - y) < r + Math.max(B.w, B.h) / 2) damageEnemy(B, dmg);
+    if (B && !B.dead && !B.hidden && Math.hypot(B.x + B.w / 2 - x, B.y + B.h / 2 - y) < r + Math.max(B.w, B.h) / 2) { damageEnemy(B, dmg); afflict(B, o.fx, o.mul); }
     if (dig) {
       const rr = Math.ceil(r / T);
       const ctx = Math.floor(x / T), cty = Math.floor(y / T);
@@ -230,7 +330,7 @@ export function updateProjs(dt) {
       let best = null, bd = 420;
       const targets = G.boss && !G.boss.dead && !G.boss.hidden ? [...G.enemies, G.boss] : G.enemies;
       for (const e of targets) {
-        if (e.dead) continue;
+        if (e.dead || (b.seen && b.seen.includes(e))) continue;
         const d = Math.hypot(e.x + e.w / 2 - b.x, e.y + e.h / 2 - b.y);
         if (d < bd) { bd = d; best = e; }
       }
@@ -273,10 +373,14 @@ export function updateProjs(dt) {
       } else {
         const list = G.boss && !G.boss.dead && !G.boss.hidden ? [...G.enemies, G.boss] : G.enemies;
         for (const e of list) {
-          if (e.dead) continue;
+          if (e.dead || (b.seen && b.seen.includes(e))) continue;
           if (b.x > e.x - b.r && b.x < e.x + e.w + b.r && b.y > e.y - b.r && b.y < e.y + e.h + b.r) {
-            if (b.kind === 'blast' || b.kind === 'bomb') { dead = true; break; }
-            damageEnemy(e, b.dmg, Math.sign(b.vx), 120);
+            if (b.kind === 'blast' || b.kind === 'bomb' || b.boom) { dead = true; break; }
+            damageEnemy(e, b.dmg, Math.sign(b.vx), b.kb || 120);
+            afflict(e, b.fx, b.mul);
+            if (b.chain) chain(e, b.chain, b.dmg * 0.6, b.color);
+            // a piercing shot flies on through, but never strikes the same foe twice
+            if (b.pierce > 0) { b.pierce--; (b.seen = b.seen || []).push(e); continue; }
             dead = true;
             break;
           }
@@ -286,6 +390,7 @@ export function updateProjs(dt) {
     if (dead) {
       if (b.kind === 'blast') explode(b.x, b.y, b.radius || 85, b.dmg, 'player', true);
       else if (b.kind === 'bomb') { explode(b.x, b.y, b.radius || 115, b.dmg, 'player', true); ring(b.x, b.y, (b.radius || 115) * 0.8, '#ffb347', 0.4, 10); shake(10); }
+      else if (b.boom) explode(b.x, b.y, b.boom, b.dmg, 'player', false, { cols: b.cols, fx: b.fx, mul: b.mul, soft: 1 });
       else if (b.kind === 'meteor') explode(b.x, b.y, 60, b.dmg, 'enemy');
       else burst(b.x, b.y, 6, b.color, 140, { add: true });
       G.projs.splice(i, 1);
@@ -296,15 +401,74 @@ export function updateProjs(dt) {
 export function drawProjs(ctx) {
   ctx.globalCompositeOperation = 'lighter';
   for (const b of G.projs) {
-    const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 2.6);
+    if (b.kind === 'wind' || b.kind === 'wave') {
+      // a crescent of wind, fire or water, curved the way it flies
+      const fade = Math.min(1, b.life * 5);
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.7 * fade;
+      ctx.strokeStyle = b.color;
+      ctx.lineWidth = b.r * 0.7;
+      ctx.beginPath(); ctx.arc(-b.r * 1.3, 0, b.r * 1.9, -1.05, 1.05); ctx.stroke();
+      ctx.globalAlpha = 0.9 * fade;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = b.r * 0.22;
+      ctx.beginPath(); ctx.arc(-b.r * 1.3, 0, b.r * 1.95, -0.9, 0.9); ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    const gr = b.r * (b.kind === 'arrow' || b.kind === 'bolt' ? 1.7 : 2.6);
+    const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, gr);
     g.addColorStop(0, '#ffffff');
     g.addColorStop(0.3, b.color);
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r * 2.6, 0, Math.PI * 2);
+    ctx.arc(b.x, b.y, gr, 0, Math.PI * 2);
     ctx.fill();
-    if (b.kind === 'star') {
+    if (b.kind === 'arrow') {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#f2ead6';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(-b.r * 3.4, 0); ctx.lineTo(b.r * 1.2, 0); ctx.stroke();
+      ctx.fillStyle = b.color;
+      ctx.beginPath(); ctx.moveTo(b.r * 2.4, 0); ctx.lineTo(b.r * 0.8, -b.r * 0.6); ctx.lineTo(b.r * 0.8, b.r * 0.6); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-b.r * 3.6, 0); ctx.lineTo(-b.r * 4.4, -b.r * 0.6); ctx.lineTo(-b.r * 3, 0); ctx.lineTo(-b.r * 4.4, b.r * 0.6); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    } else if (b.kind === 'bolt') {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
+      ctx.lineJoin = 'round';
+      for (const [col, lw] of [[b.color, 4], ['#ffffff', 1.6]]) {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        ctx.moveTo(-b.r * 5, 0); ctx.lineTo(-b.r * 3.4, -b.r * 0.9); ctx.lineTo(-b.r * 2, b.r * 0.8); ctx.lineTo(-b.r * 0.7, -b.r * 0.6); ctx.lineTo(b.r * 1.5, 0);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (b.kind === 'flask') {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.rotate(b.t * 9);
+      ctx.fillStyle = b.color;
+      ctx.strokeStyle = '#150d22';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(0, 1, b.r * 0.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#e6f0ff';
+      ctx.fillRect(-2, -b.r - 2, 4, 5);
+      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      ctx.beginPath(); ctx.arc(-b.r * 0.25, -b.r * 0.1, b.r * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else if (b.kind === 'star') {
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.rotate(b.t * 12);
@@ -405,18 +569,45 @@ export function updatePickups(dt) {
       } else if (g.kind === 'heart') {
         if (p.hp < S.maxHp) { p.hp = Math.min(S.maxHp, p.hp + 1); sfx('heal'); floater(g.x, g.y - 10, '+1 ♥', '#ff5a7a', 16); }
         else { G.save.gems += 5; sfx('gem'); floater(g.x, g.y - 10, '+5', '#ff6fb5', 13); }
+      } else if (g.kind === 'weapon') {
+        const def = armById(g.wid), R = rarityOf(def), got = addWeapon(def.id);
+        sfx(def.rar >= 2 ? 'chest' : 'buy');
+        floater(g.x, g.y - 26, shortName(def), R.col, def.rar >= 3 ? 22 : 17);
+        ring(g.x, g.y, 50 + def.rar * 14, R.col, 0.4, 5);
+        burst(g.x, g.y, 10 + def.rar * 6, [R.col, '#ffffff'], 220, { add: true, g: -40 });
+        if (got.isNew) toast(`New weapon: ${def.name} (${R.name}). Press R to open your arsenal.`, 3800);
+        else if (canMerge(got.key)) toast(`You have two of the ${shortName(def)}. Press R to merge them into a stronger one.`, 3400);
       }
       burst(g.x, g.y, 5, GEM_COL[g.val] || '#ff5a7a', 120, { add: true, g: 0 });
       G.pickups.splice(i, 1);
       continue;
     }
-    if (g.t > 60) G.pickups.splice(i, 1);
+    if (g.t > (g.kind === 'weapon' ? 240 : 60)) G.pickups.splice(i, 1);
   }
 }
 
 export function drawPickups(ctx) {
   for (const g of G.pickups) {
     const bob = Math.sin(g.t * 5 + (g.spin || 0)) * 2;
+    if (g.kind === 'weapon') {
+      // a dropped weapon stands in a pillar of light the colour of its rarity; finer ones stand taller
+      const def = armById(g.wid), R = rarityOf(def), h = 50 + def.rar * 24, w = 6 + def.rar * 1.5;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const pg = ctx.createLinearGradient(0, g.y, 0, g.y - h);
+      pg.addColorStop(0, rgba(R.col, 0.55));
+      pg.addColorStop(1, rgba(R.col, 0));
+      ctx.fillStyle = pg;
+      ctx.fillRect(g.x - w, g.y - h, w * 2, h);
+      const hg = ctx.createRadialGradient(g.x, g.y - 14, 0, g.x, g.y - 14, 30);
+      hg.addColorStop(0, rgba(R.col, 0.5 + Math.sin(g.t * 4) * 0.12));
+      hg.addColorStop(1, rgba(R.col, 0));
+      ctx.fillStyle = hg;
+      ctx.fillRect(g.x - 30, g.y - 44, 60, 60);
+      ctx.restore();
+      weaponIcon(ctx, def, g.x, g.y - 15 + bob * 1.5, 28);
+      continue;
+    }
     if (g.kind === 'gem') {
       const col = GEM_COL[g.val] || '#ffd34a', s = g.val >= 25 ? 9 : g.val >= 5 ? 7 : 5.5;
       ctx.save();

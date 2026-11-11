@@ -10,14 +10,15 @@ import { eye } from './art.js';
 const RAINBOW = ['#2a0b45', '#4a1580', '#7a2ad0', '#a64dff', '#d07aff', '#ff6ad5', '#f2d6ff'];
 import { burst, part, ring, shake, floater } from './fx.js';
 import { sfx } from './audio.js';
-import { stats, ownsWeapon, WEAPONS, worn } from './items.js';
-import { hurtPlayer, damageEnemy, shoot, breakTile } from './combat.js';
+import { stats, worn } from './items.js';
+import { hurtPlayer, damageEnemy, shoot, breakTile, afflict, explode } from './combat.js';
+import { arms, current, slotArm, SLOTS, STARTER, palOf, drawArm, shortName, rarityOf } from './weapons.js';
 
 export function makePlayer(x, y) {
   const p = {
     x, y, w: 30, h: 34, vx: 0, vy: 0, face: 1, ground: false, jumps: 0, coyote: 0, jbuf: 0, rising: false,
     dashT: 0, dashCd: 0, dashDir: 1, inv: 0, hp: 5, shield: 0, ctrlLock: 0, wallDir: 0, dropT: 0,
-    whipT: 0, whipAng: 0, whipCd: 0, whipSide: 1, combo: 0, lastWhip: -9, blastCd: 0, starCd: 0, atkBuf: 0, altBuf: 0,
+    whipT: 0, whipAng: 0, whipCd: 0, whipSide: 1, whipDur: 0.17, whipR: 125, whipArc: 1.2, aimT: 0, shotCd: 0, combo: 0, lastWhip: -9, blastCd: 0, starCd: 0, atkBuf: 0, altBuf: 0,
     armour: 0, armT: 0, healT: 0, energy: 100, beaming: false, beamLen: 0, beamTick: 0, aegis: 0, wing: 200, flying: false, flapT: 0, bombCd: 0,
     charge: 0, slow: 0, gliding: false, runPhase: 0, sx: 1, sy: 1, ax: 1, ay: 0, stepT: 0, dead: false, tail: [],
   };
@@ -37,7 +38,7 @@ export function updatePlayer(dt) {
   const p = G.player, S = stats(), B = BIOMES[BIOME_LIST[G.biome]];
   if (p.dead) return;
   p.inv -= dt; p.dashCd -= dt; p.ctrlLock -= dt; p.whipCd -= dt; p.blastCd -= dt; p.starCd -= dt; p.bombCd -= dt;
-  p.shield -= dt; p.slow -= dt; p.dropT -= dt; p.whipT -= dt;
+  p.shield -= dt; p.slow -= dt; p.dropT -= dt; p.whipT -= dt; p.aimT -= dt; p.shotCd -= dt;
   // the Aegis recharges after blocking a hit
   if (S.aegis && p.aegis > 0) { p.aegis -= dt; if (p.aegis <= 0) { sfx('bubble', 0.5); ring(p.x + p.w / 2, p.y + p.h / 2, 50, '#ffe14a', 0.4, 5); } }
   if (p.hp > S.maxHp) p.hp = S.maxHp;
@@ -202,19 +203,18 @@ export function updatePlayer(dt) {
     }
   }
 
-  // Weapon selection
-  const NW = WEAPONS.length;
-  for (let i = 0; i < NW; i++) if (tapped('Digit' + (i + 1)) && ownsWeapon(i)) selectWeapon(i);
+  // Weapon selection: the three you carry (1 2 3, or Q and the wheel to step through them)
+  for (let i = 0; i < SLOTS; i++) if (tapped('Digit' + (i + 1)) && slotArm(i)) selectSlot(i);
   if (tapped('KeyQ') || mouse.wheel) {
     const step = mouse.wheel < 0 ? -1 : 1;
-    let w = G.save.weapon;
-    for (let k = 0; k < NW; k++) { w = (w + step + NW) % NW; if (ownsWeapon(w)) break; }
-    selectWeapon(w);
+    let w = arms().cur;
+    for (let k = 0; k < SLOTS; k++) { w = (w + step + SLOTS) % SLOTS; if (slotArm(w)) break; }
+    if (slotArm(w)) selectSlot(w);
   }
-  if (tapped('KeyG') && ownsWeapon(4)) fireBomb(p, S);
+  if (tapped('KeyG') && S.hasBombs) fireBomb(p, S);
 
   // Attacks. A press during a cooldown is remembered briefly, so no click is lost.
-  const weapon = WEAPONS[G.save.weapon].id;
+  const W = current(), kind = W.def.kind;
   if (mouse.pressed || tapped('KeyJ', 'KeyK', 'KeyZ')) p.atkBuf = 0.3; else p.atkBuf -= dt;
   if (mouse.rpressed || tapped('KeyX', 'KeyI')) p.altBuf = 0.3; else p.altBuf -= dt;
   const atk = mouse.down || held('KeyJ', 'KeyK', 'KeyZ') || p.atkBuf > 0;
@@ -223,12 +223,7 @@ export function updatePlayer(dt) {
   p.beaming = false;
   if (alt) { if (fireBlast(p, S)) p.altBuf = 0; }
   else if (atk) {
-    let fired = false;
-    if (weapon === 'whip') fired = fireWhip(p, S, dir);
-    else if (weapon === 'blast') fired = fireBlast(p, S);
-    else if (weapon === 'stars') fired = fireStar(p, S);
-    else if (weapon === 'beam') fired = fireBeam(p, S, dt);
-    else if (weapon === 'bomb') fired = fireBomb(p, S);
+    const fired = kind === 'shot' ? fireShot(p, S, W) : kind === 'beam' ? fireBeam(p, S, dt, W) : kind === 'lob' ? fireLob(p, S, W) : fireMelee(p, S, dir, W);
     if (fired) p.atkBuf = 0;
   }
   if (!p.beaming) p.energy = Math.min(100, p.energy + 28 * dt);
@@ -257,42 +252,61 @@ export function updatePlayer(dt) {
 
 const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-function selectWeapon(i) {
-  if (G.save.weapon !== i) { G.save.weapon = i; sfx('ui'); }
+function selectSlot(i) {
+  const A = arms();
+  if (A.cur === i) return;
+  A.cur = i;
+  sfx('ui');
+  const W = current(), p = G.player;
+  floater(p.x + p.w / 2, p.y - 16, shortName(W.def), rarityOf(W.def).col, 14);
 }
 
 function targets() {
   return G.boss && !G.boss.dead && !G.boss.hidden ? [...G.enemies, G.boss] : G.enemies;
 }
 
-function fireWhip(p, S, dir) {
+// The wielder's bonus to a weapon's damage: shop upgrades, boss powers, armour and the weapon's stars.
+const bonus = (S, W) => S.wdmg * (1 + 0.25 * (W.lv - 1));
+
+// Whips, swords, axes, spears and the rest: a swing through an arc in front of you.
+function fireMelee(p, S, dir, W) {
   if (p.whipCd > 0) return false;
-  p.combo = G.t - p.lastWhip < 0.5 ? (p.combo + 1) % 3 : 0;
+  const def = W.def, mul = bonus(S, W), pal = palOf(def);
+  p.combo = G.t - p.lastWhip < Math.max(0.5, def.cd * 2) ? (p.combo + 1) % 3 : 0;
   p.lastWhip = G.t;
   const finisher = p.combo === 2;
-  p.whipCd = finisher ? 0.3 : WHIP_CD;
-  p.whipT = WHIP_T;
+  p.whipCd = def.cd * (finisher ? 1.5 : 1);
+  p.whipDur = clamp(def.cd * 0.85, 0.11, 0.26);
+  p.whipT = p.whipDur;
   p.whipAng = Math.atan2(p.ay, p.ax);
   p.whipSide = (p.combo % 2 ? -1 : 1) * (p.ax < 0 ? -1 : 1);
   p.whipFin = finisher;
   sfx('whip');
   if (p.ground && !dir) p.vx += p.ax * 110;
-  const cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 4, reach = S.reach * (finisher ? 1.15 : 1);
-  let hit = false;
+  const cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 4;
+  const reach = def.reach * S.reachK * (finisher ? 1.15 : 1), arc = def.arc || 1.2, dmg = def.dmg * mul * (finisher ? 1.6 : 1);
+  p.whipR = reach;
+  p.whipArc = arc;
+  let hit = false, boomAt = null;
   for (const e of targets()) {
     if (e.dead) continue;
     const ex = clamp(cx, e.x, e.x + e.w), ey = clamp(cy, e.y, e.y + e.h);
     const d = Math.hypot(ex - cx, ey - cy);
     const a = Math.atan2(e.y + e.h / 2 - cy, e.x + e.w / 2 - cx);
-    if (d < reach && (d < 34 || Math.abs(angDiff(p.whipAng, a)) < 1.2)) {
-      damageEnemy(e, S.whipDmg * (finisher ? 1.6 : 1), Math.sign(e.x + e.w / 2 - cx), finisher ? 420 : 260);
-      burst(clamp(cx + Math.cos(p.whipAng) * 40, e.x, e.x + e.w), clamp(cy + Math.sin(p.whipAng) * 40, e.y, e.y + e.h), 8, RAINBOW, 260, { add: true, g: 0 });
+    if (d < reach && (d < 34 || Math.abs(angDiff(p.whipAng, a)) < arc)) {
+      damageEnemy(e, dmg, Math.sign(e.x + e.w / 2 - cx), (def.kb || 260) * (finisher ? 1.6 : 1));
+      afflict(e, def.fx, mul);
+      burst(clamp(cx + Math.cos(p.whipAng) * 40, e.x, e.x + e.w), clamp(cy + Math.sin(p.whipAng) * 40, e.y, e.y + e.h), 8, pal, 260, { add: true, g: 0 });
+      if (!boomAt) boomAt = [e.x + e.w / 2, e.y + e.h / 2];
       hit = true;
     }
   }
+  // a blow that bursts, and a swing that throws a crescent ahead of it
+  if (def.boom && boomAt) explode(boomAt[0], boomAt[1], def.boom, dmg * 0.5, 'player', false, { cols: pal, fx: def.fx, mul, soft: 1 });
+  if (def.wave) shoot({ x: cx + p.ax * 34, y: cy + p.ay * 34, vx: p.ax * def.wave.speed, vy: p.ay * def.wave.speed, r: 15, dmg: dmg * def.wave.dmg, team: 'player', kind: 'wave', color: def.glow, life: def.wave.life, pierce: 99, fx: def.fx, mul, kb: 160 });
   // Break ore and crystals along the swing
   for (let k = -2; k <= 2; k++) {
-    const a = p.whipAng + k * 0.35;
+    const a = p.whipAng + k * arc * 0.3;
     for (let d = 16; d < reach; d += 14) {
       const tx = Math.floor((cx + Math.cos(a) * d) / T), ty = Math.floor((cy + Math.sin(a) * d) / T);
       const t = tileAt(tx, ty);
@@ -302,7 +316,7 @@ function fireWhip(p, S, dir) {
   }
   // Pop bubbles for a bounce
   for (const b of G.bubbles) {
-    if (Math.hypot(b.x - cx, b.y - cy) < reach && Math.abs(angDiff(p.whipAng, Math.atan2(b.y - cy, b.x - cx))) < 1.2) b.pop = true;
+    if (Math.hypot(b.x - cx, b.y - cy) < reach && Math.abs(angDiff(p.whipAng, Math.atan2(b.y - cy, b.x - cx))) < arc) b.pop = true;
   }
   if (hit) {
     G.hitstop = Math.max(G.hitstop, finisher ? 0.07 : 0.035);
@@ -327,41 +341,68 @@ function fireBlast(p, S) {
   return true;
 }
 
-function fireStar(p, S) {
-  if (p.starCd > 0) return false;
-  p.starCd = 0.11;
-  const h = hornTip(p), a0 = Math.atan2(p.ay, p.ax);
-  for (let i = 0; i < S.stars; i++) {
-    const a = a0 + (S.stars > 1 ? (i / (S.stars - 1) - 0.5) * 0.5 : 0) + rand(-0.12, 0.12);
-    shoot({ x: h.x, y: h.y, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760, r: 6, dmg: S.starDmg, team: 'player', kind: 'star', color: pick(['#ffe14a', '#ff9ad6', '#8fe8ff']), homing: true, life: 1.3, trail: '#fff2a8' });
+const SHOT_SFX = { star: 'star', bolt: 'bolt', fire: 'shoot', shard: 'star', arrow: 'whip', wind: 'whip' };
+
+// Bows, wands, staffs and fans: one or more shots toward your aim.
+function fireShot(p, S, W) {
+  if (p.shotCd > 0) return false;
+  const def = W.def, mul = bonus(S, W), base = def.n || 1, n = base + S.extraShots;
+  p.shotCd = def.cd;
+  p.aimT = 0.24;
+  p.whipAng = Math.atan2(p.ay, p.ax);
+  const h = hornTip(p), step = base > 1 ? def.spread / (base - 1) : 0.14, j = def.jitter || 0;
+  for (let i = 0; i < n; i++) {
+    const a = p.whipAng + (i - (n - 1) / 2) * step + rand(-j, j);
+    shoot({
+      x: h.x, y: h.y, vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed, r: def.r, dmg: def.dmg * mul, team: 'player', kind: def.pkind,
+      color: def.pkind === 'star' ? pick(['#ffe14a', '#ff9ad6', '#8fe8ff']) : def.glow, tip: def.col[0], homing: !!def.homing, life: def.life,
+      trail: def.pkind === 'arrow' || def.pkind === 'wind' ? null : def.pkind === 'star' ? '#fff2a8' : def.col[1],
+      pierce: def.pierce || 0, fx: def.fx, mul, chain: def.chain, boom: def.boom, cols: palOf(def), kb: def.kb,
+    });
   }
-  sfx('star');
+  sfx(SHOT_SFX[def.pkind] || 'star', def.pkind === 'bolt' ? 0.5 : 1);
   return true;
 }
 
-function fireBeam(p, S, dt) {
+// A beam that burns through everything in its path, for as long as there is energy.
+function fireBeam(p, S, dt, W) {
   if (p.energy <= 0) return false;
+  const def = W.def, mul = bonus(S, W);
   p.beaming = true;
-  p.energy = Math.max(0, p.energy - S.beamDrain * dt);
+  p.aimT = 0.1;
+  p.whipAng = Math.atan2(p.ay, p.ax);
+  p.energy = Math.max(0, p.energy - def.drain * S.drainK * dt);
   const h = hornTip(p), ox = h.x, oy = h.y;
   const len = rayLength(ox, oy, p.ax, p.ay, 560);
   p.beamLen = len;
   p.beamTick -= dt;
   if (p.beamTick <= 0) {
-    p.beamTick = 0.08;
+    p.beamTick = def.cd;
     sfx('beam');
     for (const e of targets()) {
       if (e.dead) continue;
       const ex = e.x + e.w / 2 - ox, ey = e.y + e.h / 2 - oy, along = ex * p.ax + ey * p.ay;
       if (along < 0 || along > len) continue;
       const side = Math.abs(ex * p.ay - ey * p.ax);
-      if (side < Math.max(e.w, e.h) / 2 + 10) damageEnemy(e, S.beamDmg, Math.sign(p.ax), 60);
+      if (side < Math.max(e.w, e.h) / 2 + 10) { damageEnemy(e, def.dmg * mul * S.beamK, Math.sign(p.ax), 60); afflict(e, def.fx, mul); }
     }
     const tx = Math.floor((ox + p.ax * (len + 6)) / T), ty = Math.floor((oy + p.ay * (len + 6)) / T);
     const t = tileAt(tx, ty);
     if (t === ORE || t === CRYSTAL) breakTile(tx, ty);
   }
-  if (Math.random() < 0.6) part({ x: ox + p.ax * len, y: oy + p.ay * len, vx: rand(-120, 120), vy: rand(-120, 120), life: 0.25, size: 3, color: pick(RAINBOW), add: true });
+  if (Math.random() < 0.6) part({ x: ox + p.ax * len, y: oy + p.ay * len, vx: rand(-120, 120), vy: rand(-120, 120), life: 0.25, size: 3, color: pick(palOf(def)), add: true });
+  return true;
+}
+
+// Flasks: lobbed in an arc, bursting where they land.
+function fireLob(p, S, W) {
+  if (p.shotCd > 0) return false;
+  const def = W.def, mul = bonus(S, W), h = hornTip(p), sp = 640;
+  p.shotCd = def.cd;
+  p.aimT = 0.24;
+  p.whipAng = Math.atan2(p.ay, p.ax);
+  shoot({ x: h.x, y: h.y, vx: p.ax * sp + p.vx * 0.3, vy: p.ay * sp - 230, g: 1300, r: 8, dmg: def.dmg * mul, team: 'player', kind: 'flask', color: def.glow, life: 1.4, boom: def.boom, cols: palOf(def), fx: def.fx, mul, trail: def.col[1] });
+  sfx('whip');
   return true;
 }
 
@@ -414,7 +455,7 @@ export function updateTail(p, dt) {
   const f = p.face, an = tailAnchor(p), ax = an.x, ay = an.y;
   const N = p.tail.length;
   if (p.whipT > 0) {
-    const S = stats(), u = 1 - p.whipT / WHIP_T, reach = S.reach * (p.whipFin ? 1.15 : 1);
+    const u = 1 - p.whipT / p.whipDur, reach = p.whipR;
     const sweep = (1.0 - 2.0 * u) * (p.whipSide || 1);
     for (let i = 0; i < N; i++) {
       const k = i / (N - 1), a = p.whipAng - sweep * (1 - k * 0.55);
@@ -438,9 +479,10 @@ export function updateTail(p, dt) {
     pt.x = prev.x + (dx / d) * seg;
     pt.y = prev.y + (dy / d) * seg;
   }
-  if (Math.random() < 0.2 && !(p.holy > 0.5)) {
+  const W = wield(p);
+  if (Math.random() < 0.2 && !(p.holy > 0.5) && W.def.kind === 'lash') {
     const tip = p.tail[N - 1];
-    part({ x: tip.x, y: tip.y, vx: rand(-20, 20), vy: rand(-20, 20), life: 0.6, size: rand(1.4, 2.4), color: pick(RAINBOW), add: true, shape: 'star', vr: 3 });
+    part({ x: tip.x, y: tip.y, vx: rand(-20, 20), vy: rand(-20, 20), life: 0.6, size: rand(1.4, 2.4), color: pick(palOf(W.def)), add: true, shape: 'star', vr: 3 });
   }
 }
 
@@ -548,11 +590,45 @@ function sparkle(ctx, x, y, s, a) {
   ctx.restore();
 }
 
+// The weapon this angel holds. Puppets in cutscenes (bare) always carry the Shadow Lash.
+const BARE = { def: STARTER, lv: 1, key: 'lash:1' };
+const wield = p => (p.bare ? BARE : current());
+// The angle each kind of weapon is carried at when it is not in use (0 = pointing ahead).
+const REST = { sword: -1.0, great: -1.15, dagger: -0.5, club: -0.9, hammer: -1.1, axe: -1.0, scythe: -1.25, spear: -1.3, trident: -1.3, glaive: -1.3, bow: 0.15, wand: -0.7, staff: -1.4, fan: -0.8, flask: -0.4, bolt: -0.6 };
+
 export function drawTail(ctx, p) {
-  const N = p.tail.length, pts = p.tail;
+  const N = p.tail.length, pts = p.tail, W = wield(p), RAINBOW = palOf(W.def);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   const whip = p.whipT > 0;
+  if (W.def.kind === 'lash') drawLash(ctx, p, RAINBOW, whip);
+  if (whip) {
+    const u = 1 - p.whipT / p.whipDur, cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 4;
+    const R = p.whipR, k = Math.min(1, u * 1.8), span = Math.min(2.9, (p.whipArc || 1.2) * 1.9);
+    const side = p.whipSide || 1, a0 = p.whipAng - (span / 2) * side;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (let c = 0; c < 7; c++) {
+      ctx.strokeStyle = RAINBOW[c];
+      ctx.globalAlpha = 0.75 * (1 - u * 0.8);
+      ctx.lineWidth = p.whipFin ? 5 : 4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R * (0.58 + c * 0.065), a0, a0 + span * k * side, side < 0);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#ffffff';
+    ctx.globalAlpha = 0.9 * (1 - u);
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.98, a0, a0 + span * k * side, side < 0);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+}
+
+function drawLash(ctx, p, RAINBOW, whip) {
+  const N = p.tail.length, pts = p.tail;
   const ribbons = [];
   for (let c = 0; c < RAINBOW.length; c++) {
     const line = [];
@@ -574,30 +650,6 @@ export function drawTail(ctx, p) {
   ctx.globalAlpha = 0.5;
   taper(ctx, ribbons[0].map(([x, y]) => [x, y - 0.6]), 1.1, 0.3, '#ffffff');
   ctx.globalAlpha = 1;
-
-  if (whip) {
-    const S = stats(), u = 1 - p.whipT / WHIP_T, cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 4;
-    const R = S.reach * (p.whipFin ? 1.15 : 1), k = Math.min(1, u * 1.8), span = 2.3;
-    const side = p.whipSide || 1, a0 = p.whipAng - (span / 2) * side;
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.lineCap = 'round';
-    for (let c = 0; c < 7; c++) {
-      ctx.strokeStyle = RAINBOW[c];
-      ctx.globalAlpha = 0.75 * (1 - u * 0.8);
-      ctx.lineWidth = p.whipFin ? 5 : 4;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R * (0.58 + c * 0.065), a0, a0 + span * k * side, side < 0);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = '#ffffff';
-    ctx.globalAlpha = 0.9 * (1 - u);
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R * 0.98, a0, a0 + span * k * side, side < 0);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-  }
 }
 
 // ---------- The dark angel ----------
@@ -633,7 +685,7 @@ function pose(p, t) {
   const bob = air ? 0 : run > 0.08 ? Math.abs(Math.sin(p.runPhase)) * 1.8 * run : Math.sin(t * 2.2) * 0.5;
   const lean = run * 2.5, sh = [0.5 + lean, -37 - bob];
   let hand;
-  if (p.whipT > 0) {
+  if (p.whipT > 0 || p.aimT > 0 || p.beaming) {
     const la = p.face > 0 ? p.whipAng : Math.PI - p.whipAng;
     hand = [sh[0] + Math.cos(la) * 11, sh[1] + 2 + Math.sin(la) * 11];
   } else {
@@ -1033,7 +1085,20 @@ export function drawAngel(ctx, p, t) {
   ctx.beginPath(); ctx.ellipse(0, 0.3, 5.4, 3.2, 0, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
   ctx.restore();
 
-  // the near arm, wielding the lash of shadow-fire
+  // the weapon in the near hand (a lash is drawn apart, as a ribbon of fire)
+  const W = wield(p);
+  if (W.def.kind !== 'lash' && holy < 0.5) {
+    let wa = null;
+    if (p.whipT > 0) wa = p.whipAng - (1 - 2 * (1 - p.whipT / p.whipDur)) * (p.whipSide || 1) * Math.min(1.25, p.whipArc || 1.2);
+    else if (p.aimT > 0 || p.beaming) wa = Math.atan2(p.ay, p.ax);
+    ctx.save();
+    ctx.translate(hand[0], hand[1]);
+    ctx.rotate(wa == null ? REST[W.def.shape] : f > 0 ? wa : Math.PI - wa);
+    drawArm(ctx, W.def, 1);
+    ctx.restore();
+  }
+
+  // the near arm
   const el = [(sh[0] + hand[0]) / 2 - 1.5, (sh[1] + hand[1]) / 2 + 2.5];
   limb2(ctx, [[sh[0], sh[1] + 1], el, hand], 3.9, HC.arm);
   limb2(ctx, [el, hand], 3.4, METAL[1]);
@@ -1066,7 +1131,7 @@ export function drawAngel(ctx, p, t) {
   }
   // Beam from the horn
   if (p.beaming) {
-    const h = hornTip(p), ox = h.x, oy = h.y, ex = ox + p.ax * p.beamLen, ey = oy + p.ay * p.beamLen;
+    const h = hornTip(p), ox = h.x, oy = h.y, ex = ox + p.ax * p.beamLen, ey = oy + p.ay * p.beamLen, RAINBOW = palOf(wield(p).def);
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
     for (let c = 0; c < 7; c++) {

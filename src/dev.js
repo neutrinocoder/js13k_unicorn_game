@@ -7,6 +7,7 @@ import { keys } from './input.js';
 import { sfx } from './audio.js';
 import { killEnemy, damageEnemy } from './combat.js';
 import { teleport, saveGame } from './main.js';
+import { ARMS, armById, addWeapon, arms, rarityOf } from './weapons.js';
 
 const $ = id => document.getElementById(id);
 const history = [];
@@ -107,16 +108,27 @@ const COMMANDS = {
     run() { const p = G.player; return `x ${Math.round((p.x + p.w / 2) / T)}  y ${Math.round((p.y + p.h) / T)}`; },
   },
   give: {
-    args: 'all', desc: 'every upgrade, weapon and boss power at full level, every suit of armour, plus 3 Ambrosia',
+    args: 'all', desc: 'every upgrade and boss power at full level, one of each weapon, every suit of armour, plus 3 Ambrosia',
     run() {
       for (const it of SHOP) if (!it.consumable) G.save.up[it.id] = it.max;
-      Object.assign(G.save.up, { stars: 1, beam: 1, bombs: 2, fly: 2, might: 2, swift: 2 });
+      Object.assign(G.save.up, { bombs: 2, fly: 2, might: 2, swift: 2, luck: 1, fortune: 1 });
+      for (const w of ARMS) addWeapon(w.id);
       G.save.potions = 3;
       G.save.armours = G.save.armours || {};
       for (const a of ARMOURS) G.save.armours[a.id] = 1;
       G.player.hp = stats().maxHp;
       G.player.armour = stats().armour;
-      return `all upgrades given, and all ${ARMOURS.length} suits of armour (wear one at an armourer, or with: armour <id>)`;
+      return `all upgrades and all ${ARMS.length} weapons given, and all ${ARMOURS.length} suits of armour (wear one at an armourer, or with: armour <id>)`;
+    },
+  },
+  weapon: {
+    args: '<id | list> [stars] [count]', desc: 'give a weapon, e.g. weapon fang 3 2 (two Fangs at 3 stars); weapon list shows every id',
+    run(args) {
+      const def = armById((args[0] || '').toLowerCase());
+      if (!def || def.rar < 0) return ARMS.map(w => `${w.id} (${rarityOf(w).name}, ${w.set})`).join(', ');
+      const lv = Math.min(5, Math.max(1, parseInt(args[1], 10) || 1)), n = Math.min(99, Math.max(1, parseInt(args[2], 10) || 1));
+      for (let i = 0; i < n; i++) addWeapon(def.id, lv);
+      return `${n} × ${def.name} at ${lv} star${lv > 1 ? 's' : ''}; you now carry ${Object.keys(arms().inv).length} kinds`;
     },
   },
   heal: { desc: 'restore full health', run() { G.player.hp = stats().maxHp; return 'healed'; } },

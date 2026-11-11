@@ -1,11 +1,12 @@
 // Shop catalogue and the player stats derived from upgrades.
 import { G } from './state.js';
+import { addWeapon, armById, bossLoot, rarityOf } from './weapons.js';
 
 export const SHOP = [
   { id: 'potion', name: 'Ambrosia', icon: '🍯', desc: 'Drink with H to restore 3 health. Carry up to 3.', consumable: 1, cost: () => 30 },
   { id: 'heart', name: 'Heart of Olympus', icon: '❤️', desc: '+1 maximum health.', max: 6, cost: l => 45 + l * 45 },
-  { id: 'tail', name: 'Shadowfire Lash', icon: '🔥', desc: 'Your lash and stars deal more damage.', max: 5, cost: l => 35 + l * 40 },
-  { id: 'reach', name: 'Comet Lash', icon: '☄️', desc: 'Your lash reaches 15% further.', max: 3, cost: l => 55 + l * 50 },
+  { id: 'tail', name: 'Shadowfire Edge', icon: '🔥', desc: 'Every weapon you wield deals 30% more damage.', max: 5, cost: l => 35 + l * 40 },
+  { id: 'reach', name: 'Comet Reach', icon: '☄️', desc: 'Whips and melee weapons reach 15% further.', max: 3, cost: l => 55 + l * 50 },
   { id: 'blast', name: 'Overcharged Gauntlet', icon: '💥', desc: 'Blast recharges 20% faster and hits harder.', max: 3, cost: l => 60 + l * 60 },
   { id: 'triple', name: 'Zephyr Charm', icon: '🪶', desc: 'Jump a third time in mid-air.', max: 1, cost: () => 120 },
   { id: 'wings', name: 'Night Pinions', icon: '🌑', desc: 'Hold Jump while falling to glide.', max: 1, cost: () => 180 },
@@ -14,12 +15,12 @@ export const SHOP = [
   { id: 'lantern', name: 'Halo Lantern', icon: '🏮', desc: 'Your halo lights the dark further.', max: 2, cost: l => 45 + l * 45 },
   { id: 'hooves', name: 'Bronze Greaves', icon: '🥾', desc: 'Dashing through enemies hurts them.', max: 1, cost: () => 110 },
   // Wares the shopkeepers only bring out once a great foe has fallen ("unlock" names that boss).
-  { id: 'constellation', name: 'Constellation', icon: '✨', desc: 'Starfall shoots one more star with every shot.', max: 2, unlock: 'cerberus', cost: l => 160 + l * 160 },
+  { id: 'constellation', name: 'Constellation', icon: '✨', desc: 'Ranged weapons fire one more shot every time.', max: 2, unlock: 'cerberus', cost: l => 160 + l * 160 },
   { id: 'icarus', name: 'Icarus Feathers', icon: '🦢', desc: '+50% flight energy, and it refills faster.', max: 2, unlock: 'storm', cost: l => 150 + l * 150 },
   { id: 'forge', name: "Hephaestus' Forge", icon: '🔨', desc: 'Bombs hit 30% harder and recharge faster.', max: 3, unlock: 'heretic', cost: l => 170 + l * 150 },
   { id: 'apple', name: 'Golden Apple', icon: '🍎', desc: '+1 maximum health, beyond the Hearts of Olympus.', max: 4, unlock: 'hades', cost: l => 260 + l * 180 },
   { id: 'aegis', name: 'Aegis Shield', icon: '🛡️', desc: 'Blocks one hit completely, then recharges (30s, or 18s at level 2).', max: 2, unlock: 'hades', cost: l => 380 + l * 320 },
-  { id: 'lens', name: 'Helios Lens', icon: '🔭', desc: 'Umbral Lance burns 30% hotter and drains less energy.', max: 3, unlock: 'hades', cost: l => 240 + l * 200 },
+  { id: 'lens', name: 'Helios Lens', icon: '🔭', desc: 'Beam weapons burn 30% hotter and drain less energy.', max: 3, unlock: 'hades', cost: l => 240 + l * 200 },
   { id: 'talaria', name: 'Winged Sandals', icon: '👟', desc: 'Dash recharges 30% faster and keeps you safe for longer.', max: 2, unlock: 'ares', cost: l => 320 + l * 260 },
   { id: 'ichor', name: 'Chalice of Ichor', icon: '🏆', desc: 'Heal 1 health for every 10 foes you defeat (6 at level 2).', max: 2, unlock: 'apollo', cost: l => 420 + l * 380 },
   { id: 'phoenix', name: 'Phoenix Feather', icon: '🔥', desc: 'If you fall, rise again with full health. It burns away when used.', max: 1, unlock: 'athena', cost: () => 600 },
@@ -76,21 +77,14 @@ export const armourOwned = a => !!(G.save.armours && G.save.armours[a.id]);
 // Shop items that are still locked behind a boss.
 export const shopLocked = it => !!it.unlock && !(G.save.bosses && G.save.bosses[it.unlock]);
 
-export const WEAPONS = [
-  { id: 'whip', name: 'Shadow Lash', key: '1' },
-  { id: 'blast', name: 'Recoil Blast', key: '2' },
-  { id: 'stars', name: 'Starfall', key: '3', need: 'stars' },
-  { id: 'beam', name: 'Umbral Lance', key: '4', need: 'beam' },
-  { id: 'bomb', name: 'Hellfire Bombs', key: '5', need: 'bombs' },
-];
-
-// Every boss leaves a powerup behind. The second time a power is earned it grows stronger.
+// Every boss leaves a powerup behind, and the weapon it carried (see bossLoot in weapons.js).
+// The second time a power is earned it grows stronger.
 export const REWARDS = {
-  cerberus: { up: 'stars', name: 'Starfall', icon: '⭐', text: 'A new weapon: rapid homing stars that seek out your foes. Press 3 to use it.' },
+  cerberus: { up: 'luck', name: 'Nose of the Hound', icon: '🐾', text: 'You can smell treasure: fallen foes leave weapons behind half again as often.' },
   storm: { up: 'fly', name: 'Wings of the Storm', icon: '🪽', text: 'You can fly! Hold Jump in the air to beat your wings and climb. Flying uses wing energy (the gold bar), which refills while you stand on the ground. You still cannot pass through walls.' },
-  heretic: { up: 'bombs', name: 'Hellfire Bombs', icon: '💣', text: 'A new weapon: bombs that arc through the air and burst in a huge blast that also breaks rock. Press 5 to select them, or G to throw one at any time.' },
+  heretic: { up: 'bombs', name: 'Hellfire Bombs', icon: '💣', text: 'Bombs that arc through the air and burst in a huge blast that also breaks rock. Press G to throw one at any time.' },
   titan: { up: 'might', name: "Titan's Might", icon: '💪', text: 'The strength of a giant: all of your attacks deal 25% more damage.' },
-  hades: { up: 'beam', name: 'Umbral Lance', icon: '🔆', text: 'A new weapon: a piercing laser beam that burns through everything in its path. It drains energy while you fire. Press 4 to use it.' },
+  hades: { up: 'fortune', name: 'Hoard of the Dead', icon: '👑', text: 'The riches of the underworld favour you: the weapons you find are finer, as if the danger were 4 levels higher.' },
   ares: { up: 'might', name: 'Fury of Ares', icon: '⚔️', text: 'The fury of war: all of your attacks deal another 25% more damage.' },
   apollo: { up: 'swift', name: 'Sandals of the Sun Chariot', icon: '☀️', text: 'You run 20% faster.' },
   athena: { up: 'fly', name: "Athena's Owl Wings", icon: '🦉', text: 'Your wings grow stronger: twice the flight energy, and it refills faster.' },
@@ -106,16 +100,12 @@ export function grantReward(id) {
   if (s.rewards[id]) return null;
   s.rewards[id] = 1;
   const u = s.up;
-  if ((r.up === 'stars' || r.up === 'beam') && u[r.up] > 0) {
-    // already bought in the shop in an older save: the power becomes extra strength instead
-    u.might = (u.might || 0) + 1;
-    return { ...r, text: `You already carry the ${r.name}, so its power flows into you instead: all of your attacks deal 25% more damage.` };
-  }
   u[r.up] = (u[r.up] || 0) + 1;
-  return r;
+  // the boss's own weapon goes straight into your arsenal
+  const def = armById(bossLoot(id));
+  addWeapon(def.id);
+  return { ...r, loot: `You take a weapon from the fallen: ${def.name} (${rarityOf(def).name}). Press R to open your arsenal.` };
 }
-
-export const ownsWeapon = i => !WEAPONS[i].need || G.save.up[WEAPONS[i].need] > 0;
 
 export function stats() {
   const A = worn() || {};
@@ -123,8 +113,10 @@ export function stats() {
   const ic = u.icarus || 0, fg = u.forge || 0, ln = u.lens || 0;
   return {
     maxHp: 6 + u.heart + (u.apple || 0),
-    whipDmg: (2 + u.tail * 1.5) * dm,
-    reach: 125 * (1 + 0.15 * u.reach),
+    // every weapon's damage is multiplied by this
+    wdmg: (1 + 0.3 * u.tail) * dm,
+    whipDmg: 2 * (1 + 0.3 * u.tail) * dm,
+    reachK: 1 + 0.15 * u.reach,
     blastCd: 1.1 * Math.pow(0.8, u.blast),
     blastDmg: (6 + u.blast * 3) * dm,
     speed: (1 + 0.2 * (u.swift || 0)) * (1 + (A.speed || 0)),
@@ -134,8 +126,13 @@ export function stats() {
     bombDmg: (bombs >= 2 ? 16 : 11) * dm * (1 + 0.3 * fg),
     bombR: bombs >= 2 ? 150 : 115,
     bombCd: (bombs >= 2 ? 0.45 : 0.7) * Math.pow(0.82, fg),
-    stars: 1 + (u.constellation || 0),
-    beamDrain: 42 * Math.pow(0.78, ln),
+    hasBombs: bombs > 0,
+    extraShots: u.constellation || 0,
+    beamK: 1 + 0.3 * ln,
+    drainK: Math.pow(0.78, ln),
+    // weapon drops: how often, and how many danger levels better than the land
+    luck: 1 + 0.5 * (u.luck || 0),
+    fortune: 4 * (u.fortune || 0),
     dashCd: 0.55 * Math.pow(0.7, u.talaria || 0) * (1 - (A.dash || 0)),
     dashInv: 0.25 + 0.1 * (u.talaria || 0),
     aegis: u.aegis > 0,
@@ -148,8 +145,6 @@ export function stats() {
     magnet: 80 + u.magnet * 90,
     light: 330 + u.lantern * 120,
     hooves: u.hooves > 0,
-    starDmg: (1 + u.tail * 0.4) * dm,
-    beamDmg: (1.6 + u.tail * 0.5) * dm * (1 + 0.3 * ln),
     // armour
     armour: A.pips || 0,
     armourRegen: 5 / (A.regen || 1),

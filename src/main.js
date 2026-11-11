@@ -7,13 +7,14 @@ import { initAudio, sfx, setTheme, setMuted, muted } from './audio.js';
 import { makePlayer, updatePlayer, updateBubbles } from './player.js';
 import { makeEnemy, updateEnemy } from './enemies.js';
 import { spawnBoss, updateBoss } from './bosses.js';
-import { updateProjs, updatePickups, dropGems } from './combat.js';
+import { updateProjs, updatePickups, dropGems, dropWeapon, updateAfflictions } from './combat.js';
+import { fixArsenal, rollWeapon } from './weapons.js';
 import { updateFx, part, burst, ring, floater, shake } from './fx.js';
 import { render, drawMap, mapToScreen, shrinePos } from './render.js';
 import { stats, grantReward, SHOP, ARMOURS } from './items.js';
 import { rand, clamp, mix, pick, RAINBOW } from './util.js';
 import { initDev, devOpen } from './dev.js';
-import { show, hide, isShown, toast as uiToast, openShop, closeShop, openDialog, advanceDialog } from './ui.js';
+import { show, hide, isShown, toast as uiToast, openShop, closeShop, openDialog, advanceDialog, openArsenal, closeArsenal } from './ui.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -56,6 +57,9 @@ function loadSave() {
         const l = LANDMARKS.find(x => x.id === out.spawn.id) || LANDMARKS.find(x => x.id === (out.oly ? 'oly_hub' : 'town'));
         out.spawn = l ? { x: l.x, y: l.y, id: l.id } : base.spawn;
       }
+      // saves from before weapons were found in the field get an arsenal made from what they owned
+      if (!s.arms) delete out.arms;
+      fixArsenal(out);
       return out;
     }
   } catch (e) {}
@@ -182,6 +186,7 @@ function virgilLines() {
       'West, in Gluttony, Cerberus gnaws. East, Semiramis rides the storms of Lust. Above burns Farinata in Heresy. Below, Ephialtes lies frozen in Treachery.',
       'Bring all four Seals to the Gate beside this market and the road to Hades will open. Defeat him, and the way up to Olympus will open with him.',
       'Gems spill from every fallen thing and every glittering stone. Charon will trade you anything for them. And wake the shrines you find: they remember you, and you may travel between them.',
+      'Fallen foes sometimes leave their weapons behind. Every circle has its own, and the greater the danger, the finer they are. Press R to choose the three you carry, and to merge two of a kind into a stronger one.',
       'The roads lead to the Wardens, but the caves around them hide the treasure. Your blast can even break rock. Go well, little star.',
     ];
   }
@@ -191,9 +196,11 @@ function virgilLines() {
   const left = SITES.slice(0, 4).filter(x => !s.bosses[x.id]).map(x => x.name);
   const tips = [
     'Hold Jump while falling, once you own Pegasus Wings, to glide across chasms.',
-    'Right-click fires your blast whatever weapon is selected. Blast downward to rocket upward.',
+    'Right-click fires your blast whatever weapon is in your hand. Blast downward to rocket upward.',
+    'Every circle hides five weapons of its own, from common to legendary. The legendary ones wait where the danger is greatest.',
+    'Two of the same weapon merge into one that is a star stronger. Press R to open your arsenal.',
     'Bubbles trap nearby enemies; trapped enemies take extra damage. You can bounce on them too.',
-    'Danger rises the further you travel from Limbo. So do the rewards.',
+    'Danger rises the further you travel from Limbo. So do the rewards: foes in dangerous places drop far finer weapons.',
     'Lean on a wall while falling to slide, then jump to leap away from it.',
     'Press M to open your map, and click a shrine you have woken to travel there.',
   ];
@@ -243,6 +250,8 @@ function interact(o) {
       const gems = Math.round((16 + o.level * 9) * (o.big ? 3 : 1) * rand(0.85, 1.2));
       dropGems(o.x, o.y - 20, gems);
       if (Math.random() < (o.big ? 0.8 : 0.22) && s.potions < 3) { s.potions++; floater(o.x, o.y - 50, '+1 Ambrosia', '#ffe28a', 18); }
+      // some chests hold a weapon, a little finer than the land around them
+      if (Math.random() < (o.big ? 1 : 0.3)) dropWeapon(o.x, o.y - 30, rollWeapon(biomeAt(Math.floor(o.x / T), Math.floor(o.y / T)), o.level + (o.big ? 5 : 2) + stats().fortune).id);
       burst(o.x, o.y - 20, 30, ['#ffd34a', '#fff6c4', ...RAINBOW], 320, { add: true });
       ring(o.x, o.y - 20, 80, '#ffd34a');
       sfx('chest');
@@ -347,7 +356,6 @@ function respawn() {
 
 // ---------- Bosses ----------
 // Every boss leaves a powerup. It is shown on a card once play is calm again (no map or pause open).
-const WEAPON_OF = { stars: 2, beam: 3, bombs: 4 };
 function rewardCard(id, then) {
   const r = grantReward(id);
   if (!r) { then && then(); return; }
@@ -357,7 +365,7 @@ function rewardCard(id, then) {
   // and which armour the armourers can now forge
   const arm = ARMOURS.find(a => a.boss === id);
   if (arm) lines.push(`The armourers can now forge the ${arm.icon} ${arm.name}: ${arm.pips} armour. ${arm.perk}`);
-  if (WEAPON_OF[r.up] != null && G.save.up[r.up] === 1) G.save.weapon = WEAPON_OF[r.up];
+  if (r.loot) lines.push(r.loot);
   if (r.up === 'fly' && G.player) G.player.wing = stats().flyMax;
   saveGame();
   const show = () => {
@@ -400,7 +408,7 @@ export function onBossDefeated(b) {
       $('ending-title').textContent = 'The Brightest Star';
       $('ending-text').innerHTML = `The King of the Gods falls, and his thunder rolls away into silence. The clouds part, and all of Olympus is bathed in your light.<br><br>` +
         `<b>Time:</b> ${Math.floor(st.time / 60)} min · <b>Foes defeated:</b> ${st.kills} · <b>Gems found:</b> ${st.gemsEarned.toLocaleString()} · <b>Falls:</b> ${st.deaths}<br><br>` +
-        (zr ? `<b>Powerup: ${zr.icon} ${zr.name}.</b> ${zr.text}<br><br>` : '') +
+        (zr ? `<b>Powerup: ${zr.icon} ${zr.name}.</b> ${zr.text} ${zr.loot || ''}<br><br>` : '') +
         `You have conquered the underworld and the heavens. Both are still yours to explore.`;
       $('btn-ending').textContent = 'Keep exploring';
       endingNext = null;
@@ -438,6 +446,7 @@ function update(dt) {
   for (const e of G.enemies) if (!e.dead) updateEnemy(e, dt);
   G.enemies = G.enemies.filter(e => !e.dead);
   updateBoss(dt);
+  updateAfflictions(dt);
   updateProjs(dt);
   updatePickups(dt);
   updateBubbles(dt);
@@ -625,6 +634,10 @@ function onKey(code) {
     case 'play':
       if (code === 'Escape' || code === 'KeyP') pause();
       else if (code === 'KeyM' || code === 'Tab') openMap();
+      else if (code === 'KeyR' && !G.player.dead) openArsenal(saveGame);
+      break;
+    case 'arsenal':
+      if (code === 'Escape' || code === 'KeyR') closeArsenal();
       break;
     case 'map':
       if (code === 'Escape' || code === 'KeyM' || code === 'Tab') closeMap();
@@ -694,6 +707,7 @@ canvas.addEventListener('wheel', e => {
 
 $('dialog').addEventListener('click', () => advanceDialog());
 $('shop').querySelector('[data-close]').onclick = () => closeShop();
+$('arsenal').querySelector('[data-close]').onclick = () => closeArsenal();
 let confirmNew = 0;
 $('btn-new').onclick = () => {
   initAudio();

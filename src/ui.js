@@ -1,7 +1,8 @@
 // HTML overlays: shop, dialogue, toasts and screens.
 import { G } from './state.js';
 import { SHOP, stats, shopLocked, ARMOURS, armourKnown, armourOwned } from './items.js';
-import { SITES, BIOMES } from './world.js';
+import { SITES, BIOMES, BIOME_LIST, T, levelAt, HEAVEN_LVL } from './world.js';
+import { arms, owned, slotArm, SLOTS, equip, merge, mergeAll, canMerge, countOf, armFacts, stars, rarityOf, iconUrl, ARMS, SETS, RARITY, STARTER, rarityOdds, shortName, setOf } from './weapons.js';
 import { sfx } from './audio.js';
 
 const $ = id => document.getElementById(id);
@@ -139,12 +140,116 @@ function buy(it) {
     G.save.up[it.id]++;
     if (it.id === 'heart' || it.id === 'apple') G.player.hp = stats().maxHp;
     if (it.id === 'icarus') G.player.wing = stats().flyMax;
-    if (it.id === 'stars') { G.save.weapon = 2; toast('Starfall ready — press 3.'); }
-    if (it.id === 'beam') { G.save.weapon = 3; toast('Umbral Lance ready — press 4.'); }
   }
   sfx('buy');
   renderShop();
   shopCtx.o.bought = true;
+}
+
+// ---------- Arsenal ----------
+// The weapons you have found: pick the three you carry, and merge two of a kind into a stronger one.
+let arsSlot = 0, arsClose = null;
+
+export function openArsenal(onClose) {
+  arsClose = onClose;
+  arsSlot = arms().cur;
+  G.scene = 'arsenal';
+  $('ars-mergeall').onclick = () => {
+    const n = mergeAll();
+    if (!n) return;
+    sfx('buy');
+    toast(n === 1 ? 'Merged 1 pair.' : `Merged ${n} pairs.`);
+    renderArsenal();
+  };
+  renderArsenal();
+  show('arsenal');
+  sfx('ui');
+}
+
+export function closeArsenal() {
+  hide('arsenal');
+  G.scene = 'play';
+  const cb = arsClose;
+  arsClose = null;
+  cb && cb();
+}
+
+const pct = v => (v >= 0.1 ? Math.round(v * 100) : v >= 0.01 ? Math.round(v * 1000) / 10 : Math.round(v * 10000) / 100) + '%';
+
+function renderArsenal(flash) {
+  const A = arms(), S = stats(), p = G.player;
+  // the three slots; the chosen one is where the next weapon you pick will go
+  const row = $('ars-slots');
+  row.innerHTML = '';
+  for (let i = 0; i < SLOTS; i++) {
+    const w = slotArm(i), b = document.createElement('button');
+    b.className = 'slot' + (i === arsSlot ? ' on' : '');
+    if (w) {
+      const R = rarityOf(w.def);
+      b.style.setProperty('--rc', R.col);
+      b.innerHTML = `<kbd>${i + 1}</kbd><img src="${iconUrl(w.def)}" alt=""><span><b>${shortName(w.def)}</b><small>${R.name}${w.def.rar >= 0 ? ' · ' + stars(w.lv) : ''}</small></span>`;
+    } else b.innerHTML = `<kbd>${i + 1}</kbd><i></i><span><b>Empty</b><small>Pick a weapon below</small></span>`;
+    b.onclick = () => { arsSlot = i; sfx('ui'); renderArsenal(); };
+    row.appendChild(b);
+  }
+
+  // what is likely to drop where you stand
+  const B = BIOMES[BIOME_LIST[G.biome]], base = B.heaven ? HEAVEN_LVL : levelAt(Math.round((p.x + p.w / 2) / T), Math.round((p.y + p.h / 2) / T));
+  const odds = rarityOdds(base + S.fortune), set = SETS.find(x => x.id === setOf(G.biome));
+  $('ars-odds').innerHTML = `<b>${B.name} · Danger ${base}${S.fortune ? ' +' + S.fortune : ''}</b>` +
+    RARITY.map((r, i) => `<span style="color:${r.col}">${r.name} ${pct(odds[i])}</span>`).join('') +
+    `<em>${set ? `Foes here drop the ${set.theme} weapons of ${set.name}.` : 'Weapons from all four circles wash up here.'} More danger means finer weapons.</em>`;
+
+  // everything you carry
+  const box = $('ars-items');
+  box.innerHTML = '';
+  for (const w of [{ def: STARTER, lv: 1, key: 'lash:1' }, ...owned()]) {
+    const R = rarityOf(w.def), n = countOf(w.key), at = A.slots.indexOf(w.key), found = w.def.rar >= 0;
+    const card = document.createElement('div');
+    card.className = 'item wpn' + (at >= 0 ? ' worn' : '') + (w.key === flash ? ' flash' : '');
+    card.style.setProperty('--rc', R.col);
+    card.innerHTML = `<img class="icon" src="${iconUrl(w.def)}" alt=""><span class="info"><b>${w.def.name}</b><small>${armFacts(w.def, w.lv, S.wdmg)}</small><small>${w.def.text}</small>` +
+      `<em>${R.name}${found ? ' · ' + stars(w.lv) + ' · ×' + n : ''}${at >= 0 ? ' · slot ' + (at + 1) : ''}</em></span><span class="acts"></span>`;
+    const acts = card.querySelector('.acts');
+    const eq = document.createElement('button');
+    eq.className = 'mini';
+    eq.textContent = at === arsSlot ? 'Equipped' : 'Equip';
+    eq.disabled = at === arsSlot;
+    eq.onclick = () => { equip(arsSlot, w.key); A.cur = arsSlot; sfx('ui'); renderArsenal(); };
+    acts.appendChild(eq);
+    if (found) {
+      const can = canMerge(w.key), mg = document.createElement('button');
+      mg.className = 'mini' + (can ? ' go' : '');
+      mg.textContent = w.lv >= 5 ? 'Max' : 'Merge';
+      mg.disabled = !can;
+      mg.title = w.lv >= 5 ? 'This weapon is as strong as it can be.' : 'Two of the same weapon with the same stars merge into one a star stronger (+25% damage).';
+      mg.onclick = () => {
+        const up = merge(w.key);
+        if (!up) return;
+        sfx('buy');
+        toast(`${shortName(w.def)} is now ${stars(w.lv + 1)}`);
+        renderArsenal(up);
+      };
+      acts.appendChild(mg);
+    }
+    box.appendChild(card);
+  }
+  $('ars-mergeall').disabled = !owned().some(w => canMerge(w.key));
+
+  // the codex: five sets, five rarities
+  const cx = $('ars-codex');
+  let html = '<span></span>' + RARITY.map(r => `<span class="h" style="color:${r.col}">${r.name}</span>`).join('');
+  for (const st of SETS) {
+    html += `<span class="set">${st.name}<small>${st.theme}</small></span>`;
+    for (let r = 0; r < 5; r++) {
+      const def = ARMS.find(w => w.set === st.id && w.rar === r);
+      html += A.seen[def.id]
+        ? `<span class="cell yes" style="--rc:${RARITY[r].col}" title="${def.text}"><img src="${iconUrl(def)}" alt="">${shortName(def)}</span>`
+        : `<span class="cell no" title="Not found yet. Dropped by foes in ${st.name}.">?</span>`;
+    }
+  }
+  cx.innerHTML = html;
+  $('ars-count').textContent = `${ARMS.filter(w => A.seen[w.id]).length} of ${ARMS.length} found`;
 }
 
 // ---------- Dialogue ----------

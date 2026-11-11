@@ -208,6 +208,7 @@ function angel(ctx, x, y, sc, o = {}) {
   p.runPhase += (o.run ? 0.25 : 0);
   p.inv = 0; p.dashT = o.dash ? 0.1 : 0; p.sx = 1; p.sy = 1;
   p.holy = o.holy || 0;
+  p.bare = 1;
   ctx.save();
   ctx.translate(x, y);
   if (o.rot) ctx.rotate(o.rot);
