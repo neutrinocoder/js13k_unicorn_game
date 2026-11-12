@@ -2,7 +2,7 @@
 // underworld; angels, cherubs, seraphim and ophanim guarding the heavens.
 import { G } from './state.js';
 import { BIOMES, BIOME_LIST } from './world.js';
-import { moveBody, groundAhead } from './physics.js';
+import { moveBody, groundAhead, onPlatform } from './physics.js';
 import { rand, clamp, shade, overlap, TAU } from './util.js';
 import { part, shake, HOOKS } from './fx.js';
 import { sfx } from './audio.js';
@@ -70,7 +70,7 @@ export function updateEnemy(e, dt) {
     e.x += e.vx * dt;
     return;
   }
-  const aware = d < (e.type === 'spider' ? 680 : 540) && !p.dead;
+  const aware = d < (e.type === 'spider' ? 820 : 720) && !p.dead;
   // a "!" pops up the moment a foe first spots you
   e.alertT = Math.max(0, (e.alertT || 0) - dt);
   if (aware && !e.alerted && e.state !== 'hang') { e.alerted = 1; e.alertT = 0.8; }
@@ -79,14 +79,31 @@ export function updateEnemy(e, dt) {
     if (e.hitWall || (e.ground && !groundAhead(e, e.face))) e.face *= -1;
     e.vx = e.face * speed;
   };
+  // The player is below (more than a couple of tiles): a walking foe drops through the platform
+  // it stands on, or keeps going until it walks off the nearest ledge.
+  const below = dy > 56;
+  e.dropT = Math.max(0, (e.dropT || 0) - dt);
+  const descend = speed => {
+    if (!e.ground || !below) return;
+    if (onPlatform(e)) { if (Math.abs(dx) < 280) e.dropT = 0.3; }
+    else if (Math.abs(dx) < e.w * 0.5 + 24) { if (e.hitWall) e.face *= -1; e.vx = e.face * speed; }
+  };
+  // How hard to jump to reach a player standing above: enough to clear the height, up to about 8 tiles.
+  const leapUp = () => -Math.min(1000, Math.sqrt(3600 * (50 - dy)));
+  // A gap in the floor between it and a player who is not below: leap across.
+  const gap = () => e.ground && e.cd < 0 && !below && Math.abs(dx) > 60 && !groundAhead(e, e.face);
   switch (e.type) {
     case 'imp': {
       if (aware) {
-        e.vx += (e.face * chase(e, dx, 135 + e.level * 4) - e.vx) * Math.min(1, 6 * dt);
-        if (e.ground && e.cd < 0 && (e.hitWall || (dy < -50 && Math.abs(dx) < 260) || !groundAhead(e, e.face))) { e.vy = -680; e.cd = 1.2; }
+        e.vx += (e.face * chase(e, dx, 165 + e.level * 5) - e.vx) * Math.min(1, 6 * dt);
+        descend(150);
+        // close enough to strike: a quick lunge at the player
+        if (e.ground && e.cd < 0 && Math.abs(dx) < 170 && Math.abs(dy) < 70) { e.vy = -340; e.vx = Math.sign(dx) * 520; e.cd = 0.8; }
+        else if (e.ground && e.cd < 0 && dy < -50 && Math.abs(dx) < 300) { e.vy = leapUp(); e.cd = 0.7; }
+        else if (e.ground && e.cd < 0 && (e.hitWall || gap())) { e.vy = -700; e.cd = 0.7; }
       } else wander(60);
       e.vy = Math.min(e.vy + 1800 * dt, 900);
-      moveBody(e, dt);
+      moveBody(e, dt, e.dropT > 0);
       break;
     }
     case 'spider': {
@@ -102,12 +119,15 @@ export function updateEnemy(e, dt) {
         if (e.ground) { e.state = 'hunt'; e.cd = 0.35; sfx('land', 0.4); }
       } else {
         if (aware) {
-          e.vx += (e.face * chase(e, dx, 190 + e.level * 5) - e.vx) * Math.min(1, 7 * dt);
-          if (e.ground && e.cd < 0 && Math.abs(dx) < 280 && Math.abs(dy) < 170) { e.vy = -560; e.vx = clamp(dx * 2.4, -480, 480); e.cd = 1.4; }
-          else if (e.ground && e.hitWall && e.cd < 0) { e.vy = -640; e.cd = 0.6; }
+          e.vx += (e.face * chase(e, dx, 215 + e.level * 5) - e.vx) * Math.min(1, 7 * dt);
+          descend(170);
+          // a high leap at a player on a platform above, or a pounce at one on the same level
+          if (e.ground && e.cd < 0 && dy < -60 && Math.abs(dx) < 320) { e.vy = leapUp(); e.vx = clamp(dx * 2, -420, 420); e.cd = 0.9; }
+          else if (e.ground && e.cd < 0 && Math.abs(dx) < 300 && Math.abs(dy) < 170) { e.vy = -560; e.vx = clamp(dx * 2.4, -500, 500); e.cd = 1; }
+          else if (e.ground && e.cd < 0 && (e.hitWall || gap())) { e.vy = -640; e.vx = e.face * 300; e.cd = 0.5; }
         } else wander(70);
         e.vy = Math.min(e.vy + 1800 * dt, 900);
-        moveBody(e, dt);
+        moveBody(e, dt, e.dropT > 0);
       }
       break;
     }
@@ -121,24 +141,27 @@ export function updateEnemy(e, dt) {
       } else if (e.state === 'charge') {
         e.vx = e.face * (e.type === 'angel' ? 800 : 640);
         if (Math.random() < 0.7) part({ x: cx - e.face * 20, y: e.y + e.h - 4, vx: -e.face * 80, vy: -30, life: 0.4, size: 4, color: e.accent, add: true });
-        if (e.hitWall) { e.state = 'idle'; e.cd = e.type === 'angel' ? 0.6 : 1.1; shake(6); sfx('land'); }
-        else if (e.t2 <= 0) { e.state = 'idle'; e.cd = e.type === 'angel' ? 0.5 : 0.9; }
+        if (e.hitWall) { e.state = 'idle'; e.cd = e.type === 'angel' ? 0.45 : 0.7; shake(6); sfx('land'); }
+        else if (e.t2 <= 0) { e.state = 'idle'; e.cd = e.type === 'angel' ? 0.35 : 0.5; }
       } else {
         if (aware) {
           const angel = e.type === 'angel';
-          e.vx += (e.face * chase(e, dx, angel ? 215 : 165) - e.vx) * Math.min(1, 5 * dt);
+          e.vx += (e.face * chase(e, dx, angel ? 240 : 195) - e.vx) * Math.min(1, 5 * dt);
+          descend(angel ? 200 : 160);
+          // a knight heaves itself up at a player standing above
+          if (!angel && e.ground && e.cd < 0 && dy < -80 && Math.abs(dx) < 280) { e.vy = leapUp(); e.vx = clamp(dx * 1.5, -320, 320); e.cd = 0.9; }
           if (angel && e.ground && e.cd < 0 && dy < -110 && Math.abs(dx) < 340) {
             // spread the wings and leap up at a player above
             e.vy = -1000; e.vx = clamp(dx * 1.6, -420, 420); e.cd = 1.3;
             for (let i = 0; i < 10; i++) part({ x: cx + rand(-18, 18), y: e.y + e.h - 6, vx: rand(-120, 120), vy: rand(-40, 60), life: 0.7, size: 3, color: '#ffffff', add: true });
             sfx('dash', 0.5);
           }
-          if (e.cd < 0 && Math.abs(dy) < 120 && Math.abs(dx) > 40 && Math.abs(dx) < 600) { e.state = 'wind'; e.t2 = angel ? 0.32 : 0.45; }
-          if (e.ground && e.hitWall && e.cd < 0) { e.vy = -600; e.cd = 0.6; }
+          if (e.cd < 0 && Math.abs(dy) < 120 && Math.abs(dx) > 40 && Math.abs(dx) < 640) { e.state = 'wind'; e.t2 = angel ? 0.28 : 0.36; }
+          if (e.ground && e.cd < 0 && (e.hitWall || gap())) { e.vy = -620; e.vx = e.face * 280; e.cd = 0.5; }
         } else wander(45);
       }
       e.vy = Math.min(e.vy + 1800 * dt, 900);
-      moveBody(e, dt);
+      moveBody(e, dt, e.dropT > 0 && e.state === 'idle');
       break;
     }
     case 'spitter': {
@@ -146,8 +169,8 @@ export function updateEnemy(e, dt) {
       e.vy = Math.min(e.vy + 1800 * dt, 900);
       moveBody(e, dt);
       if (aware) chase(e, dx, 0);
-      if (aware && e.cd < 0 && d < 600) {
-        e.cd = Math.max(2.2, 3.4 - e.level * 0.05);
+      if (aware && e.cd < 0 && d < 680) {
+        e.cd = Math.max(1.5, 2.6 - e.level * 0.05);
         e.t2 = 0.25;
         const tt = clamp(d / 430, 0.6, 1.3), g = 900;
         shoot({ x: cx + e.face * 10, y: e.y + 6, vx: dx / tt, vy: (dy - 0.5 * g * tt * tt) / tt, g, r: 7, dmg: e.dmg, color: e.accent, kind: 'glob', trail: e.tint });
@@ -158,7 +181,7 @@ export function updateEnemy(e, dt) {
     case 'bat':
     case 'cherub': {
       if (e.type === 'cherub' && aware && e.cd < 0 && d < 560) {
-        e.cd = rand(1.6, 2.4);
+        e.cd = rand(1.2, 1.9);
         e.t2 = 0.3;
         const a0 = Math.atan2(dy, dx);
         for (let i = -1; i <= 1; i++) {
@@ -168,10 +191,10 @@ export function updateEnemy(e, dt) {
         sfx('shoot');
       }
       if (aware) {
-        const s = 175 + e.level * 4;
+        const s = 205 + e.level * 4;
         const tx = dx + Math.sin(e.t * 2.6) * 70, ty = dy - 30 + Math.cos(e.t * 3.4) * 60, l = Math.hypot(tx, ty) || 1;
-        e.vx += ((tx / l) * s - e.vx) * 2.6 * dt;
-        e.vy += ((ty / l) * s - e.vy) * 2.6 * dt;
+        e.vx += ((tx / l) * s - e.vx) * 3.2 * dt;
+        e.vy += ((ty / l) * s - e.vy) * 3.2 * dt;
       } else {
         e.vx = Math.sin(e.t) * 40;
         e.vy = Math.cos(e.t * 1.3) * 30;
@@ -183,7 +206,7 @@ export function updateEnemy(e, dt) {
     case 'wisp':
     case 'seraph': {
       if (e.type === 'seraph' && aware && e.cd < 0 && d < 500) {
-        e.cd = rand(2.5, 3.3);
+        e.cd = rand(2, 2.7);
         e.t2 = 0.3;
         for (let i = 0; i < 9; i++) {
           const a = (i / 9) * Math.PI * 2 + e.t;
@@ -192,11 +215,11 @@ export function updateEnemy(e, dt) {
         sfx('fire');
       }
       if (aware) {
-        const s = (e.type === 'seraph' ? 120 : 80) + e.level * 2;
-        e.vx += ((dx / d) * s - e.vx) * 1.4 * dt;
-        e.vy += ((dy / d) * s - e.vy) * 1.4 * dt;
-        if (e.type === 'wisp' && e.level >= 5 && e.cd < 0 && d < 420) {
-          e.cd = 4.2;
+        const s = (e.type === 'seraph' ? 145 : 110) + e.level * 2;
+        e.vx += ((dx / d) * s - e.vx) * 1.9 * dt;
+        e.vy += ((dy / d) * s - e.vy) * 1.9 * dt;
+        if (e.type === 'wisp' && e.level >= 3 && e.cd < 0 && d < 460) {
+          e.cd = 3;
           shoot({ x: cx, y: cy, vx: (dx / d) * 180, vy: (dy / d) * 180, r: 6, dmg: 1, color: e.accent, kind: 'orb', ghost: true, life: 3 });
         }
       } else {
@@ -216,7 +239,7 @@ export function updateEnemy(e, dt) {
       e.y = e.homeY + Math.sin(e.t * 1.6) * 6;
       if (aware) chase(e, dx, 0);
       if (aware && e.cd < 0 && d < 660) {
-        e.cd = rand(1.7, 2.2);
+        e.cd = rand(1.3, 1.8);
         e.t2 = 0.25;
         const a0 = Math.atan2(dy, dx);
         for (let i = -1; i <= 1; i++) {

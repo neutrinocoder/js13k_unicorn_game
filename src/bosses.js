@@ -14,8 +14,9 @@ import * as GART from './godart.js';
 import { lightning } from './art.js';
 
 const ART = { ...BART, ...GART };
-// The gods of Olympus hit one point harder with every attack than the underworld's wardens.
-const bonus = () => (G.boss && G.boss.heaven ? 1 : 0);
+// The gods of Olympus hit one point harder with every attack than the underworld's wardens,
+// and any boss in its final fury hits one point harder still.
+const bonus = () => (G.boss ? (G.boss.heaven ? 1 : 0) + (G.boss.phase >= 3 ? 1 : 0) : 0);
 const shoot = o => shootP({ ...o, dmg: (o.dmg || 1) + bonus() });
 const hurtPlayer = (n, x) => hurtP(n + bonus(), x);
 const SIZES = {
@@ -285,8 +286,8 @@ export function updateBoss(dt) {
   const p = G.player;
   b.t += dt; b.stT -= dt; b.flash -= dt; b.hurtT -= dt; b.roarT -= dt;
   const hpK = b.hp / b.max;
-  // Every boss has three phases: enraged at 60%, final fury at 30% (the gods start enraged).
-  const newPhase = b.heaven ? (hpK < 0.4 ? 3 : 2) : hpK < 0.3 ? 3 : hpK < 0.6 ? 2 : 1;
+  // Every boss has three phases: enraged at 75%, final fury at 45% (the gods start enraged).
+  const newPhase = b.heaven ? (hpK < 0.55 ? 3 : 2) : hpK < 0.45 ? 3 : hpK < 0.75 ? 2 : 1;
   const P = b.pal;
   if (newPhase > b.phase) {
     b.phase = newPhase;
@@ -300,7 +301,8 @@ export function updateBoss(dt) {
     if (!b.hidden) radial(b, 14 + b.phase * 4, 250, Math.random(), b.accent, 'orb', { trail: b.accent });
     b.haz = 1.5;
   }
-  const fast = (b.phase >= 3 ? 0.55 : b.phase === 2 ? 0.75 : 1) * (b.heaven ? 0.85 : 1);
+  // how long it rests between attacks: less the angrier it is, and never for long
+  const fast = (b.phase >= 3 ? 0.4 : b.phase === 2 ? 0.55 : 0.75) * (b.heaven ? 0.85 : 1);
   const mid = (b.ax0 + b.ax1) / 2, dx = pcx() - cxOf(b);
   const ox = cxOf(b), oy = cyOf(b);
 

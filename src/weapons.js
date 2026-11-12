@@ -348,13 +348,15 @@ export function owned() {
 
 // ---------- Drops ----------
 // Chance of each rarity at a danger level, in percent. Values in between are blended.
+// Epic and legendary weapons are true rarities: together they are under 1% of drops, even at the
+// greatest danger. The surest way to an epic or a legendary is to take it from a boss.
 const ODDS = [
-  [1, [78, 18, 3.5, 0.45, 0.05]],
-  [4, [55, 29, 12.5, 3, 0.5]],
-  [8, [32, 32, 24, 10, 2]],
-  [12, [20, 28, 30, 17, 5]],
-  [18, [9, 21, 33, 27, 10]],
-  [30, [3, 10, 27, 38, 22]],
+  [1, [80, 17.4, 2.5, 0.08, 0.02]],
+  [4, [66, 26, 7.75, 0.2, 0.05]],
+  [8, [52, 33, 14.6, 0.32, 0.08]],
+  [12, [42, 36, 21.44, 0.44, 0.12]],
+  [18, [32, 38, 29.27, 0.55, 0.18]],
+  [30, [24, 38, 37.05, 0.7, 0.25]],
 ];
 export function rarityOdds(danger) {
   const d = Math.max(1, danger);

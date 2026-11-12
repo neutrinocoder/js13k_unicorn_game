@@ -76,17 +76,17 @@ export const BIOMES = {
 };
 
 export const SITES = [
-  { id: 'cerberus', name: 'Cerberus', title: 'The Great Worm of Gluttony', biome: 'gluttony', tx: -700, ty: 0, w: 76, h: 30, hp: 300 },
-  { id: 'storm', name: 'Semiramis', title: 'Queen of the Endless Storm', biome: 'lust', tx: 700, ty: 0, w: 76, h: 30, hp: 280 },
-  { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -700, w: 76, h: 30, hp: 325 },
-  { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 700, w: 76, h: 30, hp: 370 },
-  { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 1500 },
+  { id: 'cerberus', name: 'Cerberus', title: 'The Great Worm of Gluttony', biome: 'gluttony', tx: -700, ty: 0, w: 76, h: 30, hp: 600 },
+  { id: 'storm', name: 'Semiramis', title: 'Queen of the Endless Storm', biome: 'lust', tx: 700, ty: 0, w: 76, h: 30, hp: 560 },
+  { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -700, w: 76, h: 30, hp: 650 },
+  { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 700, w: 76, h: 30, hp: 740 },
+  { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 3000 },
   // Olympus: four gods guard the Sigils that open the way to Zeus.
-  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -760, ty: -3716, w: 76, h: 30, hp: 3500, god: 1 },
-  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 760, ty: -3716, w: 76, h: 30, hp: 3200, god: 1 },
-  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -4330, w: 76, h: 30, hp: 3450, god: 1 },
-  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -3110, w: 76, h: 30, hp: 3850, god: 1 },
-  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -4760, w: 84, h: 36, hp: 12000 },
+  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -760, ty: -3716, w: 76, h: 30, hp: 5600, god: 1 },
+  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 760, ty: -3716, w: 76, h: 30, hp: 5100, god: 1 },
+  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -4330, w: 76, h: 30, hp: 5500, god: 1 },
+  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -3110, w: 76, h: 30, hp: 6200, god: 1 },
+  { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -4760, w: 84, h: 36, hp: 20000 },
 ];
 const HS = SITES[4];
 export const GODS = SITES.slice(5, 9);
