@@ -11,8 +11,8 @@ const RAINBOW = ['#2a0b45', '#4a1580', '#7a2ad0', '#a64dff', '#d07aff', '#ff6ad5
 import { burst, part, ring, shake, floater } from './fx.js';
 import { sfx } from './audio.js';
 import { stats, worn } from './items.js';
-import { hurtPlayer, damageEnemy, shoot, breakTile, afflict, explode } from './combat.js';
-import { arms, current, slotArm, SLOTS, STARTER, palOf, drawArm, shortName, rarityOf } from './weapons.js';
+import { hurtPlayer, damageEnemy, shoot, breakTile, afflict, explode, chain } from './combat.js';
+import { arms, current, slotArm, SLOTS, HANDS, palOf, drawArm, shortName, rarityOf } from './weapons.js';
 
 export function makePlayer(x, y) {
   const p = {
@@ -223,7 +223,8 @@ export function updatePlayer(dt) {
   p.beaming = false;
   if (alt) { if (fireBlast(p, S)) p.altBuf = 0; }
   else if (atk) {
-    const fired = kind === 'shot' ? fireShot(p, S, W) : kind === 'beam' ? fireBeam(p, S, dt, W) : kind === 'lob' ? fireLob(p, S, W) : fireMelee(p, S, dir, W);
+    // with empty hands, the blast is all you have
+    const fired = kind === 'none' ? fireBlast(p, S) : kind === 'shot' ? fireShot(p, S, W) : kind === 'beam' ? fireBeam(p, S, dt, W) : kind === 'lob' ? fireLob(p, S, W) : fireMelee(p, S, dir, W);
     if (fired) p.atkBuf = 0;
   }
   if (!p.beaming) p.energy = Math.min(100, p.energy + 28 * dt);
@@ -296,6 +297,7 @@ function fireMelee(p, S, dir, W) {
     if (d < reach && (d < 34 || Math.abs(angDiff(p.whipAng, a)) < arc)) {
       damageEnemy(e, dmg, Math.sign(e.x + e.w / 2 - cx), (def.kb || 260) * (finisher ? 1.6 : 1));
       afflict(e, def.fx, mul);
+      if (def.chain) chain(e, def.chain, dmg * 0.6, def.glow);
       burst(clamp(cx + Math.cos(p.whipAng) * 40, e.x, e.x + e.w), clamp(cy + Math.sin(p.whipAng) * 40, e.y, e.y + e.h), 8, pal, 260, { add: true, g: 0 });
       if (!boomAt) boomAt = [e.x + e.w / 2, e.y + e.h / 2];
       hit = true;
@@ -590,8 +592,8 @@ function sparkle(ctx, x, y, s, a) {
   ctx.restore();
 }
 
-// The weapon this angel holds. Puppets in cutscenes (bare) always carry the Shadow Lash.
-const BARE = { def: STARTER, lv: 1, key: 'lash:1' };
+// The weapon this angel holds. Puppets in cutscenes (bare) carry nothing.
+const BARE = { def: HANDS, lv: 1, key: null };
 const wield = p => (p.bare ? BARE : current());
 // The angle each kind of weapon is carried at when it is not in use (0 = pointing ahead).
 const REST = { sword: -1.0, great: -1.15, dagger: -0.5, club: -0.9, hammer: -1.1, axe: -1.0, scythe: -1.25, spear: -1.3, trident: -1.3, glaive: -1.3, bow: 0.15, wand: -0.7, staff: -1.4, fan: -0.8, flask: -0.4, bolt: -0.6 };
@@ -1087,7 +1089,7 @@ export function drawAngel(ctx, p, t) {
 
   // the weapon in the near hand (a lash is drawn apart, as a ribbon of fire)
   const W = wield(p);
-  if (W.def.kind !== 'lash' && holy < 0.5) {
+  if (W.def.kind !== 'lash' && W.def.kind !== 'none' && holy < 0.5) {
     let wa = null;
     if (p.whipT > 0) wa = p.whipAng - (1 - 2 * (1 - p.whipT / p.whipDur)) * (p.whipSide || 1) * Math.min(1.25, p.whipArc || 1.2);
     else if (p.aimT > 0 || p.beaming) wa = Math.atan2(p.ay, p.ax);

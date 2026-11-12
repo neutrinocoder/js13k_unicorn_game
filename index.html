@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;700&family=Nunito:wght@400;600;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=8e628a9a49">
+<link rel="stylesheet" href="style.css?v=eea253d1be">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -64,30 +64,39 @@
 
   <section id="shop" class="panel hidden">
     <header>
-      <h2 id="shop-title">Charon's Emporium</h2>
+      <span class="face" id="shop-face">⚱️</span>
+      <div class="who">
+        <h2 id="shop-title">Charon's Emporium</h2>
+        <p class="shop-quote" id="shop-quote"></p>
+      </div>
       <div class="gems"><i></i><span id="shop-gems">0</span></div>
       <button class="x" data-close aria-label="Close">✕</button>
     </header>
-    <p class="shop-quote" id="shop-quote"></p>
-    <div id="shop-items" class="items"></div>
-    <p class="shop-hint">Esc or E to leave</p>
+    <div id="shop-items" class="items pbody"></div>
+    <footer>Click to buy · Esc or E to leave</footer>
   </section>
 
   <section id="arsenal" class="panel hidden">
     <header>
       <h2>Arsenal</h2>
-      <span class="ars-count" id="ars-count"></span>
-      <button class="mini go" id="ars-mergeall">Merge all pairs</button>
+      <nav class="tabs">
+        <button class="tab on" id="ars-tab-w">Weapons</button>
+        <button class="tab" id="ars-tab-c">Codex <span id="ars-count"></span></button>
+      </nav>
       <button class="x" data-close aria-label="Close">✕</button>
     </header>
-    <div id="ars-slots" class="ars-slots"></div>
-    <p class="ars-odds" id="ars-odds"></p>
-    <div class="ars-scroll">
-      <div id="ars-items" class="items"></div>
-      <h3 class="ars-h">Codex</h3>
-      <div id="ars-codex" class="codex"></div>
+    <div id="ars-main" class="ars-main">
+      <div class="ars-left">
+        <h4>In your hands</h4>
+        <div id="ars-slots" class="ars-slots"></div>
+        <div class="ars-bar"><h4>Found weapons</h4><button class="mini go" id="ars-mergeall">Merge all pairs</button></div>
+        <div id="ars-items" class="ars-grid"></div>
+        <div id="ars-odds" class="ars-odds"></div>
+      </div>
+      <aside id="ars-detail" class="ars-detail"></aside>
     </div>
-    <p class="shop-hint">Click a slot, then Equip · Merge two of a kind for +1 star · R or Esc to close</p>
+    <div id="ars-codex" class="ars-codex hidden"></div>
+    <footer>Click a weapon, then a slot to carry it · Two of a kind merge into one a star stronger · R or Esc to close</footer>
   </section>
 
   <section id="dialog" class="hidden">
@@ -95,7 +104,7 @@
     <div class="body">
       <h3 id="dlg-name"></h3>
       <p id="dlg-text"></p>
-      <span class="hint">E or click to continue</span>
+      <span class="hint"><b id="dlg-count"></b>E or click to continue <i>▸</i></span>
     </div>
   </section>
 
@@ -103,6 +112,7 @@
     <div class="card">
       <h2>Paused</h2>
       <button class="btn primary" id="btn-resume">Resume</button>
+      <button class="btn" id="btn-pause-weapons">Weapons</button>
       <button class="btn" id="btn-pause-map">Map</button>
       <button class="btn" id="btn-pause-controls">Controls</button>
       <button class="btn" id="btn-mute">Sound: On</button>
@@ -134,8 +144,8 @@
   <div id="toast"></div>
 </div>
 <!-- STAMP:BEGIN written by stamp.py, do not edit by hand -->
-<script type="importmap">{"imports":{"./src/art.js":"./src/art.js?v=6998483fa5","./src/audio.js":"./src/audio.js?v=a191133e0d","./src/bossart.js":"./src/bossart.js?v=d023a8f7e1","./src/bosses.js":"./src/bosses.js?v=e4be6df798","./src/caves.js":"./src/caves.js?v=c6e33d333e","./src/combat.js":"./src/combat.js?v=ea02dcb268","./src/cutscene.js":"./src/cutscene.js?v=c2bb3f3d35","./src/dev.js":"./src/dev.js?v=7ab07ac386","./src/enemies.js":"./src/enemies.js?v=4f4a219f03","./src/fx.js":"./src/fx.js?v=a9a88e34cb","./src/god_apollo_athena.js":"./src/god_apollo_athena.js?v=7acd8f07d6","./src/god_ares_poseidon.js":"./src/god_ares_poseidon.js?v=11dbe23fae","./src/god_zeus.js":"./src/god_zeus.js?v=7e4b8854b6","./src/godart.js":"./src/godart.js?v=b0789e7da2","./src/heaven_enemies.js":"./src/heaven_enemies.js?v=e3191f08b4","./src/hell_enemies.js":"./src/hell_enemies.js?v=b36a072ee6","./src/input.js":"./src/input.js?v=bb4517417a","./src/items.js":"./src/items.js?v=b61c735625","./src/main.js":"./src/main.js?v=dc70f7bebd","./src/physics.js":"./src/physics.js?v=c36b65154f","./src/player.js":"./src/player.js?v=6ee27dfdc1","./src/render.js":"./src/render.js?v=01a5edbaca","./src/state.js":"./src/state.js?v=a75da6c024","./src/ui.js":"./src/ui.js?v=d7c00f0216","./src/util.js":"./src/util.js?v=c83de0e750","./src/weapons.js":"./src/weapons.js?v=f34cee3d50","./src/world.js":"./src/world.js?v=5dfb6ff84e"}}</script>
-<script type="module" src="./src/main.js?v=dc70f7bebd"></script>
+<script type="importmap">{"imports":{"./src/art.js":"./src/art.js?v=6998483fa5","./src/audio.js":"./src/audio.js?v=a191133e0d","./src/bossart.js":"./src/bossart.js?v=d023a8f7e1","./src/bosses.js":"./src/bosses.js?v=e4be6df798","./src/caves.js":"./src/caves.js?v=c6e33d333e","./src/combat.js":"./src/combat.js?v=7c4a20c5fc","./src/cutscene.js":"./src/cutscene.js?v=c2bb3f3d35","./src/dev.js":"./src/dev.js?v=7ab07ac386","./src/enemies.js":"./src/enemies.js?v=4b42a94b1d","./src/fx.js":"./src/fx.js?v=a9a88e34cb","./src/god_apollo_athena.js":"./src/god_apollo_athena.js?v=7acd8f07d6","./src/god_ares_poseidon.js":"./src/god_ares_poseidon.js?v=11dbe23fae","./src/god_zeus.js":"./src/god_zeus.js?v=7e4b8854b6","./src/godart.js":"./src/godart.js?v=b0789e7da2","./src/heaven_enemies.js":"./src/heaven_enemies.js?v=e3191f08b4","./src/hell_enemies.js":"./src/hell_enemies.js?v=b36a072ee6","./src/input.js":"./src/input.js?v=bb4517417a","./src/items.js":"./src/items.js?v=b61c735625","./src/main.js":"./src/main.js?v=8ca5d30a87","./src/physics.js":"./src/physics.js?v=c36b65154f","./src/player.js":"./src/player.js?v=770de17b37","./src/render.js":"./src/render.js?v=c40a0b1802","./src/state.js":"./src/state.js?v=52528ef161","./src/ui.js":"./src/ui.js?v=c65288cba9","./src/util.js":"./src/util.js?v=c83de0e750","./src/weapons.js":"./src/weapons.js?v=5e571964a4","./src/world.js":"./src/world.js?v=4ca83c9d0c"}}</script>
+<script type="module" src="./src/main.js?v=8ca5d30a87"></script>
 <!-- STAMP:END -->
 <script>
 // If the game's code fails to load, say so instead of leaving buttons that do nothing.

@@ -27,7 +27,8 @@ export const ETYPES = {
 };
 
 export function makeEnemy(type, x, y, level, biome, hang = false) {
-  const d = ETYPES[type], B = BIOMES[BIOME_LIST[biome]], m = 1 + (type === 'spider' ? 0.45 : 0.3) * (level - 1);
+  // foes grow tougher with danger, and a quarter faster in the underworld than in heaven
+  const d = ETYPES[type], B = BIOMES[BIOME_LIST[biome]], m = 1 + (type === 'spider' ? 0.45 : 0.3) * (B.heaven ? 1 : 1.25) * (level - 1);
   const e = {
     type, x: x - d.w / 2, y: y - d.h, w: d.w, h: d.h, vx: 0, vy: 0, hp: d.hp * m, max: d.hp * m,
     dmg: d.dmg + Math.floor((level - 1) / (type === 'spider' ? 4 : 7)), level, gem: d.gem, fly: d.fly, ghost: d.ghost,

@@ -51,7 +51,7 @@ export function newSave() {
     explored: {},
     mods: {},
     // weapons found ("id:stars" -> how many), the three you carry, and which is in your hand
-    arms: { inv: {}, slots: ['lash:1', null, null], cur: 0, seen: {}, dry: 9, leech: 0 },
+    arms: { v: 2, inv: {}, slots: [null, null, null], cur: 0, seen: {}, dry: 0, leech: 0 },
     talked: 0,
     won: 0,
     stats: { kills: 0, time: 0, deaths: 0, gemsEarned: 0 },

@@ -8,7 +8,7 @@ import { stats, worn } from './items.js';
 import { lightning } from './art.js';
 import { bossDefeated } from './bosses.js';
 import { onPlayerDeath, toast } from './main.js';
-import { arms, armById, rarityOf, shortName, addWeapon, canMerge, current, rollWeapon, dropChance, weaponIcon } from './weapons.js';
+import { arms, armById, rarityOf, shortName, addWeapon, canMerge, current, rollWeapon, dropChance, weaponIcon, hasWeapons } from './weapons.js';
 
 const fmt = n => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10).toString();
 
@@ -162,11 +162,11 @@ export function killEnemy(e) {
   }
   if (Math.random() < 0.16) G.pickups.push({ kind: 'heart', x: cx, y: cy, vx: rand(-80, 80), vy: -300, t: 0 });
   // Sometimes a weapon is left behind. The more dangerous the land, the finer it is likely to be.
-  // A long run of bad luck always ends in a drop.
+  // A long run of bad luck always ends in a drop, and so does a kill made with empty hands.
   const A = arms();
   if (!e.summoned) {
     A.dry = (A.dry || 0) + 1;
-    if (Math.random() < dropChance(e) * S.luck || A.dry >= 12) {
+    if (Math.random() < dropChance(e) * S.luck || A.dry >= 12 || !hasWeapons()) {
       A.dry = 0;
       dropWeapon(cx, cy, rollWeapon(e.biome, e.level + S.fortune).id);
     }

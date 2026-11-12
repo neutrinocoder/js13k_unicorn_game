@@ -186,7 +186,8 @@ function virgilLines() {
       'West, in Gluttony, Cerberus gnaws. East, Semiramis rides the storms of Lust. Above burns Farinata in Heresy. Below, Ephialtes lies frozen in Treachery.',
       'Bring all four Seals to the Gate beside this market and the road to Hades will open. Defeat him, and the way up to Olympus will open with him.',
       'Gems spill from every fallen thing and every glittering stone. Charon will trade you anything for them. And wake the shrines you find: they remember you, and you may travel between them.',
-      'Fallen foes sometimes leave their weapons behind. Every circle has its own, and the greater the danger, the finer they are. Press R to choose the three you carry, and to merge two of a kind into a stronger one.',
+      'You fell with nothing in your hands but the fire in your fist: click, and it will blast whatever stands before you. The first foe you fell will leave you a weapon.',
+      'Every circle has weapons of its own, and the greater the danger, the finer they are. Press R to choose the three you carry, and to merge two of a kind into a stronger one.',
       'The roads lead to the Wardens, but the caves around them hide the treasure. Your blast can even break rock. Go well, little star.',
     ];
   }
@@ -198,6 +199,7 @@ function virgilLines() {
     'Hold Jump while falling, once you own Pegasus Wings, to glide across chasms.',
     'Right-click fires your blast whatever weapon is in your hand. Blast downward to rocket upward.',
     'Every circle hides five weapons of its own, from common to legendary. The legendary ones wait where the danger is greatest.',
+    'They say the weapons of heaven put ours to shame: the plainest sword up there is a match for a rare one down here.',
     'Two of the same weapon merge into one that is a star stronger. Press R to open your arsenal.',
     'Bubbles trap nearby enemies; trapped enemies take extra damage. You can bounce on them too.',
     'Danger rises the further you travel from Limbo. So do the rewards: foes in dangerous places drop far finer weapons.',
@@ -744,6 +746,7 @@ $('btn-pause-controls').onclick = openControls;
 document.querySelectorAll('#controls [data-close]').forEach(b => (b.onclick = () => hide('controls')));
 $('btn-resume').onclick = resume;
 $('btn-pause-map').onclick = () => { hide('pause'); openMap(); };
+$('btn-pause-weapons').onclick = () => { hide('pause'); openArsenal(saveGame); };
 $('btn-mute').onclick = () => { setMuted(!muted); $('btn-mute').textContent = 'Sound: ' + (muted ? 'Off' : 'On'); };
 $('btn-mute').textContent = 'Sound: ' + (muted ? 'Off' : 'On');
 $('btn-quit').onclick = () => {

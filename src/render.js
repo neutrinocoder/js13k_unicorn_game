@@ -21,7 +21,7 @@ import { drawAngel, drawBubbles, hornTip } from './player.js';
 import { drawEnemy } from './enemies.js';
 import { drawBoss, drawBossBar } from './bosses.js';
 import { stats, worn, ARMOURS, armourKnown } from './items.js';
-import { arms, slotArm, SLOTS, current, rarityOf, armById, weaponIcon, palOf } from './weapons.js';
+import { arms, slotArm, SLOTS, current, rarityOf, armById, weaponIcon, palOf, hasWeapons } from './weapons.js';
 import { devLabel } from './dev.js';
 import { objective, sealCount, sigilCount, interactLabel } from './main.js';
 import { lightning, EMIT, drawEmissive } from './art.js';
@@ -1126,6 +1126,8 @@ function drawHUD(ctx) {
   ctx.font = '700 11px Nunito, sans-serif';
   ctx.textAlign = 'left';
   hudTextSmall(ctx, 'R — weapons', 26, by + 66, 'rgba(255,255,255,.55)');
+  // nothing in your hands yet: say how to fight and how to find a weapon
+  if (!hasWeapons()) { ctx.font = '800 13px Nunito, sans-serif'; hudTextSmall(ctx, 'Empty hands: click to blast. Defeat a foe to find a weapon.', 26, by - 12, '#ffe9b0'); }
   const NBOX = SLOTS + extra.length, beam = held.def.kind === 'beam';
   // bubble charge
   const bx = 24 + NBOX * 58 + 36, byc = by + 25, k = clamp(p.charge / S.bubbleT, 0, 1);
