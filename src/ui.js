@@ -186,7 +186,7 @@ export function openArsenal(onClose) {
   $('ars-mergeall').onclick = () => {
     const n = mergeAll();
     if (!n) return;
-    sfx('buy');
+    sfx('merge');
     toast(n === 1 ? 'Merged 1 pair.' : `Merged ${n} pairs.`);
     if (!countOf(arsSel || '')) { const best = owned()[0]; arsSel = best ? best.key : null; }
     renderArsenal();
@@ -295,7 +295,7 @@ function renderDetail(A, S, flash) {
     b.className = 'mini' + (at === i ? ' on' : '');
     b.textContent = i + 1;
     b.title = at === i ? 'It is in this slot' : 'Put it in slot ' + (i + 1);
-    b.onclick = () => { equip(i, w.key); A.cur = i; sfx('ui'); renderArsenal(); };
+    b.onclick = () => { equip(i, w.key); A.cur = i; sfx('equip'); renderArsenal(); };
     eq.appendChild(b);
   }
   const mg = el.querySelector('.merge'), can = canMerge(w.key);
@@ -307,7 +307,7 @@ function renderDetail(A, S, flash) {
   mg.onclick = () => {
     const up = merge(w.key);
     if (!up) return;
-    sfx('buy');
+    sfx('merge');
     arsSel = up;
     renderArsenal(up);
   };

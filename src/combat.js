@@ -571,7 +571,7 @@ export function updatePickups(dt) {
         else { G.save.gems += 5; sfx('gem'); floater(g.x, g.y - 10, '+5', '#ff6fb5', 13); }
       } else if (g.kind === 'weapon') {
         const def = armById(g.wid), R = rarityOf(def), got = addWeapon(def.id);
-        sfx(def.rar >= 2 ? 'chest' : 'buy');
+        sfx('loot', def.rar);
         floater(g.x, g.y - 26, shortName(def), R.col, def.rar >= 3 ? 22 : 17);
         ring(g.x, g.y, 50 + def.rar * 14, R.col, 0.4, 5);
         burst(g.x, g.y, 10 + def.rar * 6, [R.col, '#ffffff'], 220, { add: true, g: -40 });

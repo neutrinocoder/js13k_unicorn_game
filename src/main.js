@@ -3,7 +3,7 @@ import { G, SAVE_KEY, newSave } from './state.js';
 import { T, CS, CPX, getChunk, biomeAt, BIOMES, BIOME_LIST, SITES, LANDMARKS, GODS, ZS, OLY } from './world.js';
 import { playCutscene, cutsceneKey, drawCutscene } from './cutscene.js';
 import { initInput, endFrame, tapped, held, mouse, keys } from './input.js';
-import { initAudio, sfx, setTheme, setMuted, muted } from './audio.js';
+import { initAudio, sfx, setTheme, setMuted, muted, setHeat } from './audio.js';
 import { makePlayer, updatePlayer, updateBubbles } from './player.js';
 import { makeEnemy, updateEnemy } from './enemies.js';
 import { spawnBoss, updateBoss } from './bosses.js';
@@ -439,7 +439,7 @@ export function onBossDefeated(b) {
 }
 
 // ---------- Update ----------
-let spawnT = 0, exploreT = 0, saveT = 0, ambT = 0, lastBiome = -1, lastBiomeT = 0;
+let spawnT = 0, exploreT = 0, saveT = 0, ambT = 0, lastBiome = -1, lastBiomeT = 0, heatT = 0;
 
 function update(dt) {
   const p = G.player;
@@ -449,6 +449,14 @@ function update(dt) {
   G.enemies = G.enemies.filter(e => !e.dead);
   updateBoss(dt);
   updateAfflictions(dt);
+  // the music plays harder while foes are hunting you, and hardest against a boss
+  heatT -= dt;
+  if (heatT < 0) {
+    heatT = 0.4;
+    let hunting = 0;
+    for (const e of G.enemies) if (!e.dead && e.alerted) hunting++;
+    setHeat(G.boss && !G.boss.dead ? 1 : hunting / 3);
+  }
   updateProjs(dt);
   updatePickups(dt);
   updateBubbles(dt);

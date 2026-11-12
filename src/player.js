@@ -269,6 +269,9 @@ function targets() {
 // The wielder's bonus to a weapon's damage: shop upgrades, boss powers, armour and the weapon's stars.
 const bonus = (S, W) => S.wdmg * (1 + 0.25 * (W.lv - 1));
 
+// The sound of each kind of melee weapon, and how light it sounds (lower for the heavy ones).
+const SWING_SFX = { lash: ['whip', 1], dagger: ['stab', 1.25], spear: ['stab', 1], trident: ['stab', 0.85], club: ['heavy', 1], hammer: ['heavy', 1], sword: ['swing', 1], great: ['swing', 0.7], axe: ['swing', 0.8], scythe: ['swing', 0.75], glaive: ['swing', 0.85] };
+
 // Whips, swords, axes, spears and the rest: a swing through an arc in front of you.
 function fireMelee(p, S, dir, W) {
   if (p.whipCd > 0) return false;
@@ -282,7 +285,8 @@ function fireMelee(p, S, dir, W) {
   p.whipAng = Math.atan2(p.ay, p.ax);
   p.whipSide = (p.combo % 2 ? -1 : 1) * (p.ax < 0 ? -1 : 1);
   p.whipFin = finisher;
-  sfx('whip');
+  const snd = SWING_SFX[def.shape] || SWING_SFX.lash;
+  sfx(snd[0], snd[1] * (finisher ? 0.85 : 1));
   if (p.ground && !dir) p.vx += p.ax * 110;
   const cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 4;
   const reach = def.reach * S.reachK * (finisher ? 1.15 : 1), arc = def.arc || 1.2, dmg = def.dmg * mul * (finisher ? 1.6 : 1);
@@ -343,7 +347,7 @@ function fireBlast(p, S) {
   return true;
 }
 
-const SHOT_SFX = { star: 'star', bolt: 'bolt', fire: 'shoot', shard: 'star', arrow: 'whip', wind: 'whip' };
+const SHOT_SFX = { star: 'star', bolt: 'zap', fire: 'flame', shard: 'ice', arrow: 'bow', wind: 'wind', orb: 'soul' };
 
 // Bows, wands, staffs and fans: one or more shots toward your aim.
 function fireShot(p, S, W) {
@@ -362,7 +366,7 @@ function fireShot(p, S, W) {
       pierce: def.pierce || 0, fx: def.fx, mul, chain: def.chain, boom: def.boom, cols: palOf(def), kb: def.kb,
     });
   }
-  sfx(SHOT_SFX[def.pkind] || 'star', def.pkind === 'bolt' ? 0.5 : 1);
+  sfx(SHOT_SFX[def.pkind] || 'star');
   return true;
 }
 
@@ -404,7 +408,7 @@ function fireLob(p, S, W) {
   p.aimT = 0.24;
   p.whipAng = Math.atan2(p.ay, p.ax);
   shoot({ x: h.x, y: h.y, vx: p.ax * sp + p.vx * 0.3, vy: p.ay * sp - 230, g: 1300, r: 8, dmg: def.dmg * mul, team: 'player', kind: 'flask', color: def.glow, life: 1.4, boom: def.boom, cols: palOf(def), fx: def.fx, mul, trail: def.col[1] });
-  sfx('whip');
+  sfx('lob');
   return true;
 }
 
@@ -414,7 +418,7 @@ function fireBomb(p, S) {
   p.bombCd = S.bombCd;
   const h = hornTip(p), sp = 660;
   shoot({ x: h.x, y: h.y, vx: p.ax * sp + p.vx * 0.3, vy: p.ay * sp - 240, g: 1300, r: 9, dmg: S.bombDmg, team: 'player', kind: 'bomb', color: '#ffb347', life: 1.3, radius: S.bombR, trail: ['#ffb347', '#ffe36b'] });
-  sfx('whip');
+  sfx('lob');
   return true;
 }
 
