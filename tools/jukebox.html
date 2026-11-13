@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Angel Ascent jukebox</title>
+<style>
+@font-face { font-family: 'Cinzel'; font-weight: 400 900; src: url(../fonts/cinzel.woff2) format('woff2'); }
+@font-face { font-family: 'Nunito'; font-weight: 200 1000; src: url(../fonts/nunito.woff2) format('woff2'); }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; padding: 28px 20px 40px; color: #f3e7ff; font-family: Nunito, system-ui, sans-serif; background: radial-gradient(120% 70% at 50% 0%, #3a2466, #0d0719 62%) fixed #0d0719; }
+main { max-width: 860px; margin: 0 auto; }
+h1 { margin: 0 0 4px; font: 700 34px Cinzel, serif; color: #ffe9b0; }
+p { margin: 0 0 16px; color: #b8a8d8; line-height: 1.5; }
+h2 { margin: 26px 0 10px; font: 900 12px Nunito, sans-serif; letter-spacing: 0.18em; text-transform: uppercase; color: #ffd34a; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.tune { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14); background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)); transition: transform 0.1s, border-color 0.1s; }
+.tune:hover { transform: translateY(-2px); border-color: rgba(255, 211, 74, 0.7); }
+.tune i { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; font-style: normal; font-size: 16px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.2); }
+.tune b { display: block; font-size: 16px; }
+.tune small { color: #b8a8d8; font-size: 12.5px; }
+.tune.on { border-color: #ffe14a; background: linear-gradient(180deg, rgba(255, 225, 74, 0.2), rgba(255, 225, 74, 0.05)); box-shadow: 0 0 22px rgba(255, 225, 74, 0.2); }
+.tune.on i { background: linear-gradient(180deg, #ffe58a, #f0b23a); color: #2a1408; border-color: #fff3c0; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); }
+.bar button { font-weight: 800; padding: 9px 18px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08); }
+.bar button:hover { border-color: #ffe14a; }
+.bar label { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+#now { flex: 1; min-width: 180px; font-weight: 800; color: #ffe9b0; }
+input[type=range] { width: 170px; accent-color: #ffd34a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Angel Ascent jukebox</h1>
+  <p>Every tune in the game, played by the game's own music engine. Each one builds up as it goes: bass after two bars, arpeggio and drums after four, and the melody after eight, so give a tune twenty seconds or so. A new tune starts at the next bar line.</p>
+  <div class="bar">
+    <span id="now">Pick a tune</span>
+    <label>Calm <input type="range" id="heat" min="0" max="1" step="0.05" value="0"> In a fight</label>
+    <button id="stop">Stop</button>
+  </div>
+  <div id="lists"></div>
+</main>
+<script type="module">
+import { initAudio, setTheme, setHeat, hush } from '../src/audio.js';
+
+const GROUPS = [
+  ['The story', [
+    ['title', 'Title screen', 'Wistful: flute over harp'],
+    ['prelude', 'Prelude: Olympus', 'The opening, when all is well'],
+    ['fall', 'The fall', 'Cast down: slow, with a choir'],
+    ['victory', 'Victory', 'After Hades and Zeus fall'],
+  ]],
+  ['The underworld', [
+    ['limbo', 'Limbo', 'The first circle: bells'],
+    ['lust', 'Lust', 'Endless storms: a swirling harp'],
+    ['gluttony', 'Gluttony', 'Ceaseless rain: low brass, lurching'],
+    ['heresy', 'Heresy', 'Burning tombs: brass over a gallop'],
+    ['treachery', 'Treachery', 'The frozen lake: sparse bells'],
+    ['abyss', 'The Throne of Hades', 'Organ and war drums'],
+  ]],
+  ['Heaven', [
+    ['olympus', 'The White Citadel', 'A horn melody with a march'],
+    ['gold', 'The Golden Fields', 'Bright and dancing'],
+    ['silver', 'The Silver Peaks', 'Martial: brass and organ'],
+    ['mist', 'The Cloudlands', 'Floating: flute over glass'],
+    ['zeus', 'The Summit of Olympus', 'The fastest: organ and choir'],
+  ]],
+  ['Battle', [
+    ['boss', 'Boss fight', 'Every Warden and god'],
+  ]],
+];
+
+const lists = document.getElementById('lists'), now = document.getElementById('now');
+let playing = null;
+function play(id, name, btn) {
+  initAudio();
+  hush(false);
+  setTheme(id);
+  // the boss tune is always at full heat in the game
+  if (id === 'boss') { document.getElementById('heat').value = 1; setHeat(1); }
+  playing = id;
+  now.textContent = 'Playing: ' + name;
+  for (const b of document.querySelectorAll('.tune')) { b.classList.toggle('on', b === btn); b.querySelector('i').textContent = b === btn ? '♪' : '▶'; }
+}
+for (const [title, tunes] of GROUPS) {
+  const h = document.createElement('h2');
+  h.textContent = title;
+  lists.appendChild(h);
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  for (const [id, name, note] of tunes) {
+    const b = document.createElement('button');
+    b.className = 'tune';
+    b.innerHTML = `<i>▶</i><span><b>${name}</b><small>${note}</small></span>`;
+    b.onclick = () => play(id, name, b);
+    grid.appendChild(b);
+  }
+  lists.appendChild(grid);
+}
+document.getElementById('heat').oninput = e => setHeat(+e.target.value);
+document.getElementById('stop').onclick = () => {
+  hush(true);
+  playing = null;
+  now.textContent = 'Stopped';
+  for (const b of document.querySelectorAll('.tune')) { b.classList.remove('on'); b.querySelector('i').textContent = '▶'; }
+};
+</script>
+</body>
+</html>
