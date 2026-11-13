@@ -317,6 +317,8 @@ export function teleport(x, y) {
   p.y = y - p.h;
   p.vx = p.vy = 0;
   for (const t of p.tail) { t.x = t.px = p.x; t.y = t.py = p.y + 10; }
+  // every foe goes back to its post: free the spawn point, or it would think its foe still lives and never make another
+  for (const e of G.enemies) if (e.spawn) e.spawn.ent = null;
   G.enemies.length = 0;
   G.projs.length = 0;
   G.pickups.length = 0;
@@ -355,7 +357,6 @@ function rise() {
   G.boss = null;
   G.effects.length = 0;
   G.projs.length = 0;
-  G.enemies = G.enemies.filter(e => !e.summoned);
   teleport(sp.x, sp.y - 6);
   p.dead = false;
   p.hp = stats().maxHp; p.armour = stats().armour;
