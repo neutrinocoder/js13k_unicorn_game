@@ -1,4 +1,5 @@
 // Keyboard and mouse state. Keys are tracked by KeyboardEvent.code.
+import { G } from './state.js';
 export const keys = Object.create(null);
 export const pressed = Object.create(null);
 export const mouse = { x: 0, y: 0, down: false, pressed: false, rdown: false, rpressed: false, wheel: 0, inside: false, used: false };
@@ -8,7 +9,8 @@ const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRig
 export function initInput(canvas, onKey) {
   addEventListener('keydown', e => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-    if (PREVENT.has(e.code) && e.target === document.body) e.preventDefault();
+    // keep the arrow keys, Space and Tab from scrolling or moving focus on the page around the game
+    if (PREVENT.has(e.code) && !(e.target && e.target.tagName === 'BUTTON' && e.code === 'Space')) e.preventDefault();
     if (e.repeat) return;
     keys[e.code] = true;
     pressed[e.code] = true;
@@ -24,12 +26,15 @@ export function initInput(canvas, onKey) {
     mouse.x = e.clientX - r.left;
     mouse.y = e.clientY - r.top;
   };
-  canvas.addEventListener('pointermove', e => { pos(e); mouse.inside = true; mouse.used = true; });
+  // a finger is not a mouse: touches are handled by the on-screen controls (touch.js)
+  canvas.addEventListener('pointermove', e => { if (e.pointerType === 'touch') return; pos(e); mouse.inside = true; mouse.used = true; });
+  canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
   canvas.addEventListener('pointerleave', () => { mouse.inside = false; });
   // Clicks are read from the whole window (not just the canvas), and from both pointer and
   // mouse events, so a click counts whatever keys are held and whatever is drawn on top.
   const onGame = t => t === canvas || t === document.body || t === document.documentElement || (t && t.id === 'ui');
   const down = e => {
+    if (e.pointerType === 'touch' || (G.touch && e.type === 'mousedown')) return;
     if (!onGame(e.target)) return;
     pos(e);
     mouse.inside = true;

@@ -109,7 +109,12 @@ export function render(ctx) {
   vg.addColorStop(1, 'rgba(0,0,0,.55)');
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, H);
-  if (G.scene !== 'title') drawHUD(ctx);
+  if (G.scene !== 'title') {
+    // on a small screen the HUD is drawn smaller, as if the screen were larger
+    const k = G.hud, W0 = G.W, H0 = G.H;
+    if (k < 1) { ctx.save(); ctx.scale(k, k); G.W = W0 / k; G.H = H0 / k; }
+    try { drawHUD(ctx); } finally { if (k < 1) { G.W = W0; G.H = H0; ctx.restore(); } }
+  }
   if (G.fade > 0) {
     ctx.fillStyle = `rgba(0,0,0,${Math.min(1, G.fade)})`;
     ctx.fillRect(0, 0, W, H);
@@ -973,7 +978,7 @@ function drawPrompt(ctx) {
   ctx.fill();
   ctx.fillStyle = '#1a1020';
   ctx.textAlign = 'center';
-  ctx.fillText('E', n.x - w / 2 + 16, y + 1);
+  ctx.fillText(G.touch ? '☝' : 'E', n.x - w / 2 + 16, y + 1);
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'left';
   ctx.fillText(text, n.x - w / 2 + 32, y + 1);
@@ -1058,7 +1063,7 @@ function drawHUD(ctx) {
   ctx.fillRect(-4, -11, 8, 5);
   ctx.restore();
   ctx.font = '800 16px Nunito, sans-serif';
-  hudText(ctx, '×' + save.potions + '  (H)', 46, 105);
+  hudText(ctx, '×' + save.potions + (G.touch ? '' : '  (H)'), 46, 105);
   // seals
   (save.bosses.hades ? GODS : SITES.slice(0, 4)).forEach((s, i) => {
     const x = 34 + i * 24, y = 132;
@@ -1098,8 +1103,8 @@ function drawHUD(ctx) {
     ctx.textAlign = 'left';
     ctx.fillText(String(i + 1), x + 5, by + 14);
   }
-  const extra = [['blast', 'RMB', p.blastCd / S.blastCd]];
-  if (S.hasBombs) extra.push(['bomb', 'G', p.bombCd / S.bombCd]);
+  const extra = [['blast', G.touch ? '' : 'RMB', p.blastCd / S.blastCd]];
+  if (S.hasBombs) extra.push(['bomb', G.touch ? '' : 'G', p.bombCd / S.bombCd]);
   extra.forEach(([id, key, cd], i) => {
     const x = 24 + (SLOTS + i) * 58 + 8;
     ctx.fillStyle = 'rgba(10,6,20,.6)';
@@ -1125,9 +1130,9 @@ function drawHUD(ctx) {
   });
   ctx.font = '700 11px Nunito, sans-serif';
   ctx.textAlign = 'left';
-  hudTextSmall(ctx, 'R — weapons', 26, by + 66, 'rgba(255,255,255,.55)');
+  if (!G.touch) hudTextSmall(ctx, 'R — weapons', 26, by + 66, 'rgba(255,255,255,.55)');
   // nothing in your hands yet: say how to fight and how to find a weapon
-  if (!hasWeapons()) { ctx.font = '800 13px Nunito, sans-serif'; hudTextSmall(ctx, 'Empty hands: click to blast. Defeat a foe to find a weapon.', 26, by - 12, '#ffe9b0'); }
+  if (!hasWeapons()) { ctx.font = '800 13px Nunito, sans-serif'; hudTextSmall(ctx, G.touch ? 'Empty hands: attack to blast. Defeat a foe to find a weapon.' : 'Empty hands: click to blast. Defeat a foe to find a weapon.', 26, by - 12, '#ffe9b0'); }
   const NBOX = SLOTS + extra.length, beam = held.def.kind === 'beam';
   // bubble charge
   const bx = 24 + NBOX * 58 + 36, byc = by + 25, k = clamp(p.charge / S.bubbleT, 0, 1);
@@ -1140,7 +1145,7 @@ function drawHUD(ctx) {
   ctx.fillStyle = k >= 1 ? '#ffffff' : 'rgba(255,255,255,.5)';
   ctx.font = '900 14px Nunito, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('B', bx, byc + 5);
+  ctx.fillText(G.touch ? '◯' : 'B', bx, byc + 5);
   if (k >= 1 && Math.floor(G.t * 3) % 2) { ctx.strokeStyle = 'rgba(191,243,255,.5)'; ctx.beginPath(); ctx.arc(bx, byc, 26, 0, TAU); ctx.stroke(); }
   if (beam) {
     // energy for a beam weapon
@@ -1282,7 +1287,7 @@ function drawMinimap(ctx) {
   const lv = B.heaven ? HEAVEN_LVL : levelAt(Math.round(ptx), Math.round(pty));
   hudTextSmall(ctx, B.name + '  ·  Danger ' + lv, mx, my + R + 18, '#f3e7ff');
   ctx.font = '700 11px Nunito, sans-serif';
-  hudTextSmall(ctx, 'M — map', mx, my + R + 50, 'rgba(255,255,255,.5)');
+  if (!G.touch) hudTextSmall(ctx, 'M — map', mx, my + R + 50, 'rgba(255,255,255,.5)');
 }
 
 function hudTextSmall(ctx, text, x, y, col) {

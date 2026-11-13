@@ -26,6 +26,9 @@ export const G = {
   windForce: 0,
   near: null,
   map: { x: 0, y: 0, zoom: 2, drag: null },
+  // touch: on-screen controls are in use. hud: how much the HUD is shrunk to fit a small screen.
+  touch: false,
+  hud: 1,
 };
 
 export const SAVE_KEY = 'unicornAscent.adventure.v1';

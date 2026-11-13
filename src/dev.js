@@ -13,6 +13,8 @@ const $ = id => document.getElementById(id);
 const history = [];
 let hIndex = 0;
 
+// False in release builds, where this file is replaced by an empty stand-in.
+export const DEV_TOOLS = true;
 export const dev = () => (G.save && G.save.dev) || {};
 export const devOpen = () => !$('devcon').classList.contains('hidden');
 

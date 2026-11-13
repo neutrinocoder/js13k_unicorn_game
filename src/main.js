@@ -3,7 +3,9 @@ import { G, SAVE_KEY, newSave } from './state.js';
 import { T, CS, CPX, getChunk, biomeAt, BIOMES, BIOME_LIST, SITES, LANDMARKS, GODS, ZS, OLY } from './world.js';
 import { playCutscene, cutsceneKey, drawCutscene } from './cutscene.js';
 import { initInput, endFrame, tapped, held, mouse, keys } from './input.js';
-import { initAudio, sfx, setTheme, setMuted, muted, setHeat } from './audio.js';
+import { initAudio, sfx, setTheme, setMuted, muted, setHeat, hush } from './audio.js';
+import { hostInit, hostLoaded, hostPlaying, adBreak, inAdBreak } from './host.js';
+import { initTouch, updateTouch } from './touch.js';
 import { makePlayer, updatePlayer, updateBubbles } from './player.js';
 import { makeEnemy, updateEnemy } from './enemies.js';
 import { spawnBoss, updateBoss } from './bosses.js';
@@ -13,7 +15,7 @@ import { updateFx, part, burst, ring, floater, shake } from './fx.js';
 import { render, drawMap, mapToScreen, shrinePos } from './render.js';
 import { stats, grantReward, SHOP, ARMOURS } from './items.js';
 import { rand, clamp, mix, pick, RAINBOW } from './util.js';
-import { initDev, devOpen } from './dev.js';
+import { initDev, devOpen, DEV_TOOLS } from './dev.js';
 import { show, hide, isShown, toast as uiToast, openShop, closeShop, openDialog, advanceDialog, openArsenal, closeArsenal } from './ui.js';
 
 const canvas = document.getElementById('game');
@@ -33,6 +35,7 @@ function resize() {
   canvas.style.width = G.W + 'px';
   canvas.style.height = G.H + 'px';
   G.scale = Math.max(G.H / 720, G.W / 1600);
+  G.hud = clamp(Math.min(G.W / 1100, G.H / 620), 0.5, 1);
 }
 addEventListener('resize', resize);
 resize();
@@ -60,6 +63,7 @@ function loadSave() {
       // saves from before weapons were found in the field get an arsenal made from what they owned
       if (!s.arms) delete out.arms;
       fixArsenal(out);
+      if (!DEV_TOOLS) delete out.dev;
       return out;
     }
   } catch (e) {}
@@ -341,7 +345,11 @@ export function onPlayerDeath() {
   }, 1300);
 }
 
+// Rising after a fall is a natural pause: the host may show an advert first.
 function respawn() {
+  if (!inAdBreak()) adBreak(hush, rise);
+}
+function rise() {
   hide('death');
   const sp = G.save.spawn, p = G.player;
   G.boss = null;
@@ -588,6 +596,10 @@ function frame(now) {
   last = now;
   let frozen = false;
   try { frozen = step(dt); } catch (e) { console.error(e && e.stack ? e.stack : e); }
+  updateTouch();
+  // the host hears "playing" from the player's first input in play until play is interrupted
+  if (G.scene !== 'play' || !G.player || G.player.dead) acted = false;
+  hostPlaying(acted);
   // During a hit freeze-frame, keep this frame's presses so they act once play resumes.
   if (!frozen) endFrame();
 }
@@ -635,9 +647,12 @@ function titleUpdate(dt) {
 }
 
 // ---------- Input wiring ----------
+let acted = false;   // has the player done anything since play last began?
 function onKey(code) {
+  if (inAdBreak()) return;
   initAudio();
   if (devOpen()) return;
+  if (G.scene === 'play') acted = true;
   if (code === 'KeyN') { setMuted(!muted); $('btn-mute').textContent = 'Sound: ' + (muted ? 'Off' : 'On'); toast(muted ? 'Sound off' : 'Sound on', 1200); return; }
   switch (G.scene) {
     case 'cutscene': cutsceneKey(code); break;
@@ -681,6 +696,7 @@ function closeMap() { G.scene = 'play'; }
 
 canvas.addEventListener('pointerdown', e => {
   initAudio();
+  if (G.scene === 'play') acted = true;
   if (G.scene !== 'map') return;
   const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
   // shrine travel
@@ -737,16 +753,21 @@ $('btn-new').onclick = () => {
   });
 };
 $('btn-story').onclick = () => {
-  hide('story');
-  G.player = null;
-  startGame(newSave());
+  if (inAdBreak()) return;
+  adBreak(hush, () => {
+    hide('story');
+    G.player = null;
+    startGame(newSave());
+  });
 };
 $('btn-continue').onclick = () => {
   initAudio();
   const s = loadSave();
-  if (!s) return;
-  G.player = null;
-  startGame(s);
+  if (!s || inAdBreak()) return;
+  adBreak(hush, () => {
+    G.player = null;
+    startGame(s);
+  });
 };
 const openControls = () => { show('controls'); sfx('ui'); };
 $('btn-controls').onclick = openControls;
@@ -786,10 +807,17 @@ function refreshTitle() {
 }
 
 initInput(canvas, onKey);
+initTouch({ onKey, label: () => (G.scene === 'play' && G.near && interactLabel(G.near)) || '', bombs: () => !!G.save && stats().hasBombs });
 initDev();
+// leaving the tab or putting the phone down pauses the game
+document.addEventListener('visibilitychange', () => { if (document.hidden && G.scene === 'play' && G.player && !G.player.dead) pause(); });
 refreshTitle();
 document.addEventListener('pointerdown', () => initAudio(), { once: true });
 setTheme('title');
 requestAnimationFrame(frame);
 addEventListener('beforeunload', saveGame);
 window.__gameReady = 1;
+// Tell the host the game is ready once its own code and its fonts are in.
+const FONTS = ['900 20px "Cinzel Decorative"', '700 20px "Cinzel Decorative"', '700 16px Cinzel', '500 16px Cinzel', '400 16px Nunito', '800 16px Nunito', '900 16px Nunito'];
+const fonts = document.fonts && document.fonts.load ? Promise.all(FONTS.map(f => document.fonts.load(f).catch(() => {}))) : Promise.resolve();
+Promise.all([hostInit(), fonts]).then(hostLoaded, hostLoaded);

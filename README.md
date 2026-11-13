@@ -1,99 +1,65 @@
-# Unicorn Ascent
+# Angel Ascent
 
-You were the brightest unicorn on Olympus, until Zeus grew afraid of you and cast you down into Hell. Fight your way out of the underworld, defeat Hades, then climb back to the heavens to face Ares, Apollo, Athena, Poseidon and finally Zeus himself. You have a rainbow tail, a recoil blast and a little help from some bubbles.
+You were the brightest angel of Olympus, until Zeus grew afraid of you and cast you down. Fight through the circles of the underworld, defeat Hades, then climb back to the heavens to face Ares, Apollo, Athena, Poseidon and Zeus himself.
 
-The game uses JavaScript, Canvas 2D and Web Audio. All artwork and sound are made in code. You do not need to install libraries to play.
+An open-world action platformer in plain JavaScript, Canvas 2D and Web Audio. All artwork, music and sound are made in code. There are no libraries and nothing to install to play.
 
-## How to play
+## Play
 
-Open `index.html` in your browser and choose Begin. You can also extract `unicorn-ascent.zip` into a folder and open the `index.html` inside it.
+Serve this folder with any static web server and open it in a browser, for example:
 
-| Control | Action |
+```sh
+python -m http.server 5173
+```
+
+Then open `http://localhost:5173`.
+
+- **Keyboard and mouse:** A/D to move, W or Space to jump, mouse to aim, left click to attack, right click to blast. The full list is under Controls on the title screen.
+- **Phones and tablets:** on-screen controls appear by themselves: a thumb-stick on the left and buttons on the right. Attacks aim at the nearest foe.
+
+Progress is saved in the browser.
+
+## What is where
+
+| Path | What it is |
 | :--- | :--- |
-| A / D or Left / Right | Move |
-| W, Up or Space | Jump. Press again in the air to double jump. |
-| C or Shift | Dash with brief protection |
-| Mouse | Aim |
-| Left mouse button or Z | Attack. Hold to keep attacking. |
-| 1 | Select the rainbow tail whip |
-| 4 | Select the recoil blast |
-| B or 2 | Activate charged bubbles |
-| M | Mute or unmute all audio |
-| Escape | Release the mouse pointer |
-| Enter | Return to the title after winning |
+| `index.html`, `style.css` | The page and its styles |
+| `src/` | The game, one module for each part (`main.js` starts it) |
+| `fonts/` | The three fonts the game uses (SIL Open Font Licence), so nothing is fetched from outside |
+| `stamp.py` | Writes a version stamp for every module into `index.html` |
+| `tools/` | The Poki build |
+| `classic/` | The original 13 KB js13k game, Unicorn Ascent, and (at the top level) its own build and tests |
 
-Clicking the game captures your mouse for aiming. Aiming does not change your movement direction. Without mouse aiming, attacks follow the way you face; Up and Down aim vertically.
+## Working on the game
 
-The tail whip hits enemies along its sweep. The blast has unlimited ammo and a one-second cooldown. Aiming the blast vertically also gives you recoil. Bubbles charge in ten seconds, shield you briefly and trap nearby enemies. You can bounce off empty bubbles too.
+Edit the files in `src/`. Before committing, run:
 
-Checkpoints save your progress at world boundaries. The current build includes a testing shortcut: press T during play to jump straight to Hades, or restart his fight.
+```sh
+python stamp.py
+```
 
-<details>
-<summary>Stuck? Here is how the world works.</summary>
+It gives every module an address that changes when the file does, so a browser never mixes old and new files.
 
-Climbing Limbo never ends. The real route starts at the portal below the starting area. It leads through Lust, Gluttony, Heresy and Treachery. Wind, mud, volcanic attacks and hail make each region different. Defeat Hades to escape.
+The developer console (the backtick key) has cheats for testing: `help` lists them. It is not part of the Poki build.
 
-</details>
-
-## Build the ZIP from the readable source
-
-Edit the root `index.html`. This is the readable source, not the minified game.
-
-Install Node.js 22 with npm, clone or download this repository, then open a terminal in its folder and run:
+## The Poki build
 
 ```sh
 npm ci
-npm run build
+python tools/poki_build.py
 ```
 
-`npm ci` installs the build tools using the versions in `package-lock.json`. Run it when starting from a fresh copy or after the dependencies change.
+`npm ci` installs the minifier and is only needed once. The build writes `build/poki/` and `build/angel-ascent-poki.zip`; upload either to the [Poki Inspector](https://inspector.poki.dev) to test, then to Poki for Developers.
 
-`npm run build`:
+Compared with the game as it runs from this folder, the Poki build:
 
-1. Converts descriptive global names to compact names, then uses Terser to minify the JavaScript.
-2. Writes the smaller game to `dist/index.html`, leaving your readable source unchanged.
-3. Packages it into `unicorn-ascent.zip` in the repository folder, replacing the old ZIP.
+- loads the Poki SDK and reports to it (`src/host.js`): loading finished, play started and stopped, and a commercial break before a new game, a continue, and rising after a fall;
+- has no developer console or cheats, and no link to the classic version;
+- makes no request to anywhere but Poki;
+- is minified.
 
-This is how the ZIP included in the repository is created. You do not need to zip anything manually. The archive contains only `index.html` at its top level. Build tools, tests and documentation are not included.
+Outside Poki the SDK is absent and `src/host.js` does nothing, so the same code runs everywhere.
 
-The build prints the ZIP size and remaining space. It fails if the archive is **13,312 bytes or larger**. The latest verified build is **13,077 bytes**, leaving **235 bytes** below the limit. Check the size printed after your own changes.
+## The classic version
 
-Do not edit `dist/index.html`; the next build overwrites it.
-
-## Run the tests
-
-To test the readable source, build the ZIP and test the minified version:
-
-```sh
-npm run check
-```
-
-Or run each step yourself:
-
-```sh
-npm test
-npm run build
-npm run test:dist
-```
-
-These tests check game logic using a simulated canvas and audio setup. Before submitting, also extract the ZIP and play it in Chrome and Firefox. Check their consoles for errors and play through the boss fight.
-
-## Files in the repository
-
-| File | Purpose |
-| :--- | :--- |
-| `index.html` | Readable game source and styles |
-| `build.cjs` | Minifies, packages and checks the ZIP size |
-| `source-names.json` | Maps readable global names to compact build names |
-| `rename.cjs` | Renames JavaScript identifiers without changing strings or property names |
-| `package.json` | Build commands and development dependencies |
-| `package-lock.json` | Pins dependency versions |
-| `verify.cjs` | Game regression tests |
-| `dist/index.html` | Generated minified game, ignored by Git |
-| `unicorn-ascent.zip` | Submission archive |
-
-Start with `update` for movement and combat, `generate` for platforms, `tail` and `whipHits` for the whip, and `drawWorld` for rendering. `soundtrack` and `sound` generate the audio.
-
-## Credits and release note
-
-Quotations are from Dante's Inferno, translated by Henry Wadsworth Longfellow.
+`classic/index.html` is the readable source of the original js13k entry. `npm run build` minifies it to `dist/index.html` and packs `unicorn-ascent.zip` (it must stay under 13,312 bytes); `npm run check` tests the source and the build.

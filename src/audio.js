@@ -10,10 +10,17 @@ try { muted = localStorage.getItem('ua.muted') === '1'; } catch (e) {}
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const mtof = n => 440 * Math.pow(2, (n - 69) / 12);
 
+let hushed = false;
 export function setMuted(m) {
   muted = m;
-  if (master) master.gain.setTargetAtTime(m ? 0 : 0.9, ac.currentTime, 0.05);
+  if (master) master.gain.setTargetAtTime(m || hushed ? 0 : 0.9, ac.currentTime, 0.05);
   try { localStorage.setItem('ua.muted', m ? '1' : '0'); } catch (e) {}
+}
+
+// Silence everything for a while (an advert is playing), without changing the player's own setting.
+export function hush(on) {
+  hushed = on;
+  if (master) master.gain.setTargetAtTime(on || muted ? 0 : 0.9, ac.currentTime, 0.05);
 }
 
 // How hard the music should play: 0 when all is calm, 1 in the thick of a fight.
@@ -25,7 +32,7 @@ export function initAudio() {
   if (!AC) return;
   ac = new AC();
   master = ac.createGain();
-  master.gain.value = muted ? 0 : 0.9;
+  master.gain.value = muted || hushed ? 0 : 0.9;
   const comp = ac.createDynamicsCompressor();
   comp.threshold.value = -14;
   comp.ratio.value = 4;
@@ -590,6 +597,7 @@ function playStep(th, s, t) {
   }
 }
 
+// DEV:BEGIN
 // For tests: run every sound effect and many bars of every tune, to shake out mistakes.
 export function selfTest(bars = 40) {
   if (!ac) return 'no audio';
@@ -606,3 +614,4 @@ export function selfTest(bars = 40) {
   heat = keepHeat;
   return `${names.length} sounds, ${Object.keys(THEMES).length} tunes, ${steps} steps`;
 }
+// DEV:END

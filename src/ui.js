@@ -4,6 +4,7 @@ import { SHOP, stats, shopLocked, ARMOURS, armourKnown, armourOwned } from './it
 import { SITES, BIOMES, BIOME_LIST, T, levelAt, HEAVEN_LVL } from './world.js';
 import { arms, owned, slotArm, SLOTS, equip, merge, mergeAll, canMerge, countOf, parseKey, current, rarityOf, iconUrl, ARMS, SETS, REALMS, RARITY, MAX_STARS, rarityOdds, shortName, dropsIn, setById, armsOf, dmgText, kindName, speedName, traits } from './weapons.js';
 import { sfx } from './audio.js';
+import { touchText } from './touch.js';
 
 const $ = id => document.getElementById(id);
 
@@ -14,7 +15,7 @@ export const isShown = id => !$(id).classList.contains('hidden');
 let toastTimer = null;
 export function toast(text, ms = 2600) {
   const el = $('toast');
-  el.textContent = text;
+  el.textContent = touchText(text);
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), ms);
@@ -337,6 +338,7 @@ function renderCodex(A) {
 // ---------- Dialogue ----------
 let dlg = null;
 export function openDialog(name, lines, onDone, portrait = '🌿') {
+  lines = lines.map(touchText);
   dlg = { lines, i: 0, onDone };
   G.scene = 'dialog';
   document.querySelector('#dialog .portrait').textContent = portrait;

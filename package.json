@@ -1,1 +1,1 @@
-{"private":true,"scripts":{"build":"node build.cjs","test":"node verify.cjs","test:dist":"node verify.cjs dist/index.html","check":"npm test && npm run build && npm run test:dist"},"devDependencies":{"terser":"5.44.0","acorn":"8.18.0"}}
+{"private":true,"scripts":{"build":"node build.cjs","test":"node verify.cjs","test:dist":"node verify.cjs dist/index.html","check":"npm test && npm run build && npm run test:dist","poki":"python tools/poki_build.py"},"devDependencies":{"terser":"5.44.0","acorn":"8.18.0"}}

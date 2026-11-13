@@ -3,6 +3,7 @@ import { G } from './state.js';
 import { T, tileAt, ORE, CRYSTAL, BIOMES, BIOME_LIST } from './world.js';
 import { moveBody, touchWall, onPlatform, hazardTouch, rayLength } from './physics.js';
 import { held, tapped, mouse } from './input.js';
+import { touchAim } from './touch.js';
 import { clamp, rand, angDiff, pick, rgba, mix } from './util.js';
 import { eye } from './art.js';
 
@@ -68,9 +69,10 @@ export function updatePlayer(dt) {
   let dir = (R ? 1 : 0) - (L ? 1 : 0);
   if (p.ctrlLock > 0) dir = 0;
 
-  // Aim: mouse when it has been used, otherwise facing / up / down.
+  // Aim: on a touch screen at the nearest foe; the mouse when it has been used; otherwise facing / up / down.
   const cx = p.x + p.w / 2, cy = p.y + p.h / 2 - 6;
-  if (mouse.used && mouse.inside) {
+  if (G.touch) [p.ax, p.ay] = touchAim(p, cx, cy);
+  else if (mouse.used && mouse.inside) {
     const wx = G.cam.x + mouse.x / G.scale, wy = G.cam.y + mouse.y / G.scale;
     const dx = wx - cx, dy = wy - cy, d = Math.hypot(dx, dy) || 1;
     p.ax = dx / d; p.ay = dy / d;
@@ -219,7 +221,7 @@ export function updatePlayer(dt) {
   if (mouse.rpressed || tapped('KeyX', 'KeyI')) p.altBuf = 0.3; else p.altBuf -= dt;
   const atk = mouse.down || held('KeyJ', 'KeyK', 'KeyZ') || p.atkBuf > 0;
   const alt = mouse.rdown || held('KeyX', 'KeyI') || p.altBuf > 0;
-  if ((atk || alt) && !dir && mouse.used && mouse.inside) p.face = p.ax < 0 ? -1 : 1;
+  if ((atk || alt) && !dir && (G.touch || (mouse.used && mouse.inside)) && p.ax) p.face = p.ax < 0 ? -1 : 1;
   p.beaming = false;
   if (alt) { if (fireBlast(p, S)) p.altBuf = 0; }
   else if (atk) {

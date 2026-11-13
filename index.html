@@ -2,13 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Angel Ascent</title>
 <meta name="description" content="An open-world adventure. Cast out of Olympus by Zeus, a fallen angel fights through the circles of the underworld, defeats Hades, and climbs back to the heavens to face the gods.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;700&family=Nunito:wght@400;600;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=eea253d1be">
+<link rel="stylesheet" href="style.css?v=02df15a03d">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -22,7 +19,9 @@
         <button id="btn-new" class="btn">New Journey</button>
         <button id="btn-controls" class="btn ghost">Controls</button>
       </div>
+      <!-- DEV:BEGIN -->
       <p class="foot"><a href="classic/">Play the original js13k version</a></p>
+      <!-- DEV:END -->
     </div>
   </section>
 
@@ -36,7 +35,7 @@
   <section id="controls" class="screen hidden">
     <div class="card wide">
       <h2>Controls</h2>
-      <div class="controls-grid">
+      <div class="controls-grid for-keys">
         <kbd>A D</kbd><span>Move (arrow keys work too)</span>
         <kbd>W / Space</kbd><span>Jump, double jump, wall jump. Hold to glide with wings</span>
         <kbd>Hold W / Space</kbd><span>Fly, once a boss has given you wings. Uses wing energy, which refills on the ground</span>
@@ -56,7 +55,23 @@
         <kbd>T</kbd><span>Teleport back to the plaza (not during a boss fight)</span>
         <kbd>Esc</kbd><span>Pause</span>
         <kbd>N</kbd><span>Mute</span>
+        <!-- DEV:BEGIN -->
         <kbd>` (backtick)</kbd><span>Developer console: fly, god, gems, tp, give all, help</span>
+        <!-- DEV:END -->
+      </div>
+      <div class="controls-grid for-touch">
+        <kbd>Left thumb</kbd><span>Move. Push down to drop through a platform</span>
+        <kbd>▲ Jump</kbd><span>Jump, double jump, wall jump. Hold to glide, or to fly once a boss has given you wings</span>
+        <kbd>⚔ Attack</kbd><span>Attack with the weapon in your hand. It aims at the nearest foe. Hold to keep attacking</span>
+        <kbd>✸ Blast</kbd><span>Recoil blast. Push the stick down and blast to rocket upward. Breaks rock</span>
+        <kbd>Stick up / down</kbd><span>Pushed firmly, it aims your attacks by hand instead</span>
+        <kbd>➤ Dash</kbd><span>Dash (brief protection)</span>
+        <kbd>⇄ Swap</kbd><span>Switch between the three weapons you carry</span>
+        <kbd>◯ Bubble</kbd><span>Bubbles: shield and trap enemies when charged</span>
+        <kbd>♥ Heal</kbd><span>Drink Ambrosia</span>
+        <kbd>● Bomb</kbd><span>Throw a bomb (once you have bombs)</span>
+        <kbd>Yellow button</kbd><span>Appears beside things you can talk to, open, trade with or rest at</span>
+        <kbd>Top of the screen</kbd><span>Pause, the world map (tap a shrine to travel), and your weapons</span>
       </div>
       <button class="btn" data-close>Back</button>
     </div>
@@ -136,16 +151,20 @@
     </div>
   </section>
 
+  <!-- DEV:BEGIN -->
   <div id="devcon" class="hidden">
     <div id="devlog"></div>
     <div class="devrow"><span>&gt;</span><input id="devin" autocomplete="off" spellcheck="false" placeholder="type a command, e.g. fly, god, gems, help"></div>
   </div>
 
+  <!-- DEV:END -->
+
   <div id="toast"></div>
+  <div id="rotate">Turn your device sideways to play</div>
 </div>
 <!-- STAMP:BEGIN written by stamp.py, do not edit by hand -->
-<script type="importmap">{"imports":{"./src/art.js":"./src/art.js?v=6998483fa5","./src/audio.js":"./src/audio.js?v=bcb599dbde","./src/bossart.js":"./src/bossart.js?v=d023a8f7e1","./src/bosses.js":"./src/bosses.js?v=837f399a80","./src/caves.js":"./src/caves.js?v=c6e33d333e","./src/combat.js":"./src/combat.js?v=ecfcf893e2","./src/cutscene.js":"./src/cutscene.js?v=c2bb3f3d35","./src/dev.js":"./src/dev.js?v=7ab07ac386","./src/enemies.js":"./src/enemies.js?v=221e532b17","./src/fx.js":"./src/fx.js?v=a9a88e34cb","./src/god_apollo_athena.js":"./src/god_apollo_athena.js?v=7acd8f07d6","./src/god_ares_poseidon.js":"./src/god_ares_poseidon.js?v=11dbe23fae","./src/god_zeus.js":"./src/god_zeus.js?v=7e4b8854b6","./src/godart.js":"./src/godart.js?v=b0789e7da2","./src/heaven_enemies.js":"./src/heaven_enemies.js?v=e3191f08b4","./src/hell_enemies.js":"./src/hell_enemies.js?v=b36a072ee6","./src/input.js":"./src/input.js?v=bb4517417a","./src/items.js":"./src/items.js?v=b61c735625","./src/main.js":"./src/main.js?v=72741a7d20","./src/physics.js":"./src/physics.js?v=c36b65154f","./src/player.js":"./src/player.js?v=eeb1c32699","./src/render.js":"./src/render.js?v=c40a0b1802","./src/state.js":"./src/state.js?v=52528ef161","./src/ui.js":"./src/ui.js?v=c8405e68f1","./src/util.js":"./src/util.js?v=c83de0e750","./src/weapons.js":"./src/weapons.js?v=e0e5a0adf7","./src/world.js":"./src/world.js?v=716efecc7c"}}</script>
-<script type="module" src="./src/main.js?v=72741a7d20"></script>
+<script type="importmap">{"imports":{"./src/art.js":"./src/art.js?v=6998483fa5","./src/audio.js":"./src/audio.js?v=8ac7b0bf91","./src/bossart.js":"./src/bossart.js?v=d023a8f7e1","./src/bosses.js":"./src/bosses.js?v=837f399a80","./src/caves.js":"./src/caves.js?v=c6e33d333e","./src/combat.js":"./src/combat.js?v=ecfcf893e2","./src/cutscene.js":"./src/cutscene.js?v=c2bb3f3d35","./src/dev.js":"./src/dev.js?v=a6f3fcef52","./src/enemies.js":"./src/enemies.js?v=221e532b17","./src/fx.js":"./src/fx.js?v=a9a88e34cb","./src/god_apollo_athena.js":"./src/god_apollo_athena.js?v=7acd8f07d6","./src/god_ares_poseidon.js":"./src/god_ares_poseidon.js?v=11dbe23fae","./src/god_zeus.js":"./src/god_zeus.js?v=7e4b8854b6","./src/godart.js":"./src/godart.js?v=b0789e7da2","./src/heaven_enemies.js":"./src/heaven_enemies.js?v=e3191f08b4","./src/hell_enemies.js":"./src/hell_enemies.js?v=b36a072ee6","./src/host.js":"./src/host.js?v=e4eb3f03f5","./src/input.js":"./src/input.js?v=8a67e3a505","./src/items.js":"./src/items.js?v=b61c735625","./src/main.js":"./src/main.js?v=42943b9cb6","./src/physics.js":"./src/physics.js?v=c36b65154f","./src/player.js":"./src/player.js?v=a864feb509","./src/render.js":"./src/render.js?v=fd226c23ae","./src/state.js":"./src/state.js?v=6bb1bf8c09","./src/touch.js":"./src/touch.js?v=bca4d6753f","./src/ui.js":"./src/ui.js?v=cb1ac4f7eb","./src/util.js":"./src/util.js?v=c83de0e750","./src/weapons.js":"./src/weapons.js?v=e0e5a0adf7","./src/world.js":"./src/world.js?v=716efecc7c"}}</script>
+<script type="module" src="./src/main.js?v=42943b9cb6"></script>
 <!-- STAMP:END -->
 <script>
 // If the game's code fails to load, say so instead of leaving buttons that do nothing.
