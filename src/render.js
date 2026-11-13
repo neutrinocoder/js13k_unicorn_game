@@ -14,7 +14,7 @@ function liquidFx(kind, x, y) {
     for (let i = 0; i < 3; i++) part({ x, y, vx: rand(-50, 50), vy: rand(-140, -60), g: 500, life: 0.5, size: 1.6, color: '#d6ff9a' });
   }
 }
-import { hash2, rand, mix, rgba, shade, RAINBOW, clamp, TAU, pick } from './util.js';
+import { hash2, hexToRgb, rand, mix, rgba, shade, RAINBOW, clamp, TAU, pick } from './util.js';
 import { drawParts, drawFloaters } from './fx.js';
 import { drawProjs, drawPickups, heartPath, starPath } from './combat.js';
 import { drawAngel, drawBubbles, hornTip } from './player.js';
@@ -38,7 +38,7 @@ export function render(ctx) {
   const { W, H, scale } = G;
   if (!lightCv) { lightCv = document.createElement('canvas'); lctx = lightCv.getContext('2d'); }
   const bg = G.bg;
-  drawBackground(ctx, bg);
+  backdrop(ctx, bg);
   const sh = G.cam.shake, shx = sh ? rand(-sh, sh) : 0, shy = sh ? rand(-sh, sh) : 0;
   const v = viewRect();
   const lights = [];
@@ -50,17 +50,21 @@ export function render(ctx) {
 
   // Tiles
   const c0x = Math.floor(v.x0 / CPX), c1x = Math.floor(v.x1 / CPX), c0y = Math.floor(v.y0 / CPX), c1y = Math.floor(v.y1 / CPX);
-  let built = 0;
+  let built = 0, ahead = null;
   const objs = [], liquids = [];
   for (let cy = c0y - 1; cy <= c1y + 1; cy++) for (let cx = c0x - 1; cx <= c1x + 1; cx++) {
     const c = getChunk(cx, cy);
     for (const o of c.objects) objs.push(o);
-    if (cx < c0x || cx > c1x || cy < c0y || cy > c1y) continue;
-    if (!c.canvas || c.dirty) { if (built >= 5 && !c.canvas) continue; built++; }
+    // just off screen: remember one chunk that still needs its picture
+    if (cx < c0x || cx > c1x || cy < c0y || cy > c1y) { if (!ahead && !c.canvas) ahead = c; continue; }
+    if (!c.canvas || c.dirty) { if (built >= 3 && !c.canvas) continue; built++; }
     ctx.drawImage(chunkCanvas(c), cx * CPX, cy * CPX, CPX + 0.6, CPX + 0.6);
     for (const l of c.lights) lights.push(l);
     if (c.liquids.length) liquids.push(...c.liquids);
   }
+  // in a frame with nothing else to paint, paint one chunk ahead of the view, so that ground is
+  // ready before it scrolls in and never has to be painted several chunks at once
+  if (!built && ahead) chunkCanvas(ahead);
   drawLiquids(ctx, liquids, G.t, liquidFx);
 
   // Objects behind actors
@@ -104,11 +108,6 @@ export function render(ctx) {
     ctx.fillStyle = `rgba(255,40,70,${G.flash * 0.6})`;
     ctx.fillRect(0, 0, W, H);
   }
-  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
-  vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(0,0,0,.55)');
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, H);
   if (G.scene !== 'title') {
     // on a small screen the HUD is drawn smaller, as if the screen were larger
     const k = G.hud, W0 = G.W, H0 = G.H;
@@ -122,6 +121,25 @@ export function render(ctx) {
 }
 
 // ---------- Background ----------
+// What costs the most in a frame is not the number of things drawn but the number of times the
+// whole screen is painted over, and the backdrop (sky, three layers of cave or cloud, and fog
+// between them) does that seven times or more. So it is put together on a sheet of its own with
+// fewer pixels than the screen, where each of those passes is cheap, and laid onto the screen in
+// one. It is distant scenery, and a little softness suits it.
+let backCv = null, bctx = null, backRes = 1;
+function backdrop(ctx, bg) {
+  const { W, H } = G;
+  backRes = clamp(G.dpr * 0.6, 0.5, 1);
+  if (!backCv) { backCv = document.createElement('canvas'); bctx = backCv.getContext('2d', { alpha: false }); }
+  const w = Math.ceil(W * backRes), h = Math.ceil(H * backRes);
+  if (backCv.width !== w || backCv.height !== h) { backCv.width = w; backCv.height = h; }
+  bctx.setTransform(backRes, 0, 0, backRes, 0, 0);
+  bctx.globalAlpha = 1;
+  bctx.globalCompositeOperation = 'source-over';
+  drawBackground(bctx, bg);
+  ctx.drawImage(backCv, 0, 0, W, H);
+}
+
 function drawBackground(ctx, bg) {
   const { W, H, scale } = G;
   const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -136,30 +154,15 @@ function drawBackground(ctx, bg) {
   ];
   const hv = bg.heaven || 0;
   if (hv > 0.01) drawHeaven(ctx, bg, hv);
-  for (const L of layers) {
+  let repainted = 0;
+  for (let n = 0; n < layers.length; n++) {
     if (hv > 0.99) break;
-    ctx.save();
+    const L = layers[n], sh = sheet(n, L, bg, repainted);
+    repainted += sh.fresh;
+    // the sheet was painted with the layer at (sh.x, sh.y) on screen; slide it to where the layer is now
     ctx.globalAlpha = 1 - hv;
-    ctx.scale(scale, scale);
-    const ox = G.cam.x * L.p, oy = G.cam.y * L.p;
-    ctx.translate(-ox, -oy);
-    const i0 = Math.floor(ox / L.cell) - 1, i1 = Math.floor((ox + W / scale) / L.cell) + 1;
-    const j0 = Math.floor(oy / L.cell) - 1, j1 = Math.floor((oy + H / scale) / L.cell) + 1;
-    ctx.fillStyle = L.col;
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const path = blob(L, i, j);
-      if (path) ctx.fill(path);
-      if (L.glow && hash2(i, j, 77) > 0.82) {
-        const gx = (i + hash2(i, j, 78)) * L.cell, gy = (j + hash2(i, j, 79)) * L.cell, r = L.cell * 0.5;
-        const rg = ctx.createRadialGradient(gx, gy, 0, gx, gy, r);
-        rg.addColorStop(0, rgba(bg.accent, 0.16));
-        rg.addColorStop(1, rgba(bg.accent, 0));
-        ctx.fillStyle = rg;
-        ctx.fillRect(gx - r, gy - r, r * 2, r * 2);
-        ctx.fillStyle = L.col;
-      }
-    }
-    ctx.restore();
+    ctx.drawImage(sh.cv, sh.x - G.cam.x * L.p * scale - PAD, sh.y - G.cam.y * L.p * scale - PAD, W + PAD * 2, H + PAD * 2);
+    ctx.globalAlpha = 1;
     const fog = ctx.createLinearGradient(0, 0, 0, H);
     fog.addColorStop(0, rgba(bg.fog, 0.0));
     fog.addColorStop(1, rgba(bg.fog, 0.12));
@@ -168,6 +171,55 @@ function drawBackground(ctx, bg) {
   }
   if (hv > 0.01) drawHeavenClouds(ctx, bg, hv);
   if (blobCache.size > 1500) blobCache.clear();
+}
+
+// Each layer of cave shapes behind the world is painted once onto its own sheet, a little larger
+// than the screen, and after that only copied: filling dozens of big ragged shapes every frame was
+// the dearest thing in the whole picture. A sheet is painted again when the view has drifted to
+// its edge, when the window changes, or when the colours have shifted enough to see (the colours
+// blend from one land's to the next, so a change of land repaints a sheet a few times, not every
+// frame, and never more than one sheet in a frame for colour alone).
+const PAD = 180, SHEETS = [];
+const hueGap = (a, b) => { const A = hexToRgb(a), B = hexToRgb(b); return Math.abs(A[0] - B[0]) + Math.abs(A[1] - B[1]) + Math.abs(A[2] - B[2]); };
+function sheet(n, L, bg, repainted) {
+  const { W, H, scale } = G, res = backRes;
+  const sh = SHEETS[n] || (SHEETS[n] = { cv: document.createElement('canvas'), x: 0, y: 0, size: '', col: '#000000', accent: '#000000', fresh: 0 });
+  const x = G.cam.x * L.p * scale, y = G.cam.y * L.p * scale, size = W + 'x' + H + 'x' + scale + 'x' + res;
+  const moved = sh.size !== size || Math.abs(x - sh.x) > PAD - 2 || Math.abs(y - sh.y) > PAD - 2;
+  const gap = hueGap(sh.col, L.col) + (L.glow ? hueGap(sh.accent, bg.accent) : 0);
+  // while the colours are still blending, wait for a shift big enough to see; once they have come
+  // to rest, match them exactly. Only one sheet is repainted for colour in any one frame.
+  const now = L.col + bg.accent, resting = sh.seen === now;
+  sh.seen = now;
+  sh.fresh = 0;
+  if (!moved && (gap === 0 || (gap < 10 && !resting) || (repainted && gap < 40))) return sh;
+  sh.fresh = 1;
+  sh.x = x; sh.y = y; sh.size = size; sh.col = L.col; sh.accent = bg.accent;
+  const cv = sh.cv, w = Math.ceil((W + PAD * 2) * res), h = Math.ceil((H + PAD * 2) * res);
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const c = cv.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, w, h);
+  // layer coordinates to sheet pixels: the layer's own (ox, oy) lands PAD in from the corner
+  const ox = G.cam.x * L.p, oy = G.cam.y * L.p, m = PAD / scale;
+  c.setTransform(res * scale, 0, 0, res * scale, (PAD - x) * res, (PAD - y) * res);
+  const i0 = Math.floor((ox - m) / L.cell) - 1, i1 = Math.floor((ox + W / scale + m) / L.cell) + 1;
+  const j0 = Math.floor((oy - m) / L.cell) - 1, j1 = Math.floor((oy + H / scale + m) / L.cell) + 1;
+  c.fillStyle = L.col;
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const path = blob(L, i, j);
+    if (path) c.fill(path);
+    if (L.glow && hash2(i, j, 77) > 0.82) {
+      const gx = (i + hash2(i, j, 78)) * L.cell, gy = (j + hash2(i, j, 79)) * L.cell, r = L.cell * 0.5;
+      const rg = c.createRadialGradient(gx, gy, 0, gx, gy, r);
+      rg.addColorStop(0, rgba(bg.accent, 0.16));
+      rg.addColorStop(1, rgba(bg.accent, 0));
+      c.fillStyle = rg;
+      c.fillRect(gx - r, gy - r, r * 2, r * 2);
+      c.fillStyle = L.col;
+    }
+  }
+  return sh;
 }
 
 // Olympus: a sun with slow rays (or, on the summit, a storm), distant temples and banks of cloud.
@@ -396,6 +448,14 @@ function drawLighting(ctx, lights, bg, shx, shy) {
     lctx.fillStyle = g;
     lctx.fillRect(sx - r, sy - r, r * 2, r * 2);
   }
+  // the darkened corners of the screen go onto the same sheet, which saves painting the whole
+  // screen once more for them alone
+  lctx.globalCompositeOperation = 'source-over';
+  const vg = lctx.createRadialGradient(lw / 2, lh / 2, Math.min(lw, lh) * 0.35, lw / 2, lh / 2, Math.max(lw, lh) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,.55)');
+  lctx.fillStyle = vg;
+  lctx.fillRect(0, 0, lw, lh);
   ctx.drawImage(lightCv, 0, 0, W, H);
   ctx.globalCompositeOperation = 'lighter';
   for (const l of lights) {

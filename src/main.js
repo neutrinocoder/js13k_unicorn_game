@@ -25,10 +25,15 @@ const $ = id => document.getElementById(id);
 export const toast = uiToast;
 
 // ---------- Setup ----------
+// How finely the picture is drawn. A sharp screen is drawn at up to twice its size in each
+// direction, but never with more than about three million pixels: the picture is built from many
+// screen-wide layers, and past that point it costs far more than it shows. `fine` is then lowered
+// by watchSpeed, below, on a computer that still cannot keep up.
+let fine = 1;
 function resize() {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
   G.W = window.innerWidth;
   G.H = window.innerHeight;
+  const dpr = Math.max(0.5, Math.min(2, window.devicePixelRatio || 1, Math.sqrt(3.2e6 / Math.max(1, G.W * G.H))) * fine);
   G.dpr = dpr;
   canvas.width = Math.floor(G.W * dpr);
   canvas.height = Math.floor(G.H * dpr);
@@ -544,11 +549,20 @@ function update(dt) {
   if (spawnT < 0) {
     spawnT = 0.4;
     const pcx = Math.floor((p.x + p.w / 2) / CPX), pcy = Math.floor((p.y + p.h / 2) / CPX), px = p.x + p.w / 2, py = p.y + p.h / 2;
+    // Foes wake at their posts when the player comes within reach (but not right on top of one),
+    // nearest first, and no more than 32 are awake at once.
+    const posts = [];
     for (let j = -2; j <= 2; j++) for (let i = -3; i <= 3; i++) {
       for (const sp of getChunk(pcx + i, pcy + j).spawns) {
-        if (sp.ent || G.t - sp.deadAt < 90 || G.enemies.length >= 60) continue;
+        if (sp.ent || G.t - sp.deadAt < 90) continue;
         const d = Math.hypot(sp.x - px, sp.y - py);
-        if (d < 560 || d > 1900) continue;
+        if (d >= 560 && d <= 1600) posts.push([d, sp]);
+      }
+    }
+    if (posts.length && G.enemies.length < 32) {
+      posts.sort((a, b) => a[0] - b[0]);
+      for (const [, sp] of posts) {
+        if (G.enemies.length >= 32) break;
         const e = makeEnemy(sp.type, sp.x, sp.y, sp.level, sp.biome, sp.hang);
         e.spawn = sp;
         sp.ent = e;
@@ -557,7 +571,7 @@ function update(dt) {
     }
     for (const e of G.enemies) {
       if (e.summoned) continue;
-      if (Math.hypot(e.x - px, e.y - py) > 2600) { e.dead = true; if (e.spawn) e.spawn.ent = null; }
+      if (Math.hypot(e.x - px, e.y - py) > 2200) { e.dead = true; if (e.spawn) e.spawn.ent = null; }
     }
   }
 
@@ -592,11 +606,28 @@ function update(dt) {
 }
 
 // ---------- Main loop ----------
+// A computer that cannot keep up gets a coarser picture, one step at a time, until it can. If a
+// step makes no real difference the slowness is not the picture's doing (a screen that refreshes
+// slowly, say, or a busy computer): that step is undone and the picture is left alone from then on.
+const speed = { avg: 16, t: 0, before: 0, tried: false, done: false };
+function watchSpeed(ms) {
+  if (speed.done || G.scene !== 'play' || document.hidden || ms > 250 || ms <= 0) return;
+  speed.avg += (ms - speed.avg) * 0.04;
+  speed.t += ms;
+  if (speed.t < 2500) return;
+  speed.t = 0;
+  if (speed.tried && speed.avg > speed.before * 0.9) { fine /= 0.8; speed.done = true; resize(); return; }
+  speed.tried = false;
+  // slower than about 45 frames a second, and room left to go coarser
+  if (speed.avg > 22 && fine > 0.45) { speed.before = speed.avg; speed.tried = true; fine *= 0.8; resize(); }
+}
+
 let last = null;
 function frame(now) {
   requestAnimationFrame(frame);
   // Time only between animation frames, and never negative.
   if (last === null) last = now;
+  watchSpeed(now - last);
   const dt = clamp((now - last) / 1000, 0, 0.033);
   last = now;
   let frozen = false;

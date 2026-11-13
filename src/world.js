@@ -383,6 +383,11 @@ export function setTile(tx, ty, t) {
   }
 }
 
+// How crowded with foes a chunk is, 0 to 1. It changes slowly, so quiet stretches and packs are
+// each a few chunks across. Below QUIET there are no foes; above PACK they come in twos and threes.
+export const QUIET = 0.26, PACK = 0.75;
+export const foeDensity = (cx, cy) => vnoise(cx * 0.22, cy * 0.22, 501);
+
 function weightedPick(rng, weights) {
   let total = 0;
   for (const k in weights) total += weights[k];
@@ -453,13 +458,26 @@ function genChunk(cx, cy, k) {
     if (rng() < 0.035) { const s = take(floor); if (s) place(s, { type: 'shrine', id: k + ':s', name: B.name + ' Shrine' }); }
     if (rng() < 0.55) { const s = take(floor); if (s) place(s, { type: 'torch', id: k + ':t' }); }
     if (dist > 60 && Object.keys(B.enemies).length) {
-      // the heavens are crowded with guardians: one to three in every chunk
-      const n = B.heaven ? 2 + Math.floor(rng() * 2.2) : 1 + Math.floor(rng() * 3);
+      // How crowded this part of the world is drifts slowly from place to place: about one chunk in
+      // seven lies in a quiet stretch with no foes at all, most hold one (some none, some two), and
+      // one in seven belongs to a pack: two in every chunk, and now and then a third in the heavens,
+      // which are a little more crowded all round.
+      const crowd = foeDensity(cx, cy), r = rng();
+      const n = crowd < QUIET ? 0
+        : crowd > PACK ? 2 + (B.heaven && rng() < 0.35 ? 1 : 0)
+        : B.heaven ? (r < 0.15 ? 0 : r < 0.7 ? 1 : 2) : (r < 0.28 ? 0 : r < 0.84 ? 1 : 2);
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
         const fly = type === 'bat' || type === 'wisp' || type === 'cherub' || type === 'seraph' || type === 'ophan';
         const hang = type === 'spider' && ceil.length && rng() < 0.75;
-        const s = take(hang ? ceil : fly ? (air.length ? air : floor) : floor);
+        // foes that share a chunk stand well apart (six tiles or more) when there is room
+        const list = hang ? ceil : fly ? (air.length ? air : floor) : floor;
+        let s = null;
+        for (let tries = 0; tries < 8 && list.length && !s; tries++) {
+          const spot = take(list), sx = (cx * CS + spot[0] + 0.5) * T, sy = (cy * CS + spot[1] + 1) * T;
+          if (!c.spawns.some(o => Math.hypot(o.x - sx, o.y - sy) < 6 * T)) s = spot;
+        }
+        // no room to stand apart: this chunk is too cramped for another foe
         if (!s) continue;
         c.spawns.push({ type, x: (cx * CS + s[0] + 0.5) * T, y: (cy * CS + s[1] + (hang ? 0 : 1)) * T, hang: !!hang, level: lvl, biome: bi, ent: null, deadAt: -999 });
       }
