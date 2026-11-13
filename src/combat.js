@@ -166,7 +166,7 @@ export function killEnemy(e) {
   const A = arms();
   if (!e.summoned) {
     A.dry = (A.dry || 0) + 1;
-    if (Math.random() < dropChance(e) * S.luck || A.dry >= 12 || !hasWeapons()) {
+    if (Math.random() < dropChance(e) * S.luck || A.dry >= 6 || !hasWeapons()) {
       A.dry = 0;
       dropWeapon(cx, cy, rollWeapon(e.biome, e.level + S.fortune).id);
     }

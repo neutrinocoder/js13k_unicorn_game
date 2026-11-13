@@ -394,11 +394,13 @@ export function sfx(name, v = 1) {
 // Every land plays its own order of chords at its own speed, with its own riffs and its own drum
 // pattern. The heavens and the story use one family of chords: A, C, D and G, with A major (and
 // its C sharp) in the brighter places.
-// The underworld is another matter. Its tunes are laments: slow, in A minor, their chords sinking
-// step by step (A minor, G, F, E), with D minor and E minor for sorrow. Their arpeggios fall more
-// than they rise and lean on the saddest note there is, the one a half step above the fifth; the
-// fiery lands add the tritone, the "devil's interval". They are played low and muffled, with a
-// second string tuned a shade flat, over slow, heavy drums, a great drum far off and a low wind.
+// The underworld is another matter. Its tunes are sad but they do not drag: they move at the
+// pace of the rest, on a classic beat (kick on one and three, snare on two and four, hats on the
+// eighths). The sadness is in the notes. They are in A minor, their chords sinking step by step
+// (A minor, G, F, E), with D minor and E minor for sorrow, and their arpeggios lean on the saddest
+// note there is, the one a half step above the fifth; the fiery lands add the tritone, the
+// "devil's interval". Each string has a second beside it tuned a shade flat, a great drum far off
+// marks every new section, and a low wind blows underneath.
 const NOTE = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
 // The notes a riff may use over each kind of chord, in semitones above its root:
 // r root, t third, f fifth, o octave, and two colour notes a and b (a pentatonic scale in all).
@@ -433,30 +435,30 @@ const THEMES = {
   victory: { tempo: 96, A: ['A', 'C', 'D', 'G'], B: ['D', 'G', 'A', 'A'], voice: 'pluck', drums: 'four', stab: '..x...x...x...x.',
     arp: ['rtfotfrtfotfrtfo', 'r.fo.f.to.f.b.f.', 'o.b.f.a.t.a.f.b.'], arp2: ['f...t...a...t...'],
     bass: ['r.o.r.o.r.o.r.o.', 'r.o.r.o.r.o.b.f.'] },
-  // ---- the underworld: laments (dark: played low and muffled, see pluck)
-  // Limbo: the old descending lament, A minor down to E, over a funeral drum.
-  limbo: { tempo: 66, dark: 1, A: ['Am', 'G', 'F', 'E'], B: ['Dm', 'Am', 'F', 'E'], voice: 'soft', drums: 'dirge',
-    arp: ['o.f.t.f.d.f.t.f.', 'o.f.t.f.n.f.t.r.', 'r.t.f.t.d.t.f.t.'], arp2: ['........o---f---', '........t---r---'],
-    bass: ['r-------r-----f.', 'r-------o---b-..'] },
-  // Lust: a slow sway, yearning; the chords circle and never settle.
-  lust: { tempo: 76, swing: 0.12, dark: 1, A: ['Am', 'Dm', 'G', 'C'], B: ['F', 'Dm', 'E', 'Am'], voice: 'soft', drums: 'sway',
-    arp: ['r.t.f.o.n.o.f.t.', 'o.f.t.f.d.f.t.f.', 'o.d.f.t.f.t.n.r.'], arp2: ['....o-..f-..t-..', '....d-..f-..t-..'],
-    bass: ['r.....r.o.....f.', 'r.....r.b.....f.'] },
-  // Gluttony: the slowest and heaviest, dragging its feet.
-  gluttony: { tempo: 60, swing: 0.2, dark: 1, A: ['Am', 'Am', 'Dm', 'Am'], B: ['F', 'E', 'Am', 'Am'], voice: 'pulse', drums: 'sludge',
-    arp: ['r..t..f.r..t..d.', 'o..f..t.d..f..t.', 'o..b..f.d..f..t.'], arp2: ['........f---t---'],
-    bass: ['r-----r..rr-----', 'r-----..r---b-f-'] },
-  // Heresy: the burning tombs. Tritones in the arpeggio, and drums like a pyre being built.
-  heresy: { tempo: 84, dark: 1, A: ['Am', 'C', 'Dm', 'E'], B: ['F', 'G', 'Am', 'E'], voice: 'pluck', drums: 'pyre',
-    arp: ['rr.frr.xrr.frr.t', 'r.f.o.f.d.f.x.f.', 'o.d.f.t.o.d.f.x.'], arp2: ['f---t---d---t---'],
-    bass: ['r..rr..rr..rr.f.', 'r.r.r.r.r.r.o.b.'] },
-  // Treachery: the frozen lake. Almost nothing: single notes falling into silence.
-  treachery: { tempo: 56, key: -5, dark: 1, A: ['Am', 'F', 'C', 'Em'], B: ['Dm', 'Am', 'Em', 'Am'], voice: 'soft', drums: 'frozen',
-    arp: ['o...f...t...f...', 'o...d...f...t...', 'n...t...f...r...'], arp2: ['..........o---..', '..........f---..'],
-    bass: ['r-------------..', 'r-------o-----..'] },
-  // The Throne of Hades: war drums, and a tritone tolling in the arpeggio.
-  abyss: { tempo: 92, dark: 1, A: ['Am', 'F', 'Dm', 'E'], B: ['Dm', 'E', 'F', 'E'], voice: 'pluck', drums: 'war',
-    arp: ['r.x.f.x.r.x.f.o.', 'rfofdfofrfofxfof', 'o.d.f.t.o.d.f.x.'], arp2: ['o-----d-f-----t-'],
+  // ---- the underworld: sad, but with a pulse (dark: see pluck)
+  // Limbo: the old descending lament, A minor down to E.
+  limbo: { tempo: 96, dark: 1, A: ['Am', 'G', 'F', 'E'], B: ['Dm', 'Am', 'F', 'E'], voice: 'pluck', drums: 'boom',
+    arp: ['o.f.t.f.d.f.t.f.', 'r.fo.f.do.f.t.f.', 'r.t.f.t.d.t.f.t.'], arp2: ['....f.t.....d.r.', '....t.f.....n.o.'],
+    bass: ['r..r..r.r..r..f.', 'r.....o.r...b.f.'] },
+  // Lust: running arpeggios with a swing; the chords circle and never settle.
+  lust: { tempo: 104, swing: 0.12, dark: 1, A: ['Am', 'Dm', 'G', 'C'], B: ['F', 'Dm', 'E', 'Am'], voice: 'pluck', drums: 'classic', stab: '..x...x...x...x.',
+    arp: ['rtfotfdtfotfrtfo', 'ofdfofdfofnfofdf', 'o.d.f.t.f.t.n.r.'], arp2: ['f...t...d...t...'],
+    bass: ['r.o.r.o.r.o.r.o.', 'r.r.o.r.r.o.r.b.'] },
+  // Gluttony: heavy and swung, a stomp.
+  gluttony: { tempo: 88, swing: 0.2, dark: 1, A: ['Am', 'Am', 'Dm', 'Am'], B: ['F', 'E', 'Am', 'Am'], voice: 'pulse', drums: 'stomp',
+    arp: ['r..t..f.r..t..d.', 'o..f..t.d..f..t.', 'o..b..f.d..f..t.'], arp2: ['....f.......t...'],
+    bass: ['r.....r..rr...f.', 'r...r..or...r.b.'] },
+  // Heresy: the burning tombs. A galloping bass, and tritones in the arpeggio.
+  heresy: { tempo: 116, dark: 1, A: ['Am', 'C', 'Dm', 'E'], B: ['F', 'G', 'Am', 'E'], voice: 'pluck', drums: 'rock', stab: 'x.....x.....x...',
+    arp: ['rr.frr.xrr.frr.t', 'rfofdfofrfofxfof', 'o.d.f.t.o.d.f.x.'], arp2: ['f...t...d...t...'],
+    bass: ['r..rr..rr..rr..r', 'r.r.r.r.r.r.o.b.'] },
+  // Treachery: the frozen lake. The same beat, played softly, under falling notes.
+  treachery: { tempo: 92, key: -5, dark: 1, A: ['Am', 'F', 'C', 'Em'], B: ['Dm', 'Am', 'Em', 'Am'], voice: 'soft', drums: 'ice',
+    arp: ['o.f.t.f.d.f.t.f.', 'o.d.f.t.n.t.f.r.', 'r.t.f.o.d.o.f.t.'], arp2: ['..f...o...f...d.', '..t...f...n...f.'],
+    bass: ['r.....r...r.f...', 'r...o...r...b...'] },
+  // The Throne of Hades: the fastest of them, with a tritone tolling in the arpeggio.
+  abyss: { tempo: 124, dark: 1, A: ['Am', 'F', 'Dm', 'E'], B: ['Dm', 'E', 'F', 'E'], voice: 'pluck', drums: 'throne',
+    arp: ['rfofdfofrfofxfof', 'r.x.f.x.r.x.f.o.', 'rr.frr.orr.frr.d'], arp2: ['o.....d.f.....t.'],
     bass: ['r.r.r.r.r.r.r.r.', 'r.r.o.r.r.o.r.d.'] },
   boss: { tempo: 136, A: ['Am', 'C', 'D', 'G'], B: ['C', 'D', 'C', 'D'], turn: 'G', voice: 'pluck', drums: 'drive', stab: 'x..x..x.....x...',
     arp: ['rtfotfrtfotfrtfo', 'rfofTfofrfofbfof', 'rr.frr.orr.frr.T'], arp2: ['f.t.a.t.f.t.a.r.'],
@@ -525,11 +527,11 @@ function riffAt(riff, b) {
   return [c, n];
 }
 function pluck(kind, midi, t, d, g, pan = 0, dark = false) {
-  // nothing above the A over the stave; in the underworld, nothing above the C below that
-  const top = dark ? 72 : 81;
+  // nothing above the A over the stave; in the underworld, nothing above the E below that
+  const top = dark ? 76 : 81;
   while (midi > top) midi -= 12;
-  // the underworld's strings are muffled, ring longer and sound from further off
-  const f = mtof(midi), M = pumpBus, k = dark ? 0.58 : 1, wet = dark ? 0.6 : 0, len = dark ? 1.6 : 1;
+  // the underworld's strings are a little darker and ring a little longer
+  const f = mtof(midi), M = pumpBus, k = dark ? 0.8 : 1, wet = dark ? 0.4 : 0, len = dark ? 1.25 : 1;
   if (kind === 'pluck') tone({ type: 'sawtooth', f, t, d: Math.max(d, 0.2) * len, g: g * 0.75, dest: M, filter: 1700 * k, sweep: 2, q: 3, verb: wet || 0.3, echo: 0.3, pan });
   else if (kind === 'pulse') tone({ type: 'square', f, t, d: Math.max(d, 0.2) * len, g: g * 0.42, dest: M, filter: 1300 * k, sweep: 1.8, q: 2, verb: wet || 0.3, echo: 0.25, pan });
   else {
@@ -537,7 +539,7 @@ function pluck(kind, midi, t, d, g, pan = 0, dark = false) {
     tone({ f, t, d: Math.max(d, 0.3) * len, g: g * 0.5, dest: M, pan });
   }
   // and beside each one a second string, tuned a shade flat: the sound of something gone wrong
-  if (dark) tone({ type: 'triangle', f, detune: -19, t: t + 0.012, d: Math.max(d, 0.3) * len, g: g * 0.45, dest: M, filter: 760, verb: wet, pan: -pan });
+  if (dark) tone({ type: 'triangle', f, detune: -19, t: t + 0.012, d: Math.max(d, 0.3) * len, g: g * 0.4, dest: M, filter: 900, verb: wet, pan: -pan });
 }
 function bassNote(midi, t, d, long) {
   const f = mtof(midi), M = pumpBus;
@@ -548,8 +550,7 @@ function bassNote(midi, t, d, long) {
 
 // ---- the kit. k kick, s snare, c clap, h and o closed and open hat, t and T toms, p a wood knock,
 // B a great drum far off. "x" plays, "o" plays softly.
-// A pattern marked gentle has no drum rolls; one marked slow (the underworld's) rolls on two deep
-// toms and, in a fight, adds war toms where the others add quick hats.
+// A pattern marked gentle has no drum rolls.
 const KINDS = ['k', 's', 'c', 'h', 'o', 't', 'T', 'p', 'B'];
 const DRUMS = {
   heart: { gentle: 1, k: 'x.......x..o....', h: '..o...o...o...o.', p: '....o.......o...' },
@@ -560,12 +561,11 @@ const DRUMS = {
   rock: { k: 'x.....x.x.....x.', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', o: '..............x.' },
   break: { k: 'x..x......x..x..', s: '....x..o.o..x...', h: 'x.x.x.x.x.x.x.x.' },
   march: { k: 'x...x...x...x...', s: '..oo..x...oo..xo', h: 'x.x.x.x.x.x.x.x.' },
-  dirge: { slow: 1, k: 'x.........x.....', B: '........x.......', p: '....o.......o..o', h: '..o...o...o...o.' },
-  sway: { slow: 1, k: 'x......x..x.....', s: '........x.......', h: 'o.o.o.o.o.o.o.o.', p: '......o.......o.' },
-  sludge: { slow: 1, k: 'x.....x...x.....', B: '........x.......', t: '..............oo', p: '....o.......o...' },
-  pyre: { slow: 1, k: 'x..x......x..x..', s: '........x.......', t: '......o.......o.', T: '..............o.', h: 'x.o.x.o.x.o.x.o.' },
-  frozen: { gentle: 1, k: 'x...............', B: '........x.......', p: '....o.....o.....', h: '......o.......o.' },
-  war: { slow: 1, k: 'x.....x.x.....x.', B: '........x.......', t: 'x..x..x.x..x..xx', T: '......o.......x.', h: '..o...o...o...o.' },
+  // the classic beat and three of its cousins, for the underworld
+  classic: { k: 'x.......x.x.....', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.' },
+  stomp: { k: 'x..x....x.......', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', o: '..............x.' },
+  ice: { k: 'x.......x.x.....', s: '....x.......x...', h: 'o.o.o.o.o.o.o.o.', p: '......o.......o.' },
+  throne: { k: 'x.....x.x.....x.', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', t: '...........o..o.' },
   tribal: { k: 'x...x...x...x...', c: '....x.......x...', t: 'x..x..x.x..x..xx', T: '......x.......x.', h: '..o...o...o...o.' },
   drive: { k: 'x.x...x.x.x...x.', s: '....x.......x...', h: 'xxxxxxxxxxxxxxxx', o: '......x.......x.' },
 };
@@ -646,25 +646,19 @@ function playStep(th, s, t) {
   const big = k => k !== 'h' && k !== 'o' && k !== 'p';
   for (const kind of KINDS) {
     if (!D[kind]) continue;
-    if (big(kind) && ((first && lb < 2) || roll || (calm && kind !== 'c' && kind !== 'B'))) continue;
+    if (big(kind) && ((first && lb < 2) || roll || (calm && kind !== 'c'))) continue;
     kit(kind, D[kind][b], tt, g, kind === 'h' || kind === 'o' ? 0.25 : kind === 't' ? -0.35 : kind === 'T' ? 0.35 : 0);
   }
-  if (roll && D.slow) { if (b === 12 || b === 14) kit(b === 12 ? 'T' : 't', 'x', tt, g * (b === 12 ? 0.7 : 0.9), b === 12 ? 0.3 : -0.3); }
-  else if (roll) kit(b === 15 ? 'T' : b % 2 ? 't' : 's', 'x', tt, g * (0.55 + (b - 12) * 0.15), (b - 13.5) * 0.3);
-  if (D.slow) {
-    // when it is heated the underworld adds war toms, not quick hats
-    if (hot && !roll && (b === 6 || b === 14) && !(D.t && D.t[b] !== '.')) kit('t', 'o', tt, g * 1.3, -0.3);
-    if (hot && !roll && b === 11 && !(D.T && D.T[b] !== '.')) kit('T', 'o', tt, g * 1.2, 0.3);
-  } else {
-    // quick extra hats and a knock when it is heated
-    if (hot && !D.gentle && b % 2 === 1 && !(D.h && D.h[b] !== '.')) kit('h', 'o', tt, g, -0.25);
-    if (hot && !D.gentle && (b === 3 || b === 11) && !D.p) kit('p', 'o', tt, g, 0.3);
-  }
+  if (roll) kit(b === 15 ? 'T' : b % 2 ? 't' : 's', 'x', tt, g * (0.55 + (b - 12) * 0.15), (b - 13.5) * 0.3);
+  // quick extra hats and a knock when it is heated
+  if (hot && !D.gentle && b % 2 === 1 && !(D.h && D.h[b] !== '.')) kit('h', 'o', tt, g, -0.25);
+  if (hot && !D.gentle && (b === 3 || b === 11) && !D.p) kit('p', 'o', tt, g, 0.3);
   if (th.dark) {
-    // a low wind moans through every other bar, rising and falling with the chord
+    // a great drum far off marks each new section, and a low wind blows through every other bar
+    if (lb % 4 === 0 && b === 0 && !first) kit('B', 'x', t, g * 0.8);
     if (lb % 2 === 0 && b === 0 && (!first || lb >= 2)) {
       const wf = mtof(ch.midi + key + 12);
-      noise({ t, f: wf, f2: wf * (lb % 4 ? 0.8 : 1.25), q: 5, d: stepLen * 28, g: 0.075, a: stepLen * 10, dest: musicBus, verb: 0.6, pan: lb % 4 ? 0.4 : -0.4 });
+      noise({ t, f: wf, f2: wf * (lb % 4 ? 0.8 : 1.25), q: 5, d: stepLen * 28, g: 0.05, a: stepLen * 10, dest: musicBus, verb: 0.6, pan: lb % 4 ? 0.4 : -0.4 });
     }
   } else if (lb % 4 === 0 && b === 0 && !first && !D.gentle) {
     // a soft wash marks each new section

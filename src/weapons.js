@@ -390,9 +390,11 @@ export function rollWeapon(biome, danger) {
   return armsOf(set.id, rar);
 }
 
-// How likely a fallen foe is to leave a weapon behind.
-const TOUGH = { brute: 0.26, angel: 0.22, spitter: 0.15, seraph: 0.15, ophan: 0.15, bat: 0.07, cherub: 0.07 };
-export const dropChance = e => TOUGH[e.type] || 0.11;
+// How likely a fallen foe is to leave a weapon behind: about one in four, more for the tough ones
+// and less for the small fry. (There are fewer than half as many foes as there once were, so each
+// is a little over twice as likely to drop one; a stretch of the world yields what it always did.)
+const TOUGH = { brute: 0.55, angel: 0.48, spitter: 0.34, seraph: 0.34, ophan: 0.34, bat: 0.16, cherub: 0.16 };
+export const dropChance = e => TOUGH[e.type] || 0.25;
 
 // The weapon each great foe carries.
 const BOSS_LOOT = {
