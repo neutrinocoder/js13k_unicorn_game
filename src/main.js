@@ -321,7 +321,8 @@ export function teleport(x, y) {
   for (const e of G.enemies) if (e.spawn) e.spawn.ent = null;
   G.enemies.length = 0;
   G.projs.length = 0;
-  G.pickups.length = 0;
+  // gems and hearts are swept away, but a weapon that dropped stays where it lies
+  G.pickups = G.pickups.filter(g => g.kind === 'weapon');
   G.boss = null;
   G.effects.length = 0;
   G.cam.x = p.x - G.W / G.scale / 2;
@@ -362,6 +363,9 @@ function rise() {
   p.hp = stats().maxHp; p.armour = stats().armour;
   p.inv = 2;
   G.scene = 'play';
+  // a weapon left on the ground waits a full four minutes more, time enough to walk back for it
+  for (const g of G.pickups) g.t = 1;
+  if (G.pickups.length) toast(G.pickups.length > 1 ? 'The weapons you left behind still lie where they dropped.' : 'The weapon you left behind still lies where it dropped.', 3600);
   saveGame();
 }
 
