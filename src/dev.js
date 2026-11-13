@@ -13,10 +13,12 @@ const $ = id => document.getElementById(id);
 const history = [];
 let hIndex = 0;
 
-// False in release builds, where this file is replaced by an empty stand-in.
-export const DEV_TOOLS = true;
+// On only when the game is served from this computer (localhost, or opened as a file), so the copy
+// on the public website has no cheats. False in release builds too, where this file is replaced by
+// an empty stand-in.
+export const DEV_TOOLS = ['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname);
 export const dev = () => (G.save && G.save.dev) || {};
-export const devOpen = () => !$('devcon').classList.contains('hidden');
+export const devOpen = () => DEV_TOOLS && !$('devcon').classList.contains('hidden');
 
 function flags() {
   if (!G.save.dev) G.save.dev = { fly: 0, god: 0, infGems: 0, speed: 1 };
@@ -223,6 +225,11 @@ export function toggleDev(force) {
 }
 
 export function initDev() {
+  if (!DEV_TOOLS) {
+    // no console and no mention of it
+    for (const el of document.querySelectorAll('#devcon, .dev-only')) el.remove();
+    return;
+  }
   addEventListener('keydown', e => {
     if (e.code === 'Backquote') { e.preventDefault(); e.stopImmediatePropagation(); toggleDev(); }
   }, true);

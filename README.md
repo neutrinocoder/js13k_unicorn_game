@@ -40,7 +40,7 @@ python stamp.py
 
 It gives every module an address that changes when the file does, so a browser never mixes old and new files.
 
-The developer console (the backtick key) has cheats for testing: `help` lists them. It is not part of the Poki build.
+The developer console (the backtick key) has cheats for testing: `help` lists them. It only exists when the game is served from your own computer (`localhost`), so the public website and the Poki build have no cheats.
 
 ## The Poki build
 
