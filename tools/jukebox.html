@@ -33,7 +33,7 @@ input[type=range] { width: 170px; accent-color: #ffd34a; }
 <body>
 <main>
   <h1>Angel Ascent jukebox</h1>
-  <p>Every tune in the game, played by the game's own music engine. Each one builds up as it goes: bass after two bars, arpeggio and drums after four, and the melody after eight, so give a tune twenty seconds or so. A new tune starts at the next bar line.</p>
+  <p>Every tune in the game, played by the game's own music engine. They are made of a beat, a bass line and arpeggios, with no lead instrument. Each one builds up as it goes: arpeggio and hats first, bass after two bars, the full beat after four, and a second arpeggio after eight. A new tune starts at the next bar line.</p>
   <div class="bar">
     <span id="now">Pick a tune</span>
     <label>Calm <input type="range" id="heat" min="0" max="1" step="0.05" value="0"> In a fight</label>
@@ -42,32 +42,33 @@ input[type=range] { width: 170px; accent-color: #ffd34a; }
   <div id="lists"></div>
 </main>
 <script type="module">
-import { initAudio, setTheme, setHeat, hush } from '../src/audio.js';
+// always fetch the newest music code, never a copy the browser kept
+const { initAudio, setTheme, setHeat, hush } = await import('../src/audio.js?t=' + Date.now());
 
 const GROUPS = [
   ['The story', [
-    ['title', 'Title screen', 'Wistful: flute over harp'],
-    ['prelude', 'Prelude: Olympus', 'The opening, when all is well'],
-    ['fall', 'The fall', 'Cast down: slow, with a choir'],
-    ['victory', 'Victory', 'After Hades and Zeus fall'],
+    ['title', 'Title screen', 'Slow and soft · A minor, C, D, G'],
+    ['prelude', 'Prelude: Olympus', 'Gentle · A major, D, G'],
+    ['fall', 'The fall', 'The slowest · a heartbeat'],
+    ['victory', 'Victory', 'Four-on-the-floor · A, C, D, G'],
   ]],
   ['The underworld', [
-    ['limbo', 'Limbo', 'The first circle: bells'],
-    ['lust', 'Lust', 'Endless storms: a swirling harp'],
-    ['gluttony', 'Gluttony', 'Ceaseless rain: low brass, lurching'],
-    ['heresy', 'Heresy', 'Burning tombs: brass over a gallop'],
-    ['treachery', 'Treachery', 'The frozen lake: sparse bells'],
-    ['abyss', 'The Throne of Hades', 'Organ and war drums'],
+    ['limbo', 'Limbo', 'Boom-bap beat · A minor, C, D, G'],
+    ['lust', 'Lust', 'Dance beat with swing · running arpeggios'],
+    ['gluttony', 'Gluttony', 'Heavy half-time, swung'],
+    ['heresy', 'Heresy', 'Rock beat · galloping bass'],
+    ['treachery', 'Treachery', 'Slow half-time · sparse and cold'],
+    ['abyss', 'The Throne of Hades', 'War toms · pulsing bass'],
   ]],
   ['Heaven', [
-    ['olympus', 'The White Citadel', 'A horn melody with a march'],
-    ['gold', 'The Golden Fields', 'Bright and dancing'],
-    ['silver', 'The Silver Peaks', 'Martial: brass and organ'],
-    ['mist', 'The Cloudlands', 'Floating: flute over glass'],
-    ['zeus', 'The Summit of Olympus', 'The fastest: organ and choir'],
+    ['olympus', 'The White Citadel', 'March · A major, C, D, G'],
+    ['gold', 'The Golden Fields', 'Bright dance beat with swing'],
+    ['silver', 'The Silver Peaks', 'Breakbeat · square-wave arpeggio'],
+    ['mist', 'The Cloudlands', 'Floating · a heartbeat'],
+    ['zeus', 'The Summit of Olympus', 'The fastest · driving double-time'],
   ]],
   ['Battle', [
-    ['boss', 'Boss fight', 'Every Warden and god'],
+    ['boss', 'Boss fight', 'Driving double-time · every Warden and god'],
   ]],
 ];
 

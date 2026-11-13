@@ -1,9 +1,8 @@
-// Procedural Web Audio: sound effects, and a soundtrack for every land that is composed as it plays.
-// Each land has its own key, tempo, chords, instruments, drum pattern and a written melody. The
-// music is built in sections (A A B A), brings its layers in one at a time, and plays harder when
-// foes are hunting you.
-let ac = null, master, musicBus, sfxBus, verbIn, echoIn, echoDelay, noiseBuf, timer = null;
-let theme = null, pending = 'title', nextTime = 0, step = 0, seed = 7, chord = 0, heat = 0, heatTo = 0;
+// Procedural Web Audio: sound effects, and background music for every land that is put together
+// as it plays from a big beat, a bass line and arpeggios (see Music, below). It plays in sections
+// (A A B A), brings its layers in one at a time, and plays harder when foes are hunting you.
+let ac = null, master, musicBus, pumpBus, sfxBus, verbIn, echoIn, echoDelay, noiseBuf, timer = null;
+let theme = null, pending = 'title', nextTime = 0, step = 0, seed = 7, chord = null, chordKey = 0, heat = 0, heatTo = 0;
 export let muted = false;
 try { muted = localStorage.getItem('ua.muted') === '1'; } catch (e) {}
 
@@ -41,6 +40,8 @@ export function initAudio() {
   musicBus = ac.createGain();
   musicBus.gain.value = 0.5;
   musicBus.connect(master);
+  pumpBus = ac.createGain();
+  pumpBus.connect(musicBus);
   sfxBus = ac.createGain();
   sfxBus.gain.value = 0.8;
   sfxBus.connect(master);
@@ -160,7 +161,11 @@ function noise({ t = ac.currentTime, d = 0.2, g = 0.2, type = 'bandpass', f = 10
 
 // ---------- Sound effects ----------
 // A note of the chord the music is on right now, so pickups and kills ring in tune with it.
-const inKey = (k, oct = 2) => (theme ? mtof(deg(theme, chord + k, oct)) : mtof(74 + [0, 3, 7, 10, 12, 15, 19][((k % 7) + 7) % 7]));
+function inKey(k, oct = 2) {
+  if (!chord) return mtof(74 + [0, 3, 7, 10, 12, 15, 19][((k % 7) + 7) % 7]);
+  const sc = SCALE7[chord.q];
+  return mtof(chord.midi + chordKey + sc[((k % 7) + 7) % 7] + 12 * (Math.floor(k / 7) + oct));
+}
 const lastPlayed = {};
 let gemRun = 0, gemAt = 0, foot = 0;
 
@@ -383,58 +388,88 @@ export function sfx(name, v = 1) {
 }
 
 // ---------- Music ----------
-const SC = {
-  dor: [0, 2, 3, 5, 7, 9, 10],
-  minor: [0, 2, 3, 5, 7, 8, 10],
-  phryg: [0, 1, 3, 5, 7, 8, 10],
-  harm: [0, 2, 3, 5, 7, 8, 11],
-  lyd: [0, 2, 4, 6, 7, 9, 11],
+// Background music made of three things only: a big beat, a bass line and arpeggios. There is no
+// lead instrument and nothing shrill. The small tunes live inside the arpeggio and bass riffs.
+// Every land plays its own order of the same family of chords (A, C, D and G; A minor below
+// ground, and A major, with its C sharp, in the brighter places), at its own speed, with its own
+// riffs and its own drum pattern.
+const NOTE = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+// The notes a riff may use over each kind of chord, in semitones above its root:
+// r root, t third, f fifth, o octave, and two colour notes a and b (a pentatonic scale in all).
+const TONES = {
+  maj: { r: 0, t: 4, f: 7, o: 12, a: 2, b: 9 },
+  min: { r: 0, t: 3, f: 7, o: 12, a: 5, b: 10 },
+  sus: { r: 0, t: 5, f: 7, o: 12, a: 2, b: 10 },
 };
+const SCALE7 = { maj: [0, 2, 4, 5, 7, 9, 11], min: [0, 2, 3, 5, 7, 8, 10], sus: [0, 2, 5, 5, 7, 9, 10] };
+function parseChord(name) {
+  const m = /^([A-G]#?)(m|sus)?$/.exec(name);
+  let midi = 36 + NOTE[m[1]];
+  if (midi > 51) midi -= 12;                 // roots sit between E2 and D#3
+  return { midi, q: m[2] === 'm' ? 'min' : m[2] === 'sus' ? 'sus' : 'maj' };
+}
 
-// prog and progB are the chords of the A and B sections, one a bar. mA and mB are the melodies:
-// two bars each, one character for every sixteenth note. A digit starts a note that many steps
-// of the scale above the chord's root, "-" holds it, "." is silence.
+// A and B are the chords of the two sections, one a bar. Riffs are one bar of sixteenth notes:
+// a letter (see TONES) starts a note, a capital plays it an octave up, "-" holds it, "." is silence.
+// arp holds the riffs for the A sections (they alternate) and, last, the one for the B section.
 const THEMES = {
-  title: { root: 50, scale: 'dor', tempo: 76, prog: [0, 5, 3, 4], progB: [3, 4, 0, 0], pad: 'warm', bass: 'root', arp: 'harp', arpPat: 'updown', arpRate: 2, lead: 'flute', oct: 2, drums: 'none',
-    mA: ['4-----2-0---....', '2---4---7-------'], mB: ['7---6-4-....2---', '4-----------....'] },
-  limbo: { root: 50, scale: 'dor', tempo: 88, prog: [0, 3, 5, 4], progB: [5, 4, 3, 4], pad: 'warm', bass: 'root', arp: 'pluck', arpPat: 'broken', arpRate: 2, lead: 'bell', oct: 2, drums: 'soft',
-    mA: ['4---2-0-....2-4-', '5---4-2-0-------'], mB: ['7---5-4-..2-4-5-', '4-------........'] },
-  lust: { root: 53, scale: 'harm', tempo: 98, swing: 0.12, prog: [0, 5, 6, 4], progB: [3, 6, 0, 4], pad: 'choir', bass: 'octave', arp: 'harp', arpPat: 'up', arpRate: 1, lead: 'flute', oct: 2, drums: 'soft',
-    mA: ['4-5-4-2-0---4---', '5-6-5-4-2-------'], mB: ['7-----5-4-5-7---', '9---7---5-------'] },
-  gluttony: { root: 45, scale: 'phryg', tempo: 74, swing: 0.2, prog: [0, 1, 5, 0], progB: [5, 1, 0, 0], pad: 'dark', bass: 'drone', arp: 'square', arpPat: 'alberti', arpRate: 2, lead: 'brass', oct: 0, drums: 'half',
-    mA: ['0-....1-0-......', '0-....3-1-0-----'], mB: ['4---3-1-0-......', '1---0-----------'] },
-  heresy: { root: 48, scale: 'harm', tempo: 108, prog: [0, 6, 5, 4], progB: [3, 4, 5, 4], pad: 'dark', bass: 'gallop', arp: 'pluck', arpPat: 'updown', arpRate: 1, lead: 'brass', oct: 1, drums: 'drive',
-    mA: ['0-0-4-0-5-4-2-0-', '6-5-4-2-4-------'], mB: ['7-7-5-7-9-7-5-4-', '5-4-2-4-0-------'] },
-  treachery: { root: 52, scale: 'minor', tempo: 66, prog: [0, 5, 2, 6], progB: [3, 2, 0, 4], pad: 'glass', bass: 'drone', arp: 'bell', arpPat: 'up', arpRate: 4, lead: 'bell', oct: 2, drums: 'heart',
-    mA: ['4-------....2---', '0-----------....'], mB: ['7-------5---4---', '2---------------'] },
-  abyss: { root: 43, scale: 'phryg', tempo: 120, prog: [0, 1, 0, 6], progB: [5, 6, 0, 1], pad: 'dark', bass: 'pulse', arp: 'pluck', arpPat: 'broken', arpRate: 1, lead: 'organ', oct: 1, drums: 'war',
-    mA: ['0---..0-1---..0-', '3---1---0-------'], mB: ['7---..7-8---..7-', '5---3---1-0-----'] },
-  boss: { root: 45, scale: 'harm', tempo: 132, prog: [0, 5, 1, 4], progB: [3, 4, 5, 4], pad: 'dark', bass: 'gallop', arp: 'pluck', arpPat: 'updown', arpRate: 1, lead: 'brass', oct: 1, drums: 'rock',
-    mA: ['0-.0-.4-5-.4-.2-', '0-.0-.6-5-4-2-4-'], mB: ['7-.7-.9-7-.5-.4-', '5-4-2-4-5-7-9---'] },
-  victory: { root: 55, scale: 'lyd', tempo: 84, prog: [0, 4, 5, 3], progB: [5, 3, 0, 4], pad: 'warm', bass: 'root', arp: 'harp', arpPat: 'up', arpRate: 2, lead: 'flute', oct: 2, drums: 'soft',
-    mA: ['0-2-4---7---4---', '5---4-2-4-------'], mB: ['7---9---7-5-4---', '2-4-5-7---------'] },
-  olympus: { root: 57, scale: 'lyd', tempo: 92, prog: [0, 4, 1, 5], progB: [5, 4, 3, 4], pad: 'choir', bass: 'root', arp: 'harp', arpPat: 'broken', arpRate: 2, lead: 'brass', oct: 1, drums: 'march',
-    mA: ['0---4---7-5-4---', '3---4---2-------'], mB: ['7---5-7-9-------', '7-5-4-2-0-------'] },
-  gold: { root: 59, scale: 'lyd', tempo: 100, swing: 0.1, prog: [0, 4, 5, 1], progB: [5, 4, 0, 4], pad: 'warm', bass: 'octave', arp: 'harp', arpPat: 'updown', arpRate: 1, lead: 'flute', oct: 2, drums: 'soft',
-    mA: ['4-7-4-2-4-7-9-7-', '5-4-2-4-0-------'], mB: ['9-7-5-7-4-5-2-4-', '0-2-4-7---------'] },
-  silver: { root: 55, scale: 'dor', tempo: 96, prog: [0, 6, 3, 4], progB: [3, 4, 0, 6], pad: 'organ', bass: 'pulse', arp: 'square', arpPat: 'updown', arpRate: 2, lead: 'brass', oct: 1, drums: 'march',
-    mA: ['0---0-0-4---2---', '0---0-0-5---4---'], mB: ['7---7-7-5---4---', '2---4---0-------'] },
-  mist: { root: 54, scale: 'lyd', tempo: 72, prog: [0, 3, 1, 4], progB: [5, 3, 0, 0], pad: 'glass', bass: 'drone', arp: 'bell', arpPat: 'up', arpRate: 4, lead: 'flute', oct: 2, drums: 'none',
-    mA: ['4-----------2---', '7-----------5---'], mB: ['9-------7---5---', '4---------------'] },
-  zeus: { root: 50, scale: 'harm', tempo: 140, prog: [0, 6, 5, 1], progB: [3, 4, 5, 4], pad: 'choir', bass: 'gallop', arp: 'pluck', arpPat: 'updown', arpRate: 1, lead: 'organ', oct: 1, drums: 'rock',
-    mA: ['0-0-0-7-6-7-4-..', '0-0-0-9-7-6-7---'], mB: ['9-7-6-7-9-7-6-4-', '5-4-2-4-0-------'] },
-  prelude: { root: 52, scale: 'lyd', tempo: 70, prog: [0, 4, 3, 5], progB: [5, 4, 0, 0], pad: 'choir', bass: 'drone', arp: 'harp', arpPat: 'up', arpRate: 2, lead: 'flute', oct: 2, drums: 'none',
-    mA: ['0---2---4---7---', '5-------4-------'], mB: ['7---5---4---2---', '0---------------'] },
-  fall: { root: 45, scale: 'phryg', tempo: 64, prog: [0, 1, 6, 0], progB: [5, 1, 0, 0], pad: 'dark', bass: 'drone', arp: 'bell', arpPat: 'up', arpRate: 4, lead: 'choir', oct: 1, drums: 'heart',
-    mA: ['7-------5---4---', '1-------0-------'], mB: ['4---3---1-------', '0---------------'] },
+  title: { tempo: 84, A: ['Am', 'C', 'D', 'G'], B: ['D', 'C', 'G', 'A'], voice: 'soft', drums: 'soft',
+    arp: ['r.f.o.f.T.f.o.f.', 'r.f.o.f.b.f.o.f.', 'o.f.t.f.a.f.t.f.'], arp2: ['f.......t.......', 'a.......t.......'],
+    bass: ['r.....r...r.....', 'r.....r...o.....'] },
+  prelude: { tempo: 76, A: ['A', 'D', 'A', 'G'], B: ['D', 'A', 'G', 'A'], voice: 'soft', drums: 'heart',
+    arp: ['r.t.f.o.f.t.f.o.', 'r.t.f.b.o.b.f.t.', 'o.f.t.f.a.f.t.f.'], arp2: ['f.......a.......'],
+    bass: ['r-------------..', 'r-------o-----..'] },
+  fall: { tempo: 70, key: -5, A: ['Am', 'G', 'C', 'D'], B: ['C', 'D', 'Am', 'Am'], voice: 'soft', drums: 'heart',
+    arp: ['o...f...t...f...', 'b...f...a...r...', 'o...b...f...a...'], arp2: null,
+    bass: ['r-------------..', 'r-------------..'] },
+  victory: { tempo: 96, A: ['A', 'C', 'D', 'G'], B: ['D', 'G', 'A', 'A'], voice: 'pluck', drums: 'four', stab: '..x...x...x...x.',
+    arp: ['rtfotfrtfotfrtfo', 'r.fo.f.to.f.b.f.', 'o.b.f.a.t.a.f.b.'], arp2: ['f...t...a...t...'],
+    bass: ['r.o.r.o.r.o.r.o.', 'r.o.r.o.r.o.b.f.'] },
+  limbo: { tempo: 92, A: ['Am', 'C', 'D', 'G'], B: ['Am', 'G', 'D', 'C'], voice: 'pluck', drums: 'boom',
+    arp: ['r.fo.f.to.f.b.f.', 'r.f.o.f.T.f.o.f.', 'o.b.f.a.t.a.f.b.'], arp2: ['....f.t.....a.r.', '....t.f.....b.o.'],
+    bass: ['r..r..r.r..r..f.', 'r.....o.r...b.f.'] },
+  lust: { tempo: 104, swing: 0.12, A: ['Am', 'D', 'C', 'G'], B: ['C', 'D', 'Am', 'A'], voice: 'pluck', drums: 'four', stab: '..x...x...x...x.',
+    arp: ['rtfotfrtfotfrtfo', 'rfofTfofrfofbfof', 'o.f.t.f.a.f.t.f.'], arp2: ['f...t...a...t...'],
+    bass: ['r.o.r.o.r.o.r.o.', 'r.r.o.r.r.o.r.b.'] },
+  gluttony: { tempo: 80, swing: 0.2, A: ['Am', 'C', 'G', 'D'], B: ['D', 'C', 'Am', 'G'], voice: 'pulse', drums: 'half',
+    arp: ['r..f..o.r..f..T.', 'r..f..b.r..f..a.', 'o..b..f.o..b..a.'], arp2: ['....f.......t...'],
+    bass: ['r.....r..rr...f.', 'r...r..or...r.b.'] },
+  heresy: { tempo: 116, A: ['Am', 'G', 'C', 'D'], B: ['C', 'D', 'G', 'A'], voice: 'pluck', drums: 'rock', stab: 'x.....x.....x...',
+    arp: ['rr.frr.orr.frr.T', 'rfofTfofrfofbfof', 'o.f.t.f.a.f.t.f.'], arp2: ['f...t...a...t...'],
+    bass: ['r..rr..rr..rr..r', 'r.r.r.r.r.r.o.b.'] },
+  treachery: { tempo: 76, key: -5, A: ['Am', 'G', 'C', 'D'], B: ['C', 'G', 'D', 'Am'], voice: 'soft', drums: 'half',
+    arp: ['r...f...o...f...', 'r...f...b...a...', 'o...b...f...a...'], arp2: ['..f...T...f...o.', '..t...f...a...f.'],
+    bass: ['r-------r-----f-', 'r-------o-----b-'] },
+  abyss: { tempo: 124, A: ['Am', 'C', 'D', 'C'], B: ['G', 'D', 'C', 'A'], voice: 'pluck', drums: 'tribal',
+    arp: ['rfofTfofrfofbfof', 'r.fo.f.to.f.b.f.', 'rr.frr.orr.frr.T'], arp2: ['o.....b.f.....a.'],
+    bass: ['r.r.r.r.r.r.r.r.', 'r.r.o.r.r.o.r.b.'] },
+  boss: { tempo: 136, A: ['Am', 'C', 'D', 'G'], B: ['C', 'D', 'C', 'D'], turn: 'G', voice: 'pluck', drums: 'drive', stab: 'x..x..x.....x...',
+    arp: ['rtfotfrtfotfrtfo', 'rfofTfofrfofbfof', 'rr.frr.orr.frr.T'], arp2: ['f.t.a.t.f.t.a.r.'],
+    bass: ['r..rr..rr..rr..r', 'rr.or.r.rr.or.fb'] },
+  olympus: { tempo: 96, A: ['A', 'C', 'D', 'G'], B: ['D', 'G', 'A', 'G'], voice: 'soft', drums: 'march',
+    arp: ['r.t.f.o.f.t.f.o.', 'r.t.f.b.o.b.f.t.', 'o.f.t.f.a.f.t.f.'], arp2: ['..f...t...a...t.'],
+    bass: ['r.....r...r.f...', 'r...o...r...b...'] },
+  gold: { tempo: 108, swing: 0.1, A: ['A', 'D', 'C', 'G'], B: ['C', 'G', 'D', 'A'], voice: 'pluck', drums: 'four', stab: '..x...x...x...x.',
+    arp: ['rtfotfrtfotfrtfo', 'r.fo.f.to.f.b.f.', 'o.b.f.a.t.a.f.b.'], arp2: ['f...t...a...t...'],
+    bass: ['r.o.r.o.r.o.r.o.', 'r..r..o.r..r..b.'] },
+  silver: { tempo: 100, A: ['A', 'G', 'C', 'D'], B: ['D', 'C', 'G', 'A'], voice: 'pulse', drums: 'break',
+    arp: ['rr.frr.orr.frr.T', 'r..f..o.r..f..T.', 'r.f.o.f.b.f.o.f.'], arp2: ['....f.t.....a.r.'],
+    bass: ['r.r.r.r.r.r.r.r.', 'r..r..r.r..r..f.'] },
+  mist: { tempo: 78, key: -5, A: ['A', 'D', 'G', 'D'], B: ['C', 'G', 'D', 'A'], voice: 'soft', drums: 'heart',
+    arp: ['r...f...o...f...', 'r...t...f...b...', 'o...b...f...a...'], arp2: ['..f...T...f...o.'],
+    bass: ['r-------------..', 'r-------o-----..'] },
+  zeus: { tempo: 144, A: ['A', 'C', 'D', 'G'], B: ['G', 'D', 'C', 'A'], voice: 'pluck', drums: 'drive', stab: 'x..x..x.....x...',
+    arp: ['rfofTfofrfofbfof', 'rtfotfrtfotfrtfo', 'rr.frr.orr.frr.T'], arp2: ['o.b.f.a.t.a.f.b.'],
+    bass: ['r..rr..rr..rr..r', 'rr.or.r.rr.or.fb'] },
 };
+for (const name in THEMES) {
+  const th = THEMES[name];
+  th.Ac = th.A.map(parseChord);
+  th.Bc = th.B.map(parseChord);
+  th.turnC = th.turn ? parseChord(th.turn) : null;
+}
 
 export function setTheme(name) { pending = name; }
-
-function deg(th, d, oct = 0) {
-  const s = SC[th.scale], n = s.length, o = Math.floor(d / n);
-  return th.root + s[((d % n) + n) % n] + 12 * (o + oct);
-}
 
 function schedule() {
   if (!ac || ac.state !== 'running') return;
@@ -455,146 +490,135 @@ function schedule() {
   }
 }
 
-// Crossing into a new land: a swell and a low bell on its home note.
+// Crossing into a new land: a soft swell and a low note on its first chord.
 function arrive(th, t) {
-  noise({ t, f: 500, f2: 5000, d: 1.4, g: 0.035, type: 'bandpass', a: 0.9, dest: musicBus, verb: 0.6 });
-  tone({ f: mtof(deg(th, 0, 0)), t, d: 2.6, g: 0.05, dest: musicBus, verb: 0.9 });
-  tone({ f: mtof(deg(th, 0, 0)) * 3.01, t, d: 0.9, g: 0.012, dest: musicBus, verb: 0.9 });
+  noise({ t, f: 400, f2: 2400, d: 1.2, g: 0.03, type: 'bandpass', a: 0.8, dest: musicBus, verb: 0.5 });
+  tone({ f: mtof(th.Ac[0].midi + (th.key || 0)), t, d: 2, g: 0.07, dest: musicBus, verb: 0.6 });
 }
 
-// ---- instruments
-function voice(inst, f, t, d, g, pan = 0) {
-  const M = musicBus;
-  switch (inst) {
-    case 'harp':
-      tone({ type: 'triangle', f, t, d: Math.max(d, 0.5), g, dest: M, filter: 3200, verb: 0.5, echo: 0.3, pan });
-      break;
-    case 'pluck':
-      tone({ type: 'sawtooth', f, t, d: Math.max(d, 0.22), g: g * 0.7, dest: M, filter: 2400, sweep: 2.2, q: 3, verb: 0.3, echo: 0.3, pan });
-      break;
-    case 'square':
-      tone({ type: 'square', f, t, d: Math.max(d, 0.2), g: g * 0.5, dest: M, filter: 2200, verb: 0.4, echo: 0.25, pan });
-      break;
-    case 'bell':
-      tone({ f, t, d: Math.max(d, 1.1), g, dest: M, verb: 0.8, echo: 0.35, pan });
-      tone({ f: f * 3.01, t, d: 0.5, g: g * 0.28, dest: M, verb: 0.8, pan });
-      tone({ f: f * 4.2, t, d: 0.2, g: g * 0.12, dest: M, pan });
-      break;
-    case 'flute':
-      tone({ f, t, d, g: g * 1.2, a: 0.05, sus: 1, rel: 0.12, vib: 0.006, dest: M, verb: 0.6, echo: 0.2, pan });
-      tone({ type: 'triangle', f: f * 2, t, d, g: g * 0.12, a: 0.08, sus: 1, rel: 0.12, dest: M, verb: 0.6, pan });
-      noise({ t, f: f * 2, d: Math.min(d, 0.12), g: g * 0.12, q: 2, dest: M });
-      break;
-    case 'brass':
-      tone({ type: 'sawtooth', f, t, d, g: g * 0.8, a: 0.04, sus: 1, rel: 0.1, dest: M, filter: 2000, sweep: 0.35, q: 1.5, verb: 0.5, pan, detune: -5 });
-      tone({ type: 'sawtooth', f, t, d, g: g * 0.5, a: 0.05, sus: 1, rel: 0.1, dest: M, filter: 1500, sweep: 0.35, verb: 0.5, pan, detune: 6 });
-      break;
-    case 'organ':
-      tone({ type: 'square', f, t, d, g: g * 0.45, a: 0.02, sus: 1, rel: 0.06, dest: M, filter: 2400, verb: 0.5, pan });
-      tone({ f: f * 2, t, d, g: g * 0.35, a: 0.02, sus: 1, rel: 0.06, dest: M, verb: 0.5, pan });
-      tone({ f: f / 2, t, d, g: g * 0.4, a: 0.02, sus: 1, rel: 0.06, dest: M, pan });
-      break;
-    case 'choir':
-      for (const dt of [-9, 8]) tone({ type: 'sawtooth', f, t, d, g: g * 0.6, a: 0.16, sus: 1, rel: 0.25, vib: 0.004, dest: M, filter: 1250, q: 4, verb: 0.8, pan: pan + dt / 30, detune: dt });
-      break;
+// ---- instruments: all of them plucked, low-passed and kept out of the high registers
+function pitch(ch, key, c, oct) {
+  const up = c >= 'A' && c <= 'Z';
+  return ch.midi + key + TONES[ch.q][c.toLowerCase()] + 12 * (oct + (up ? 1 : 0));
+}
+// The note a riff starts on this step, and how many steps it lasts; null when it is silent.
+function riffAt(riff, b) {
+  const c = riff[b];
+  if (!c || c === '.' || c === '-') return null;
+  let n = 1;
+  while (b + n < 16 && riff[b + n] === '-') n++;
+  return [c, n];
+}
+function pluck(kind, midi, t, d, g, pan = 0) {
+  while (midi > 81) midi -= 12;              // nothing above the A over the stave
+  const f = mtof(midi), M = pumpBus;
+  if (kind === 'pluck') tone({ type: 'sawtooth', f, t, d: Math.max(d, 0.2), g: g * 0.75, dest: M, filter: 1700, sweep: 2, q: 3, verb: 0.3, echo: 0.3, pan });
+  else if (kind === 'pulse') tone({ type: 'square', f, t, d: Math.max(d, 0.2), g: g * 0.42, dest: M, filter: 1300, sweep: 1.8, q: 2, verb: 0.3, echo: 0.25, pan });
+  else {
+    tone({ type: 'triangle', f, t, d: Math.max(d, 0.3), g, dest: M, filter: 1400, verb: 0.4, echo: 0.3, pan });
+    tone({ f, t, d: Math.max(d, 0.3), g: g * 0.5, dest: M, pan });
   }
 }
-
-function pad(th, d, t, len) {
-  const M = musicBus;
-  [0, 2, 4].forEach((k, i) => {
-    const f = mtof(deg(th, d + k, 0)), pan = (i - 1) * 0.5, L = len * 1.06;
-    if (th.pad === 'choir') {
-      for (const dt of [-8, 8]) tone({ type: 'sawtooth', f, t, d: L, g: 0.012, a: 0.7, sus: 1, rel: 0.9, dest: M, filter: 1150, q: 3.5, verb: 0.8, detune: dt, pan });
-    } else if (th.pad === 'glass') {
-      tone({ f, t, d: L, g: 0.03, a: 0.5, sus: 1, rel: 1, dest: M, verb: 0.9, pan });
-      tone({ f: f * 2, t, d: L, g: 0.009, a: 0.9, sus: 1, rel: 1, dest: M, verb: 0.9, pan: -pan });
-    } else if (th.pad === 'organ') {
-      tone({ type: 'square', f, t, d: L, g: 0.01, a: 0.25, sus: 1, rel: 0.5, dest: M, filter: 1300, verb: 0.6, pan });
-      tone({ f: f / 2, t, d: L, g: 0.018, a: 0.25, sus: 1, rel: 0.5, dest: M, pan });
-    } else {
-      const cut = th.pad === 'dark' ? 560 : 950;
-      for (const dt of [-7, 7]) tone({ type: 'sawtooth', f, t, d: L, g: 0.013, a: 0.5, sus: 1, rel: 0.8, dest: M, filter: cut, sweep: 0.55, verb: 0.6, detune: dt, pan });
-    }
-  });
+function bassNote(midi, t, d, long) {
+  const f = mtof(midi), M = pumpBus;
+  tone({ type: 'triangle', f, t, d: long ? d : 0.34, g: long ? 0.09 : 0.11, a: long ? 0.06 : 0.005, sus: long ? 1 : 0, rel: 0.3, dest: M, filter: 620 });
+  tone({ f, t, d: long ? d : 0.3, g: 0.06, a: 0.005, sus: long ? 1 : 0, rel: 0.3, dest: M });
+  if (!long) tone({ type: 'sawtooth', f, t, d: 0.2, g: 0.032, dest: M, filter: 900, sweep: 2, q: 2 });
 }
 
-const BASS = {
-  root: 'x.....x...x.....', pulse: 'x.x.x.x.x.x.x.x.', octave: 'x.X.x.X.x.X.x.X.', drone: 'L...............', gallop: 'x..xx..xx..xx..x',
-};
-function bass(th, d, b, t, stepLen) {
-  const c = BASS[th.bass][b];
-  if (c === '.') return;
-  const f = mtof(deg(th, d, c === 'X' ? 0 : -1)), long = c === 'L';
-  tone({ type: 'triangle', f, t, d: long ? stepLen * 15 : 0.34, g: long ? 0.085 : 0.1, a: long ? 0.08 : 0.005, sus: long ? 1 : 0, rel: 0.4, dest: musicBus, filter: 620 });
-  if (!long) tone({ type: 'sawtooth', f, t, d: 0.2, g: 0.03, dest: musicBus, filter: 900, sweep: 2, q: 2 });
-}
-
-const ARPS = { up: [0, 2, 4, 7], updown: [0, 2, 4, 7, 4, 2, 0, 2], broken: [0, 4, 2, 7, 4, 9, 7, 4], alberti: [0, 4, 2, 4] };
-
-// kick, snare, hat, tom: "x" plays, "o" plays softly
+// ---- the kit. k kick, s snare, c clap, h and o closed and open hat, t and T toms, p a wood knock.
+// "x" plays, "o" plays softly.
+const KINDS = ['k', 's', 'c', 'h', 'o', 't', 'T', 'p'];
 const DRUMS = {
-  heart: { k: 'x.......o.......' },
-  soft: { k: 'x.......x.......', h: '..x...x...x...x.', s: '....o.......o...' },
-  half: { k: 'x.........x.....', s: '........x.......', h: 'x...x...x...x...' },
-  drive: { k: 'x.....x.x.....x.', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.' },
-  march: { k: 'x...x...x...x...', s: '..oo..x...oo..x.', h: '................' },
-  war: { k: 'x.......x.......', t: 'x..x..x.x..x..xx', s: '............x...' },
-  rock: { k: 'x..x..x.x..x..x.', s: '....x.......x...', h: 'xxxxxxxxxxxxxxxx' },
+  heart: { gentle: 1, k: 'x.......x..o....', h: '..o...o...o...o.', p: '....o.......o...' },
+  soft: { gentle: 1, k: 'x.......x.x.....', c: '........x.......', h: '..o...o...o...o.', p: '......o.......o.' },
+  half: { k: 'x.........x..x..', s: '........x.......', h: 'x...x...x...x.x.', p: '..o...o...o...o.' },
+  boom: { k: 'x......x..x.....', s: '....x.......x...', h: 'x.x.x.x.x.x.x.xo', p: '.........o......' },
+  four: { k: 'x...x...x...x...', c: '....x.......x...', h: 'x.o.x.o.x.o.x.o.', o: '..x...x...x...x.' },
+  rock: { k: 'x.....x.x.....x.', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', o: '..............x.' },
+  break: { k: 'x..x......x..x..', s: '....x..o.o..x...', h: 'x.x.x.x.x.x.x.x.' },
+  march: { k: 'x...x...x...x...', s: '..oo..x...oo..xo', h: 'x.x.x.x.x.x.x.x.' },
+  tribal: { k: 'x...x...x...x...', c: '....x.......x...', t: 'x..x..x.x..x..xx', T: '......x.......x.', h: '..o...o...o...o.' },
+  drive: { k: 'x.x...x.x.x...x.', s: '....x.......x...', h: 'xxxxxxxxxxxxxxxx', o: '......x.......x.' },
 };
-function kit(c, kind, t, g, pan = 0) {
+function kit(kind, c, t, g, pan = 0) {
   if (c !== 'x' && c !== 'o') return;
   const v = (c === 'o' ? 0.5 : 1) * g, M = musicBus;
-  if (kind === 'k') { tone({ f: 125, f2: 40, t, d: 0.26, g: 0.2 * v, dest: M }); noise({ t, f: 2500, d: 0.015, g: 0.03 * v, dest: M }); }
-  else if (kind === 's') { noise({ t, f: 1900, d: 0.16, g: 0.075 * v, dest: M, verb: 0.3 }); tone({ type: 'triangle', f: 190, f2: 120, t, d: 0.1, g: 0.05 * v, dest: M }); }
-  else if (kind === 'h') noise({ t, f: 8200, d: 0.035, g: 0.02 * v, type: 'highpass', dest: M, pan });
-  else if (kind === 't') tone({ f: 150, f2: 78, t, d: 0.22, g: 0.13 * v, dest: M, verb: 0.3, pan });
+  switch (kind) {
+    case 'k':
+      // a deep, round kick, and everything else ducks under it for a moment
+      tone({ f: 150, f2: 42, t, d: 0.32, g: 0.34 * v, dest: M });
+      tone({ type: 'triangle', f: 92, f2: 46, t, d: 0.12, g: 0.13 * v, dest: M });
+      noise({ t, f: 2600, d: 0.012, g: 0.045 * v, dest: M });
+      pumpBus.gain.setValueAtTime(1 - 0.42 * v, t);
+      pumpBus.gain.linearRampToValueAtTime(1, t + 0.19);
+      break;
+    case 's':
+      noise({ t, f: 1700, q: 0.8, d: 0.18, g: 0.11 * v, dest: M, verb: 0.25 });
+      tone({ type: 'triangle', f: 200, f2: 130, t, d: 0.1, g: 0.08 * v, dest: M });
+      break;
+    case 'c':
+      for (let i = 0; i < 3; i++) noise({ t: t + i * 0.011, f: 1300, q: 1.2, d: 0.1, g: 0.06 * v, dest: M, verb: 0.3 });
+      break;
+    case 'h': noise({ t, f: 7000, d: 0.03, g: 0.017 * v, type: 'highpass', dest: M, pan }); break;
+    case 'o': noise({ t, f: 6000, d: 0.15, g: 0.015 * v, type: 'highpass', dest: M, pan }); break;
+    case 't': tone({ f: 130, f2: 70, t, d: 0.24, g: 0.17 * v, dest: M, verb: 0.25, pan }); break;
+    case 'T': tone({ f: 190, f2: 105, t, d: 0.2, g: 0.15 * v, dest: M, verb: 0.25, pan }); break;
+    case 'p':
+      tone({ type: 'triangle', f: 640, f2: 420, t, d: 0.045, g: 0.035 * v, dest: M, verb: 0.3, pan });
+      break;
+  }
 }
 
 function playStep(th, s, t) {
-  const bar = Math.floor(s / 16), b = s % 16, stepLen = 60 / th.tempo / 4;
+  const bar = Math.floor(s / 16), b = s % 16, stepLen = 60 / th.tempo / 4, key = th.key || 0;
   // sixteen bars to a round, in four sections: A A B A
-  const round = Math.floor(bar / 16), lb = bar % 16, section = Math.floor(lb / 4), inB = section === 2;
-  const d = (inB ? th.progB : th.prog)[lb % 4];
-  chord = d;
-  const first = round === 0;                      // the first time round, the layers arrive one by one
-  const hush = !first && round % 4 === 3 && section === 0;   // now and then, four quiet bars
+  const round = Math.floor(bar / 16), lb = bar % 16, section = lb >> 2, inB = section === 2;
+  const ch = lb === 15 && th.turnC ? th.turnC : (inB ? th.Bc : th.Ac)[lb % 4];
+  chord = ch;
+  chordKey = key;
+  const first = round === 0;                                  // the first time round, the layers arrive one by one
+  const calm = !first && round % 4 === 3 && section === 0;    // now and then, four bars with the beat stripped back
   const tt = t + (b % 2 ? (th.swing || 0) * stepLen : 0);
+  const hot = heat > 0.5;
 
-  if (b === 0) pad(th, d, t, stepLen * 16);
-  if (!hush && (!first || lb >= 2)) bass(th, d, b, tt, stepLen);
+  // the arpeggio: two riffs take turns in the A sections, a third plays in the B section
+  const riff = inB ? th.arp[2] : th.arp[(lb + section + round) % 2];
+  const n1 = riffAt(riff, b);
+  if (n1) pluck(th.voice, pitch(ch, key, n1[0], 1), tt, stepLen * n1[1] * 0.9, 0.034, b % 4 < 2 ? -0.3 : 0.3);
 
-  // the arpeggio, an octave higher when the fight is on
-  if (b % th.arpRate === 0 && (!first || lb >= 4)) {
-    const pat = ARPS[th.arpPat], k = pat[(b / th.arpRate) % pat.length];
-    voice(th.arp, mtof(deg(th, d + k, heat > 0.6 && !inB ? 2 : 1)), tt, stepLen * th.arpRate * 0.9, 0.03, b % 4 < 2 ? -0.35 : 0.35);
+  // a second, quieter voice answers it with a small tune of its own
+  if (th.arp2 && (hot || (first ? lb >= 8 : section > 0))) {
+    const n2 = riffAt(th.arp2[lb % th.arp2.length], b);
+    if (n2) pluck(th.voice === 'soft' ? 'pluck' : 'soft', pitch(ch, key, n2[0], th.voice === 'soft' ? 1 : 2), tt, stepLen * n2[1] * 0.9, 0.022, b % 8 < 4 ? 0.4 : -0.4);
   }
 
-  // the tune: silent for the first eight bars, harmonised a third above on every other round
-  if (!first || lb >= 8) {
-    const line = (inB ? th.mB : th.mA)[lb % 2], c = line[b];
-    if (c >= '0' && c <= '9') {
-      let n = 1;
-      while (b + n < 16 && line[b + n] === '-') n++;
-      const k = +c, len = stepLen * n * 0.95;
-      voice(th.lead, mtof(deg(th, d + k, th.oct)), tt, len, 0.042);
-      if (round % 2 === 1 && !hush) voice(th.lead, mtof(deg(th, d + k + 2, th.oct)), tt, len, 0.018, 0.4);
-    }
+  // short chords on the off-beats, where a tune has them
+  if (th.stab && th.stab[b] === 'x' && !calm && (!first || lb >= 4)) {
+    for (const c of ['r', 't', 'f']) tone({ type: 'sawtooth', f: mtof(pitch(ch, key, c, 1)), t: tt, d: 0.16, g: 0.016, dest: pumpBus, filter: 1100, sweep: 1.8, verb: 0.3, pan: c === 't' ? 0.3 : c === 'f' ? -0.3 : 0 });
   }
 
-  // drums: in from the fifth bar, louder in a fight, with a roll into every new section
-  const D = DRUMS[th.drums];
-  if (D && !hush && (!first || lb >= 4)) {
-    const g = 0.6 + 0.4 * heat;
-    const roll = lb % 4 === 3 && b >= 12 && (D.s || D.t);
-    if (roll) kit('x', D.t ? 't' : 's', tt, g * (0.5 + (b - 12) * 0.17), (b - 13.5) * 0.3);
-    else {
-      for (const kind in D) kit(D[kind][b], kind, tt, g, kind === 'h' ? 0.3 : kind === 't' ? (b % 8 < 4 ? -0.4 : 0.4) : 0);
-      // quick extra hats when it is heated
-      if (heat > 0.55 && D.h && b % 2 === 1 && D.h[b] === '.') kit('o', 'h', tt, g, -0.3);
-    }
-    if (lb % 4 === 0 && b === 0 && !first) noise({ t, f: 5200, d: 1.3, g: 0.035 * g, type: 'highpass', dest: musicBus, verb: 0.5 });
+  // the bass line
+  if (!calm && (!first || lb >= 2)) {
+    const nb = riffAt(th.bass[inB ? 1 : 0], b);
+    if (nb) bassNote(pitch(ch, key, nb[0], 0), tt, stepLen * nb[1], nb[1] >= 4);
   }
+
+  // the beat: hats alone for two bars, then everything, louder in a fight, with a roll into every new section
+  const D = DRUMS[th.drums], g = 0.75 + 0.25 * heat;
+  const roll = !D.gentle && lb % 4 === 3 && b >= 12 && (!first || lb >= 4);
+  for (const kind of KINDS) {
+    if (!D[kind]) continue;
+    const big = kind !== 'h' && kind !== 'o' && kind !== 'p';
+    if (big && ((first && lb < 2) || roll || (calm && kind !== 'c'))) continue;
+    kit(kind, D[kind][b], tt, g, kind === 'h' || kind === 'o' ? 0.25 : kind === 't' ? -0.35 : kind === 'T' ? 0.35 : 0);
+  }
+  if (roll) kit(b === 15 ? 'T' : b % 2 ? 't' : 's', 'x', tt, g * (0.55 + (b - 12) * 0.15), (b - 13.5) * 0.3);
+  // quick extra hats and a knock when it is heated
+  if (hot && !D.gentle && b % 2 === 1 && !(D.h && D.h[b] !== '.')) kit('h', 'o', tt, g, -0.25);
+  if (hot && !D.gentle && (b === 3 || b === 11) && !D.p) kit('p', 'o', tt, g, 0.3);
+  // a soft wash marks each new section
+  if (lb % 4 === 0 && b === 0 && !first && !D.gentle) noise({ t, f: 3200, q: 0.6, d: 1.1, g: 0.03 * g, dest: musicBus, verb: 0.5 });
 }
 
 // DEV:BEGIN
