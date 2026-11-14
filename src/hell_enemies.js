@@ -1,5 +1,5 @@
 // The underworld's creatures, drawn in detail: demons, bone widows, hell bats, flaming skulls,
-// bile maws and hell knights. Each is drawn facing right with its feet at (0, 0).
+// bile maws, hell knights, gorgers and harpies. Each is drawn facing right with its feet at (0, 0).
 // Every land dresses them differently: ghostly in Limbo, wind-torn in Lust, slime-dripping in
 // Gluttony, burning in Heresy and frozen over in Treachery.
 import { BIOME_LIST } from './world.js';
@@ -775,6 +775,154 @@ export const HELL = {
     eye(ctx, 17, -60, 1.5 + heat * 0.7, '#ffd34a', '#fff', 3.6);
     if (heat > 0.6 && Math.random() < 0.4) part({ ...W(e, 16, -58), vx: e.face * 20, vy: -60, life: 0.6, size: 4, grow: 1.5, color: 'rgba(200,200,200,.25)' });
     if (charge && Math.random() < 0.5) part({ ...W(e, 30, -30), vx: -e.face * 60, vy: rand(-60, -20), life: 0.4, size: rand(1.5, 2.5), color: '#ffb347', add: true });
+    dress(ctx, e, L, true);
+  },
+
+  // A gorger: a bloated grub, all belly and mouth. It drags itself along, rears up to bite, and
+  // bursts when it dies. Found only in Gluttony.
+  grub(ctx, e) {
+    const C = pal(e, '#c2c46a', 0.5), crawl = e.t * (3 + Math.min(1, Math.abs(e.vx) / 60) * 7);
+    const rear = e.t2 > 0 ? Math.min(1, e.t2 / 0.2) : 0;
+    const L = { tops: [[-10, -15, -0.3], [-1, -19, 0], [8, -17, 0.4]], drips: [[-8, -4], [2, -3], [10, -5]], core: [0, -10, 15] };
+    dress(ctx, e, L, false);
+    // stubby legs, rippling from tail to head
+    ctx.strokeStyle = C.dark;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let k = 0; k < 5; k++) { const x = -13 + k * 5.5, s = Math.sin(crawl - k * 0.9) * 1.6; ctx.moveTo(x, -3); ctx.lineTo(x + s, 0); }
+    ctx.stroke();
+    // five fat segments, tail first, each swelling and shrinking as it crawls
+    let head = [0, 0, 0];
+    for (let k = 0; k < 5; k++) {
+      const u = k / 4, sw = 1 + Math.sin(crawl - k * 0.9) * 0.07;
+      const x = -14 + k * 6.6 + (k === 4 ? rear * 2 : 0), r = (5.5 + Math.sin(u * Math.PI) * 4.5 + (k === 4 ? 1 : 0)) * sw;
+      const y = -r - 0.5 - (k >= 3 ? rear * (k - 2) * 3.5 : 0);
+      const g = ctx.createRadialGradient(x - 2, y - r * 0.5, 1, x, y, r * 1.15);
+      g.addColorStop(0, C.light);
+      g.addColorStop(0.7, C.body);
+      g.addColorStop(1, C.dark);
+      ctx.fillStyle = g;
+      ctx.strokeStyle = C.dark;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(x, y, r * 0.95, r, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      if (k < 4) {
+        // a bristle on its back and a breathing hole in its side
+        ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x - 2, y - r - 3.5); ctx.stroke();
+        ctx.fillStyle = 'rgba(0,0,0,.4)';
+        ctx.beginPath(); ctx.arc(x, y + r * 0.3, 1, 0, TAU); ctx.fill();
+      } else head = [x, y, r];
+    }
+    // the mouth: a round maw ringed with teeth, gaping wide as it rears to bite
+    const [hx, hy, hr] = head;
+    const open = 2.6 + rear * 3 + Math.max(0, Math.sin(e.t * 5)) * 0.8, mx = hx + hr * 0.45, my = hy + hr * 0.15;
+    ctx.fillStyle = '#1a0608';
+    ctx.beginPath(); ctx.ellipse(mx, my, open * 0.85, open, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff6e6';
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * TAU + 0.2, c = Math.cos(a), s = Math.sin(a);
+      ctx.beginPath();
+      ctx.moveTo(mx + c * open * 0.85 - s * 0.9, my + s * open + c * 0.9);
+      ctx.lineTo(mx + c * open * 0.3, my + s * open * 0.35);
+      ctx.lineTo(mx + c * open * 0.85 + s * 0.9, my + s * open - c * 0.9);
+      ctx.fill();
+    }
+    // three small eyes crowded above it
+    const ec = lit(e) ? e.accent : '#ffffff';
+    eye(ctx, hx - 1, hy - hr * 0.6, 1.5, ec, '#fff', 2.4);
+    eye(ctx, hx + 2.8, hy - hr * 0.72, 1.1, ec, '#fff', 2.2);
+    eye(ctx, hx - 4.2, hy - hr * 0.36, 1, ec, '#fff', 2.2);
+    if (lit(e) && Math.random() < 0.05) part({ ...W(e, mx, my + open), vx: rand(-8, 8), vy: 30, g: 500, life: 0.5, size: 1.6, color: e.accent });
+    dress(ctx, e, L, true);
+  },
+
+  // A harpy: a hag's head on a vulture's body. It rides the storm above its prey, then folds its
+  // wings and stoops, talons first. Found only in Lust.
+  harpy(ctx, e) {
+    const C = pal(e, '#7a4a8a', 0.5), dive = e.state === 'dive', aim = e.state === 'aim';
+    const flap = dive ? -0.9 : Math.sin(e.t * (aim ? 26 : 13));
+    const L = { tops: [[-4, -9, -0.5], [3, -10, 0.3]], drips: [[-3, 8], [3, 9]], core: [0, -2, 14] };
+    ctx.translate(0, -15);
+    if (dive) ctx.rotate(0.6);
+    dress(ctx, e, L, false);
+    ctx.strokeStyle = C.dark;
+    ctx.lineWidth = 0.8;
+    // a wing: a fan of long feathers swept back from the shoulder
+    const fan = (rot, col) => {
+      ctx.save();
+      ctx.translate(-1, -4);
+      ctx.rotate(rot);
+      for (let k = 5; k >= 0; k--) {
+        const len = 23 - Math.abs(k - 2) * 2.4;
+        ctx.save();
+        ctx.rotate(-k * 0.2);
+        ctx.fillStyle = k % 2 ? col : shade(col, 0.18);
+        ctx.beginPath();
+        ctx.moveTo(0, -1.8);
+        ctx.quadraticCurveTo(-len * 0.6, -4.5, -len, 0);
+        ctx.quadraticCurveTo(-len * 0.6, 2.6, 0, 1.8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+    };
+    fan(0.75 + flap * 0.7, shade(C.wing, -0.25));
+    // tail feathers
+    ctx.fillStyle = C.wing;
+    for (const a of [-0.35, 0, 0.35]) {
+      ctx.save();
+      ctx.translate(-5, 6);
+      ctx.rotate(Math.PI - 0.5 + a);
+      ctx.beginPath(); ctx.moveTo(0, -1.6); ctx.quadraticCurveTo(8, -3, 13, 0); ctx.quadraticCurveTo(8, 3, 0, 1.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    // legs, and talons that swing forward in the stoop
+    ctx.strokeStyle = C.bone;
+    ctx.lineWidth = 1.6;
+    const reach = dive ? 5 : 0, splay = dive ? 0.9 : 0;
+    for (const s of [-1, 1]) {
+      const x = s * 2.5 + 1 + reach;
+      ctx.beginPath();
+      ctx.moveTo(s * 2.5 + 1, 9); ctx.lineTo(x + 1, 14);
+      for (const a of [-0.5, 0, 0.5]) { ctx.moveTo(x + 1, 14); ctx.lineTo(x + 1 + Math.sin(a + splay) * 4, 14 + Math.cos(a + splay) * 4); }
+      ctx.stroke();
+    }
+    // the vulture's body, with a ruff of pale feathers at the neck
+    const g = ctx.createRadialGradient(-1, -1, 1, 0, 2, 10);
+    g.addColorStop(0, C.light);
+    g.addColorStop(1, C.dark);
+    ctx.fillStyle = g;
+    ctx.strokeStyle = C.dark;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(0, 2, 6.5, 8.5, 0.15, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = shade(C.body, 0.45);
+    for (let k = 0; k < 5; k++) { const a = -2.2 + k * 0.42; ctx.beginPath(); ctx.ellipse(2 + Math.cos(a) * 5, -3 + Math.sin(a) * 2, 2.2, 3.2, a + 1.57, 0, TAU); ctx.fill(); }
+    ctx.lineWidth = 0.8;
+    fan(0.45 + flap * 0.7, C.wing);
+    // wild hair streaming back
+    ctx.strokeStyle = C.dark;
+    ctx.lineWidth = 1.5;
+    for (let k = 0; k < 5; k++) {
+      const sway = Math.sin(e.t * 9 + k) * 1.5;
+      ctx.beginPath(); ctx.moveTo(3.5, -13 + k * 0.6); ctx.quadraticCurveTo(-3, -16 + k * 2 + sway, -9 - k, -12 + k * 2.4 + sway); ctx.stroke();
+    }
+    // a pale hag's face: hooked nose, screaming mouth, one burning eye
+    ctx.fillStyle = lit(e) ? mix('#e6d6dc', e.tint, 0.15) : '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(5.5, -9.5, 4.6, 5, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C.bone;
+    ctx.beginPath(); ctx.moveTo(9, -10.5); ctx.lineTo(13.5, -8.2); ctx.lineTo(9.2, -7.6); ctx.closePath(); ctx.fill();
+    const scream = aim || dive ? 2.4 : 1 + Math.max(0, Math.sin(e.t * 6)) * 0.8;
+    ctx.fillStyle = '#1a0608';
+    ctx.beginPath(); ctx.ellipse(7.5, -6, 1.8, scream, 0, 0, TAU); ctx.fill();
+    teeth(ctx, 6, -5.6 - scream, 9, -5.6 - scream, 2, 1.4);
+    ctx.strokeStyle = C.dark;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(4.5, -13.2); ctx.lineTo(8.6, -11.6); ctx.stroke();
+    eye(ctx, 6.8, -10.4, 1.3, lit(e) ? e.accent : '#ffffff', '#fff', 2.8);
+    if (aim && lit(e)) glow(ctx, 6, -9, 14, e.accent, 0.35);
     dress(ctx, e, L, true);
   },
 };

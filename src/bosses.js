@@ -1,7 +1,7 @@
 // Boss fights: Cerberus, Semiramis, Farinata, Ephialtes and Hades in the underworld, then the gods of
 // Olympus (Ares, Apollo, Athena, Poseidon) and Zeus himself.
 import { G } from './state.js';
-import { T, BIOMES, BIOME_LIST, SITES, HEAVEN_LVL } from './world.js';
+import { T, BIOMES, BIOME_LIST, SITES, levelAt } from './world.js';
 import { moveBody } from './physics.js';
 import { rand, pick, clamp, shade, overlap, RAINBOW } from './util.js';
 import { burst, part, ring, shake, floater } from './fx.js';
@@ -168,7 +168,7 @@ function floorWave(b, dir, color, sp = 420) {
 function summon(b, type, n) {
   if (G.enemies.length > 50 || G.enemies.filter(e => e.summoned && !e.dead).length > 8) return;
   for (let i = 0; i < n; i++) {
-    const lvl = b.heaven ? HEAVEN_LVL : b.id === 'hades' ? 10 : 7;
+    const lvl = levelAt(b.site.tx, b.site.ty);
     const e = makeEnemy(type, rand(b.ax0 + 100, b.ax1 - 100), b.ay0 + 120, lvl, BIOME_LIST.indexOf(b.site.biome));
     e.summoned = true;
     G.enemies.push(e);

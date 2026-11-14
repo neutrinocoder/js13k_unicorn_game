@@ -58,6 +58,10 @@ export function initInput(canvas, onKey) {
 export const held = (...codes) => codes.some(k => keys[k]);
 export const tapped = (...codes) => codes.some(k => pressed[k]);
 
+// Forget that a key was just pressed, so that the press which closed a window is not also taken
+// as a press in the game (E to end a conversation would otherwise start it again at once).
+export function swallow(code) { delete pressed[code]; }
+
 export function endFrame() {
   for (const k in pressed) delete pressed[k];
   mouse.pressed = mouse.rpressed = false;

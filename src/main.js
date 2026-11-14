@@ -1,8 +1,8 @@
 // Game loop, world streaming, interactions, saving and screens.
 import { G, SAVE_KEY, newSave } from './state.js';
-import { T, CS, CPX, getChunk, biomeAt, BIOMES, BIOME_LIST, SITES, LANDMARKS, GODS, ZS, OLY } from './world.js';
+import { T, CS, CPX, getChunk, biomeAt, BIOMES, BIOME_LIST, SITES, LANDMARKS, GODS, WARDENS, GOD_ORDER, ZS, OLY } from './world.js';
 import { playCutscene, cutsceneKey, drawCutscene } from './cutscene.js';
-import { initInput, endFrame, tapped, held, mouse, keys } from './input.js';
+import { initInput, endFrame, tapped, held, mouse, keys, swallow } from './input.js';
 import { initAudio, sfx, setTheme, setMuted, muted, setHeat, hush } from './audio.js';
 import { hostInit, hostLoaded, hostPlaying, adBreak, inAdBreak } from './host.js';
 import { initTouch, updateTouch } from './touch.js';
@@ -123,15 +123,14 @@ export const sealCount = () => (G.save ? SITES.slice(0, 4).filter(s => G.save.bo
 export const sigilCount = () => (G.save ? GODS.filter(s => G.save.bosses[s.id]).length : 0);
 export const SEAL_COL = { cerberus: '#b6ff6b', storm: '#ff8ad8', heretic: '#ffb347', titan: '#a8ecff', ares: '#ff5a3a', apollo: '#ffd34a', athena: '#9fd0ff', poseidon: '#3ad8ff', zeus: '#fff27a' };
 
-function nearestSite(list) {
-  const s = G.save, p = G.player, ptx = p.x / T, pty = p.y / T;
-  let best = null, bd = Infinity;
-  for (const site of list) {
-    if (s.bosses[site.id]) continue;
-    const d = Math.hypot(site.tx - ptx, site.ty - pty);
-    if (d < bd) { bd = d; best = site; }
-  }
-  return best && { tx: best.tx, ty: best.ty, label: best.name, color: SEAL_COL[best.id] };
+// Where a Warden or god is to be found, in words: "in Gluttony, to the west".
+const landOf = site => BIOMES[site.land || site.biome].name.replace(/^The /, 'the ');
+const whereIs = site => `in ${landOf(site)}, ${site.way}`;
+// The first in the list (which is in the order they are meant to be fought) still standing.
+const nextOf = list => list.find(site => !G.save.bosses[site.id]);
+function nextSite(list) {
+  const best = nextOf(list);
+  return best && { tx: best.tx, ty: best.ty, label: `${best.n}. ${best.name}`, color: SEAL_COL[best.id] };
 }
 
 export function objective() {
@@ -142,11 +141,11 @@ export function objective() {
     if (!s.oly) return { tx: SITES[4].tx, ty: SITES[4].ty + SITES[4].h / 2 - 1, label: 'Ascend to Olympus', color: '#ffe14a' };
     if (!s.irisTalked) return { tx: 2, ty: OLY.hub - 1, label: 'Talk to Iris', color: '#ffe14a' };
     if (sigilCount() >= 4) return { tx: 28, ty: OLY.hub - 2, label: 'Gate of the Thunderer', color: '#fff27a' };
-    return nearestSite(GODS);
+    return nextSite(GOD_ORDER);
   }
   if (!s.talked) return { tx: 8, ty: -1, label: 'Talk to Virgil', color: '#ffe14a' };
   if (sealCount() >= 4) return { tx: -32, ty: -2, label: 'The Gate', color: '#ff4a5a' };
-  return nearestSite(SITES.slice(0, 4));
+  return nextSite(WARDENS);
 }
 
 export function interactLabel(o) {
@@ -189,50 +188,36 @@ function virgilLines() {
   const s = G.save, n = sealCount();
   if (!s.talked) {
     return [
-      'An angel, fallen out of the sky, with wings burnt black? So the thunder last night was Zeus casting you down. They say you shone too brightly for the gods to bear.',
-      'I am Virgil. I have walked these circles before, and I will guide you as far as I can. The only road back to the heavens runs through Hades himself.',
-      'Hades sealed the way out with four Seals. Each one is held by a Warden at the far end of a road.',
-      'West, in Gluttony, Cerberus gnaws. East, Semiramis rides the storms of Lust. Above burns Farinata in Heresy. Below, Ephialtes lies frozen in Treachery.',
-      'Bring all four Seals to the Gate beside this market and the road to Hades will open. Defeat him, and the way up to Olympus will open with him.',
-      'Gems spill from every fallen thing and every glittering stone. Charon will trade you anything for them. And wake the shrines you find: they remember you, and you may travel between them.',
-      'You fell with nothing in your hands but the fire in your fist: click, and it will blast whatever stands before you. The first foe you fell will leave you a weapon.',
-      'Every circle has weapons of its own, and the greater the danger, the finer they are. Press R to choose the three you carry, and to merge two of a kind into a stronger one.',
-      'The roads lead to the Wardens, but the caves around them hide the treasure. Your blast can even break rock. Go well, little star.',
+      'A fallen angel, wings burnt black. So that thunder was Zeus casting you down. I am Virgil, and I will guide you.',
+      'Four Wardens hold the Seals of the Gate to Hades. Take them in order, for each circle is deadlier than the last: Gluttony to the west, Lust to the east, Treachery far below, then Heresy far above.',
+      'You have only the fire in your fist: click, and it will blast. The first foe you fell will leave you a weapon. Go well, little star.',
     ];
   }
-  if (s.bosses.zeus) return ['They say a new light burns on the summit of Olympus. I knew it would be you.', 'The underworld is still yours to roam, if you wish. There is always more to find.'];
-  if (s.bosses.hades) return ['You did it. Hades is broken, and the way up is open.', 'Step into the light in his throne room and climb. Show Zeus what he threw away.'];
-  if (n >= 4) return ['All four Seals! The Gate is listening. Step through it, and face Hades.'];
-  const left = SITES.slice(0, 4).filter(x => !s.bosses[x.id]).map(x => x.name);
-  const tips = [
-    'Hold Jump while falling, once you own Pegasus Wings, to glide across chasms.',
-    'Right-click fires your blast whatever weapon is in your hand. Blast downward to rocket upward.',
-    'Every circle hides five weapons of its own, from common to legendary. The legendary ones wait where the danger is greatest.',
-    'They say the weapons of heaven put ours to shame: the plainest sword up there is a match for a rare one down here.',
-    'Two of the same weapon merge into one that is a star stronger. Press R to open your arsenal.',
-    'Bubbles trap nearby enemies; trapped enemies take extra damage. You can bounce on them too.',
-    'Danger rises the further you travel from Limbo. So do the rewards: foes in dangerous places drop far finer weapons.',
-    'Lean on a wall while falling to slide, then jump to leap away from it.',
-    'Press M to open your map, and click a shrine you have woken to travel there.',
-  ];
-  return [`${n} of 4 Seals. Still waiting: ${left.join(', ')}.`, pick(tips)];
+  if (s.bosses.zeus) return ['A new light burns on the summit of Olympus. I knew it would be you.'];
+  if (s.bosses.hades) return ['Hades is broken. Step into the light in his throne room, and climb.'];
+  if (n >= 4) return ['All four Seals! Step through the Gate, and face Hades.'];
+  const next = nextOf(WARDENS);
+  return [`${n} of 4 Seals. Next is ${next.name}, ${whereIs(next)}.`];
 }
 
+const GOD_TIPS = {
+  athena: 'She rains spears from the sky: never stand still.',
+  apollo: 'He calls down the sun: watch for the light on the floor and step away.',
+  poseidon: 'His waves roll along the floor: jump them.',
+  ares: 'He charges like a bull: get above him and let him hit his own walls.',
+};
 function irisLines() {
   const s = G.save, n = sigilCount();
   if (!s.irisTalked) {
     return [
-      'Welcome home, little star. I am Iris, the rainbow that runs between the worlds. Every god on Olympus felt you climb out of Hades.',
-      'They are afraid of you. Zeus most of all. He has shut himself away on the summit, behind the Gate of the Thunderer.',
-      'Only the four Sigils of Olympus can open it, and four gods guard them: Ares in his temple to the west, Apollo burning in the east...',
-      '...Athena watching from the heights above, and Poseidon, who rules the deep clouds below.',
-      'Take their Sigils and the Gate will open for you. Hermes trades in the bazaar here, and the nectar in the fountain will heal you. Go and shine.',
+      'Welcome home, little star. I am Iris. Zeus hides behind the Gate of the Thunderer, and four gods hold the Sigils that open it.',
+      'Take them in order, for each is mightier than the last: Athena in the Citadel above, Apollo in the Golden Fields to the east, Poseidon in the Cloudlands below, then Ares in the Silver Peaks to the west.',
     ];
   }
-  if (s.bosses.zeus) return ['Olympus has a new light now, and it is yours.', 'The heavens and the underworld are both open to you. Wander as you like.'];
-  if (n >= 4) return ['All four Sigils! The Gate of the Thunderer is open. Zeus is waiting on the summit.'];
-  const left = GODS.filter(x => !s.bosses[x.id]).map(x => x.name);
-  return [`${n} of 4 Sigils. Still to face: ${left.join(', ')}.`, pick(['Ares charges like a bull. Get above him and let him crash into his own walls.', 'Apollo calls down the sun. Watch for the light on the floor and step away.', 'Athena rains spears from the sky. Keep moving and never stand still.', 'Poseidon\'s waves roll along the floor. Jump them, and strike when he raises his trident.'])];
+  if (s.bosses.zeus) return ['Olympus has a new light now, and it is yours.'];
+  if (n >= 4) return ['All four Sigils! The Gate of the Thunderer is open.'];
+  const next = nextOf(GOD_ORDER);
+  return [`${n} of 4 Sigils. Next is ${next.name}, ${whereIs(next)}. ${GOD_TIPS[next.id]}`];
 }
 
 // Arriving in Olympus after the ascent: bind the hub shrine so death brings you back here.
@@ -490,6 +475,9 @@ function update(dt) {
       const B = BIOMES[BIOME_LIST[b]];
       announce(B.name, B.sub, 3.2);
       lastBiomeT = G.t;
+      // a land further along than the one whose Warden or god still stands: say which comes first
+      const next = B.rank && nextOf(B.heaven ? GOD_ORDER : WARDENS);
+      if (next && B.rank > next.n && !G.boss) toast(`${B.name} is far too dangerous yet. First comes ${next.name}, ${whereIs(next)}.`, 5200);
     }
     lastBiome = b;
     if (!G.boss) setTheme(BIOME_LIST[b]);
@@ -684,7 +672,14 @@ function titleUpdate(dt) {
 
 // ---------- Input wiring ----------
 let acted = false;   // has the player done anything since play last began?
+// A key that closes a conversation, a shop or a menu does nothing more than that: without this,
+// the E that ended a conversation was also taken as E to talk, and started it again.
 function onKey(code) {
+  const was = G.scene;
+  handleKey(code);
+  if (was !== 'play' && G.scene === 'play') swallow(code);
+}
+function handleKey(code) {
   if (inAdBreak()) return;
   initAudio();
   if (devOpen()) return;

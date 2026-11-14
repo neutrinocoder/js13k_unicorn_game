@@ -1,7 +1,7 @@
 // HTML overlays: shop, dialogue, toasts and screens.
 import { G } from './state.js';
 import { SHOP, stats, shopLocked, ARMOURS, armourKnown, armourOwned } from './items.js';
-import { SITES, BIOMES, BIOME_LIST, T, levelAt, HEAVEN_LVL } from './world.js';
+import { SITES, BIOMES, BIOME_LIST, T, levelAt } from './world.js';
 import { arms, owned, slotArm, SLOTS, equip, merge, mergeAll, canMerge, countOf, parseKey, current, rarityOf, iconUrl, ARMS, SETS, REALMS, RARITY, MAX_STARS, rarityOdds, shortName, dropsIn, setById, armsOf, dmgText, kindName, speedName, traits } from './weapons.js';
 import { sfx } from './audio.js';
 import { touchText } from './touch.js';
@@ -210,7 +210,8 @@ export function closeArsenal() {
 const pct = v => (v >= 0.1 ? Math.round(v * 100) : v >= 0.01 ? Math.round(v * 1000) / 10 : Math.round(v * 10000) / 100) + '%';
 const filled = lv => '★'.repeat(lv);
 const starRow = lv => `<span class="stars">${filled(lv)}<i>${'★'.repeat(MAX_STARS - lv)}</i></span>`;
-const whereFound = def => { const st = setById(def.set); return st.land ? `Dropped by foes in ${st.land === 'olympus' ? 'the ' : ''}${st.name}.` : def.realm === 'heaven' ? 'Dropped by foes anywhere in heaven.' : 'Dropped by foes anywhere in the underworld.'; };
+const NTH = ['', 'first', 'second', 'third', 'fourth'];
+const whereFound = def => { const st = setById(def.set); return st.land ? `Dropped by foes in ${st.land === 'olympus' ? 'the ' : ''}${st.name}, the ${NTH[st.n]} ${st.realm === 'heaven' ? 'realm of Olympus' : 'circle'}.` : def.realm === 'heaven' ? 'Dropped by foes anywhere in heaven.' : 'Dropped by foes anywhere in the underworld.'; };
 
 function renderArsenal(flash) {
   const A = arms(), S = stats(), p = G.player, list = owned();
@@ -259,7 +260,7 @@ function renderArsenal(flash) {
   $('ars-mergeall').disabled = !list.some(w => canMerge(w.key));
 
   // what is likely to drop where you stand
-  const B = BIOMES[BIOME_LIST[G.biome]], base = B.heaven ? HEAVEN_LVL : levelAt(Math.round((p.x + p.w / 2) / T), Math.round((p.y + p.h / 2) / T));
+  const B = BIOMES[BIOME_LIST[G.biome]], base = levelAt(Math.round((p.x + p.w / 2) / T), Math.round((p.y + p.h / 2) / T));
   const odds = rarityOdds(base + S.fortune), d = dropsIn(G.biome);
   $('ars-odds').innerHTML = `<h4>Drops here <span>${B.name} · Danger ${base}${S.fortune ? ' +' + S.fortune : ''}</span></h4>` +
     `<div class="bar">${RARITY.map((r, i) => `<i style="flex:${Math.max(odds[i], 0.012)};background:${r.col}" title="${r.name} ${pct(odds[i])}"></i>`).join('')}</div>` +
@@ -322,7 +323,7 @@ function renderCodex(A) {
     html += `<h4 class="${realm.id}">${realm.name}<span>${all.filter(w => A.seen[w.id]).length} of ${all.length} found</span></h4><div class="codex"><span></span>` +
       RARITY.map(r => `<span class="h" style="color:${r.col}">${r.name}</span>`).join('');
     for (const st of sets) {
-      html += `<span class="set">${st.name}<small>${st.theme}</small></span>`;
+      html += `<span class="set">${st.n ? st.n + '. ' : ''}${st.name}<small>${st.theme}</small></span>`;
       for (let r = 0; r < 5; r++) {
         const def = armsOf(st.id, r);
         html += A.seen[def.id]
@@ -332,7 +333,7 @@ function renderCodex(A) {
     }
     html += '</div>';
   }
-  $('ars-codex').innerHTML = html + '<p class="codex-note">A common weapon of heaven is a match for a rare one from the underworld.</p>';
+  $('ars-codex').innerHTML = html + '<p class="codex-note">The lands are numbered in the order they are meant to be taken, and the later the land, the stronger its weapons. A common weapon of heaven is a match for a rare one from the underworld.</p>';
 }
 
 // ---------- Dialogue ----------

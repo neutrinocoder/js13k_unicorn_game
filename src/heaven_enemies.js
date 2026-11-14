@@ -7,8 +7,21 @@ const TAU = Math.PI * 2;
 const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const OUT = 'rgba(40,30,70,.75)';
 
+// Four guardians have a cousin in another realm of Olympus, with the same body in other colours:
+// the Spartans of the Silver Peaks (angels in dark steel and crimson), the stormlings of the
+// Cloudlands (pale sea-sprites for cherubs), the nereids there (seraphim of cold blue fire) and
+// the war wheels of the Silver Peaks (ophanim of red iron).
+const SKINS = {
+  spartan: { wingF: '#8d93a8', wingN: '#c5cad8', wingE: '#4a4f66', cover: '#a9afc2', steel: '#6b7288', steelD: '#33384a', gold: '#d8402a', goldD: '#7a1c14', robe: '#b0262a', robeD: '#6a1218', halo: '#ff9a7a', haloD: '#b03a2a', blade: '#ffe0d0' },
+  stormling: { skin: '#cfe6f5', skinD: '#8fb4d0', blush: '#7fb8ff', curl: '#e8f4ff', curlD: '#9ac0e0', wingF: '#bcd6ee', wingN: '#eaf6ff', wingE: '#6a9ac8', cloth: '#3a8ad8', bow: '#9adcf0', bowD: '#3a7a9a', halo: '#bfeaff', haloD: '#4a9ad0', eye: '#1a7aff', brow: '#3a5a7a' },
+};
+const SERAPH = { flame: ['#ff5a1a', '#ffb347', '#fff2b0'], mid: '#ffb347', root: '#fff6d0', tip: '#e8401a', line: 'rgba(120,30,10,.6)', iris: '#ff8a1a', core: '#ffe9a0', lid: '#b8641a', hot: '#ff3a1a' };
+const NEREID = { flame: ['#1a5aff', '#5fc8ff', '#e8fbff'], mid: '#5fc8ff', root: '#f0fbff', tip: '#1a4ad8', line: 'rgba(10,40,120,.6)', iris: '#1a9aff', core: '#c8f0ff', lid: '#1a5a9a', hot: '#a0f0ff' };
+const OPHAN = { rim: '#ffe28a', rimD: '#c99a2a', wing: '#eef1fb', wing2: '#ffffff', wingE: '#a8a0c8', iris: '#3a8ad8', core: '#fff6c4', coreO: '#ffd34a', spark: '255,240,180' };
+const WARWHEEL = { rim: '#ff8a5a', rimD: '#7a1c1c', wing: '#5a5f72', wing2: '#8a90a6', wingE: '#2a2c3a', iris: '#ffb020', core: '#ffd9c0', coreO: '#ff4a2a', spark: '255,150,110' };
+
 // One colour lookup per creature: everything turns white during a hit flash.
-const pal = (e, cols) => (e.flash > 0 ? new Proxy(cols, { get: () => '#ffffff' }) : cols);
+const pal = (e, cols) => (e.flash > 0 ? new Proxy(cols, { get: () => '#ffffff' }) : SKINS[e.variant] ? Object.assign(cols, SKINS[e.variant]) : cols);
 
 // A feathered wing: a fan of long feathers from a root point, plus a covert patch at the shoulder.
 function wing(ctx, x, y, len, ang, spread, n, fill, edge, cover = fill) {
@@ -266,12 +279,13 @@ export function cherub(ctx, e, t) {
 export function seraph(ctx, e, t) {
   const W = e.flash > 0;
   const T = e.t, fire = e.t2 > 0 ? e.t2 / 0.3 : 0;
-  const F = W ? ['#ffffff', '#ffffff', '#ffffff'] : ['#ff5a1a', '#ffb347', '#fff2b0'];
+  const K = e.variant === 'nereid' ? NEREID : SERAPH;
+  const F = W ? ['#ffffff', '#ffffff', '#ffffff'] : K.flame;
   ctx.save();
   ctx.translate(0, -17 + Math.sin(T * 1.8) * 2);
   const S = 1 + fire * 0.18;
   ctx.scale(S, S);
-  glow(ctx, 0, 0, 46, '#ffb347', 0.3 + fire * 0.35);
+  glow(ctx, 0, 0, 46, K.mid, 0.3 + fire * 0.35);
   flame(ctx, 0, 4, 22, 30 + fire * 18, t, F, e.x * 0.01, 4);
   // a fiery feather: gold at the root burning to red at the tip
   const feather = (ang, len, n, spread, alpha = 1, off = 0) => {
@@ -284,11 +298,11 @@ export function seraph(ctx, e, t) {
       ctx.save();
       ctx.rotate(a);
       const g = ctx.createLinearGradient(0, 0, L, 0);
-      g.addColorStop(0, W ? '#fff' : '#fff6d0');
-      g.addColorStop(0.55, W ? '#fff' : '#ffb347');
-      g.addColorStop(1, W ? '#fff' : '#e8401a');
+      g.addColorStop(0, W ? '#fff' : K.root);
+      g.addColorStop(0.55, W ? '#fff' : K.mid);
+      g.addColorStop(1, W ? '#fff' : K.tip);
       ctx.fillStyle = g;
-      ctx.strokeStyle = W ? '#fff' : 'rgba(120,30,10,.6)';
+      ctx.strokeStyle = W ? '#fff' : K.line;
       ctx.lineWidth = 0.8;
       ctx.beginPath();
       ctx.moveTo(0, -1.6);
@@ -308,24 +322,24 @@ export function seraph(ctx, e, t) {
   for (const s of [-1, 1]) {
     const a = s > 0 ? -0.3 + flap : Math.PI + 0.3 - flap;
     const ex = Math.cos(a) * 17, ey = Math.sin(a) * 17 - 1;
-    eye(ctx, ex, ey, 1.6, W ? '#fff' : '#ff8a1a', '#fff', 2.6);
+    eye(ctx, ex, ey, 1.6, W ? '#fff' : K.iris, '#fff', 2.6);
   }
   // the core and its single great eye, looking ahead
   const core = ctx.createRadialGradient(0, 0, 0, 0, 0, 11 + fire * 4);
   core.addColorStop(0, '#ffffff');
-  core.addColorStop(0.5, W ? '#fff' : '#ffe9a0');
-  core.addColorStop(1, rgba(W ? '#ffffff' : '#ff9a2e', 0));
+  core.addColorStop(0.5, W ? '#fff' : K.core);
+  core.addColorStop(1, rgba(W ? '#ffffff' : K.mid, 0));
   ctx.fillStyle = core;
   ctx.beginPath(); ctx.arc(0, 0, 11 + fire * 4, 0, TAU); ctx.fill();
   const blink = (T * 0.7 + e.x * 0.003) % 3.2 < 0.12 ? 0.15 : 1;
   ctx.fillStyle = '#fffaf0';
-  ctx.strokeStyle = W ? '#fff' : '#b8641a';
+  ctx.strokeStyle = W ? '#fff' : K.lid;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(-6, 0); ctx.quadraticCurveTo(0, -4.4 * blink, 6, 0); ctx.quadraticCurveTo(0, 4.4 * blink, -6, 0); ctx.closePath();
   ctx.fill(); ctx.stroke();
   if (blink > 0.5) {
-    ctx.fillStyle = W ? '#fff' : fire > 0 ? '#ff3a1a' : '#ff8a1a';
+    ctx.fillStyle = W ? '#fff' : fire > 0 ? K.hot : K.iris;
     ctx.beginPath(); ctx.arc(1.4, 0, 2.6, 0, TAU); ctx.fill();
     ctx.fillStyle = '#2a0a04';
     ctx.beginPath(); ctx.arc(1.9, 0, 1.2, 0, TAU); ctx.fill();
@@ -335,24 +349,24 @@ export function seraph(ctx, e, t) {
   feather(-1.94 - br, 18, 4, 0.6, 0.95, 7);
   feather(1.15 - br, 16, 4, 0.6, 0.95, 7);
   feather(1.99 + br, 16, 4, 0.6, 0.95, 7);
-  if (fire > 0) glow(ctx, 0, 0, 36, '#fff2b0', 0.5 * fire);
+  if (fire > 0) glow(ctx, 0, 0, 36, K.flame[2], 0.5 * fire);
   ctx.restore();
 }
 
 // ---------- Ophan: a wheel within a wheel, its rims full of eyes ----------
 export function ophan(ctx, e, t) {
-  const W = e.flash > 0, T = e.t;
+  const W = e.flash > 0, T = e.t, K = e.variant === 'warwheel' ? WARWHEEL : OPHAN;
   const charging = e.cd < 0.5 && e.t2 <= 0, fired = e.t2 > 0 ? e.t2 / 0.3 : 0;
   const chargeK = charging ? 1 - cl(e.cd / 0.5) : 0;
   const R = 15, spin = T * (1.2 + chargeK * 3.5) + e.x * 0.002;
   ctx.save();
   ctx.translate(0, -18 + Math.sin(T * 2.2) * 2.5);
   if (fired) ctx.translate(-fired * 3, 0);
-  glow(ctx, 0, 0, 42, '#ffe28a', 0.25 + chargeK * 0.35 + fired * 0.4);
+  glow(ctx, 0, 0, 42, K.rim, 0.25 + chargeK * 0.35 + fired * 0.4);
   // small wings at the sides
   const fl = Math.sin(T * 7) * 0.3;
-  wing(ctx, -6, -2, 13, -2.6 + fl, 0.8, 4, W ? '#fff' : '#eef1fb', W ? '#fff' : '#a8a0c8');
-  wing(ctx, 6, -2, 13, -0.55 - fl, 0.8, 4, W ? '#fff' : '#ffffff', W ? '#fff' : '#a8a0c8');
+  wing(ctx, -6, -2, 13, -2.6 + fl, 0.8, 4, W ? '#fff' : K.wing, W ? '#fff' : K.wingE);
+  wing(ctx, 6, -2, 13, -0.55 - fl, 0.8, 4, W ? '#fff' : K.wing2, W ? '#fff' : K.wingE);
   // two rings on different axes, split into back and front halves for depth
   const ring = (kind, a) => {
     const pts = [];
@@ -369,7 +383,7 @@ export function ophan(ctx, e, t) {
   };
   const A = ring(0, spin), B = ring(1, spin * 0.8 + 1.2);
   const rim = (pts, front) => {
-    for (const [col, w] of [[OUT, 4.6], [W ? '#fff' : '#c99a2a', 3.4], [W ? '#fff' : '#ffe28a', 1.6]]) {
+    for (const [col, w] of [[OUT, 4.6], [W ? '#fff' : K.rimD, 3.4], [W ? '#fff' : K.rim, 1.6]]) {
       ctx.strokeStyle = col;
       ctx.lineWidth = w;
       ctx.beginPath();
@@ -392,7 +406,7 @@ export function ophan(ctx, e, t) {
       ctx.lineWidth = 0.7;
       ctx.beginPath(); ctx.ellipse(p[0], p[1], r * 1.3, r * open, 0, 0, TAU); ctx.fill(); ctx.stroke();
       if (open > 0.5) {
-        ctx.fillStyle = W ? '#fff' : '#3a8ad8';
+        ctx.fillStyle = W ? '#fff' : K.iris;
         ctx.beginPath(); ctx.arc(p[0] + r * 0.45, p[1], r * 0.62, 0, TAU); ctx.fill();
         ctx.fillStyle = '#0a0a18';
         ctx.beginPath(); ctx.arc(p[0] + r * 0.6, p[1], r * 0.3, 0, TAU); ctx.fill();
@@ -404,14 +418,14 @@ export function ophan(ctx, e, t) {
   const cr = 6 + chargeK * 4 + fired * 5;
   const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, cr * 2);
   cg.addColorStop(0, '#ffffff');
-  cg.addColorStop(0.35, W ? '#fff' : '#fff6c4');
-  cg.addColorStop(1, rgba(W ? '#ffffff' : '#ffd34a', 0));
+  cg.addColorStop(0.35, W ? '#fff' : K.core);
+  cg.addColorStop(1, rgba(W ? '#ffffff' : K.coreO, 0));
   ctx.fillStyle = cg;
   ctx.beginPath(); ctx.arc(0, 0, cr * 2, 0, TAU); ctx.fill();
   if (charging) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = `rgba(255,240,180,${0.5 * chargeK})`;
+    ctx.strokeStyle = `rgba(${K.spark},${0.5 * chargeK})`;
     ctx.lineWidth = 1.2;
     for (let k = 0; k < 5; k++) {
       const a = k * 1.3 + T * 6, r0 = 26 - chargeK * 14;

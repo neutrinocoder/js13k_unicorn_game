@@ -1,5 +1,8 @@
-// Regular enemies: demons, spiders, hell bats, flaming skulls, bile maws and hell knights in the
-// underworld; angels, cherubs, seraphim and ophanim guarding the heavens.
+// Regular enemies. Every land has creatures of its own (see BIOMES in world.js):
+// demons, hell bats and a few bone widows in Limbo; gorgers and bile maws in Gluttony; harpies and
+// hell bats in Lust; bone widows and hell knights in Treachery; demons and flaming skulls in Heresy.
+// Above: angels and ophanim in the Citadel, cherubs and seraphim in the Golden Fields, stormlings
+// and nereids in the Cloudlands, Spartans and war wheels in the Silver Peaks.
 import { G } from './state.js';
 import { BIOMES, BIOME_LIST } from './world.js';
 import { moveBody, groundAhead, onPlatform } from './physics.js';
@@ -19,20 +22,31 @@ export const ETYPES = {
   wisp: { hp: 5, w: 26, h: 26, dmg: 1, gem: 3, fly: 1, ghost: 1 },
   spitter: { hp: 9, w: 34, h: 26, dmg: 1, gem: 4, fly: 0 },
   brute: { hp: 15, w: 46, h: 52, dmg: 2, gem: 8, fly: 0 },
+  grub: { hp: 8, w: 36, h: 22, dmg: 1, gem: 3, fly: 0 },       // gorger
+  harpy: { hp: 5, w: 34, h: 30, dmg: 1, gem: 4, fly: 1 },
   // the heavens
   angel: { hp: 13, w: 36, h: 56, dmg: 1, gem: 6, fly: 0 },
   cherub: { hp: 4, w: 28, h: 24, dmg: 1, gem: 3, fly: 1 },
   seraph: { hp: 8, w: 34, h: 34, dmg: 1, gem: 5, fly: 1, ghost: 1 },
   ophan: { hp: 9, w: 36, h: 36, dmg: 1, gem: 5, fly: 1 },
+  // cousins of the four above: the same body and habits (`like`) in other colours, a little
+  // tougher, each with an attack of its own. A foe made from one has the type it is like and
+  // carries its own name in `variant`.
+  spartan: { like: 'angel', hp: 16, gem: 8 },
+  stormling: { like: 'cherub', hp: 5, gem: 4 },
+  nereid: { like: 'seraph', hp: 9, gem: 6 },
+  warwheel: { like: 'ophan', hp: 12, gem: 7 },
 };
 
 export function makeEnemy(type, x, y, level, biome, hang = false) {
   // foes grow tougher with danger, and a quarter faster in the underworld than in heaven
-  const d = ETYPES[type], B = BIOMES[BIOME_LIST[biome]], m = 1 + (type === 'spider' ? 0.45 : 0.3) * (B.heaven ? 1 : 1.25) * (level - 1);
+  const own = ETYPES[type], variant = own.like ? type : null;
+  if (variant) type = own.like;
+  const d = { ...ETYPES[type], ...own }, B = BIOMES[BIOME_LIST[biome]], m = 1 + (type === 'spider' ? 0.45 : 0.3) * (B.heaven ? 1 : 1.25) * (level - 1);
   const e = {
     type, x: x - d.w / 2, y: y - d.h, w: d.w, h: d.h, vx: 0, vy: 0, hp: d.hp * m, max: d.hp * m,
     dmg: d.dmg + Math.floor((level - 1) / (type === 'spider' ? 4 : 7)), level, gem: d.gem, fly: d.fly, ghost: d.ghost,
-    tint: B.tint, accent: B.accent, face: 1, t: rand(0, 10), cd: rand(0.5, 2), t2: 0, flash: 0, trap: 0, state: 'idle', ground: false, biome,
+    variant, tint: B.tint, accent: B.accent, face: 1, t: rand(0, 10), cd: rand(0.5, 2), t2: 0, flash: 0, trap: 0, state: 'idle', ground: false, biome,
   };
   if (type === 'ophan') { e.homeY = e.y - 40; e.y = e.homeY; }
   if (type === 'spider') {
@@ -156,12 +170,63 @@ export function updateEnemy(e, dt) {
             for (let i = 0; i < 10; i++) part({ x: cx + rand(-18, 18), y: e.y + e.h - 6, vx: rand(-120, 120), vy: rand(-40, 60), life: 0.7, size: 3, color: '#ffffff', add: true });
             sfx('dash', 0.5);
           }
-          if (e.cd < 0 && Math.abs(dy) < 120 && Math.abs(dx) > 40 && Math.abs(dx) < 640) { e.state = 'wind'; e.t2 = angel ? 0.28 : 0.36; }
+          // a Spartan casts a spear first, from further off than it could charge
+          e.castCd = (e.castCd || 0) - dt;
+          if (e.variant === 'spartan' && e.cd < 0 && e.castCd < 0 && d > 240 && d < 700) {
+            e.castCd = rand(2.2, 3); e.cd = 0.55;
+            shoot({ x: cx + e.face * 14, y: e.y + 18, vx: (dx / d) * 640, vy: (dy / d) * 640, r: 6, dmg: shotDmg(e), color: '#ff5a3a', kind: 'shard', tip: '#ffe0d0', life: 2.2 });
+            sfx('stab', 0.5);
+          } else if (e.cd < 0 && Math.abs(dy) < 120 && Math.abs(dx) > 40 && Math.abs(dx) < 640) { e.state = 'wind'; e.t2 = angel ? 0.28 : 0.36; }
           if (e.ground && e.cd < 0 && (e.hitWall || gap())) { e.vy = -620; e.vx = e.face * 280; e.cd = 0.5; }
         } else wander(45);
       }
       e.vy = Math.min(e.vy + 1800 * dt, 900);
       moveBody(e, dt, e.dropT > 0 && e.state === 'idle');
+      break;
+    }
+    case 'grub': {
+      // a gorger drags itself after you, slow but stubborn, and rears up to bite when it is close
+      if (aware) {
+        e.vx += (e.face * chase(e, dx, 85 + e.level * 4) - e.vx) * Math.min(1, 5 * dt);
+        descend(80);
+        if (e.ground && e.cd < 0 && Math.abs(dx) < 130 && Math.abs(dy) < 70) { e.vy = -300; e.vx = Math.sign(dx) * 380; e.cd = 1.4; e.t2 = 0.35; }
+        else if (e.ground && e.cd < 0 && dy < -50 && Math.abs(dx) < 220) { e.vy = leapUp() * 0.85; e.cd = 1.2; }
+        else if (e.ground && e.cd < 0 && (e.hitWall || gap())) { e.vy = -560; e.vx = e.face * 200; e.cd = 0.9; }
+      } else wander(35);
+      e.vy = Math.min(e.vy + 1800 * dt, 900);
+      moveBody(e, dt, e.dropT > 0);
+      break;
+    }
+    case 'harpy': {
+      // a harpy hangs in the air above and to one side of you, screeches, then stoops
+      if (e.state === 'aim') {
+        e.vx *= 0.86; e.vy *= 0.86;
+        e.face = dx < 0 ? -1 : 1;
+        if (e.t2 <= 0) {
+          const sp = 540 + e.level * 8;
+          e.state = 'dive'; e.t2 = 0.8; e.dvx = (dx / d) * sp; e.dvy = (dy / d) * sp;
+          sfx('wind', 0.5);
+        }
+      } else if (e.state === 'dive') {
+        e.vx += (e.dvx - e.vx) * Math.min(1, 9 * dt);
+        e.vy += (e.dvy - e.vy) * Math.min(1, 9 * dt);
+        e.face = e.dvx < 0 ? -1 : 1;
+        if (Math.random() < 0.6) part({ x: cx - e.vx * 0.03, y: cy - e.vy * 0.03, vx: rand(-20, 20), vy: rand(-20, 20), life: 0.35, size: rand(2, 3.5), color: e.accent, add: true });
+        if (e.t2 <= 0 || e.hitWall || e.ground) { e.state = 'idle'; e.cd = rand(1.5, 2.3); e.side = -(e.side || 1); e.vy = -160; }
+      } else if (aware) {
+        if (!e.side) e.side = Math.random() < 0.5 ? -1 : 1;
+        const tx = dx + e.side * 180 + Math.sin(e.t * 1.7) * 40, ty = dy - 175 + Math.cos(e.t * 2.3) * 25, l = Math.hypot(tx, ty) || 1;
+        const s = (190 + e.level * 4) * Math.min(1, l / 70);
+        e.vx += ((tx / l) * s - e.vx) * 3 * dt;
+        e.vy += ((ty / l) * s - e.vy) * 3 * dt;
+        e.face = dx < 0 ? -1 : 1;
+        if (e.cd < 0 && d < 430 && dy > 40) { e.state = 'aim'; e.t2 = 0.34; e.alertT = 0.34; }
+      } else {
+        e.vx = Math.sin(e.t) * 40;
+        e.vy = Math.cos(e.t * 1.3) * 30;
+        e.face = e.vx < 0 ? -1 : 1;
+      }
+      moveBody(e, dt);
       break;
     }
     case 'spitter': {
@@ -180,7 +245,13 @@ export function updateEnemy(e, dt) {
     }
     case 'bat':
     case 'cherub': {
-      if (e.type === 'cherub' && aware && e.cd < 0 && d < 560) {
+      if (e.variant === 'stormling' && aware && e.cd < 0 && d < 600) {
+        // a stormling looses one fast bolt of sea-light at a time, and often
+        e.cd = rand(0.8, 1.15);
+        e.t2 = 0.3;
+        shoot({ x: cx + e.face * 8, y: cy, vx: (dx / d) * 600, vy: (dy / d) * 600, r: 6, dmg: shotDmg(e), color: '#7fd8ff', kind: 'orb', life: 2.2, trail: '#3a9bff' });
+        sfx('shoot');
+      } else if (e.type === 'cherub' && aware && e.cd < 0 && d < 560) {
         e.cd = rand(1.2, 1.9);
         e.t2 = 0.3;
         const a0 = Math.atan2(dy, dx);
@@ -205,7 +276,14 @@ export function updateEnemy(e, dt) {
     }
     case 'wisp':
     case 'seraph': {
-      if (e.type === 'seraph' && aware && e.cd < 0 && d < 500) {
+      if (e.variant === 'nereid' && aware && e.cd < 0 && d < 560) {
+        // a nereid sends three slow bolts of cold fire straight at you, and walls do not stop them
+        e.cd = rand(1.6, 2.2);
+        e.t2 = 0.3;
+        const a0 = Math.atan2(dy, dx);
+        for (let i = -1; i <= 1; i++) shoot({ x: cx, y: cy, vx: Math.cos(a0 + i * 0.3) * 250, vy: Math.sin(a0 + i * 0.3) * 250, r: 6, dmg: shotDmg(e), color: '#7fd8ff', kind: 'orb', ghost: true, life: 3, trail: '#3a7bff' });
+        sfx('ice', 0.6);
+      } else if (e.type === 'seraph' && aware && e.cd < 0 && d < 500) {
         e.cd = rand(2, 2.7);
         e.t2 = 0.3;
         for (let i = 0; i < 9; i++) {
@@ -230,7 +308,7 @@ export function updateEnemy(e, dt) {
       e.x += e.vx * dt;
       e.y += e.vy * dt;
       if (e.type === 'wisp' && Math.random() < 0.6) part({ x: cx + rand(-7, 7), y: cy - 6 + rand(-5, 5), vx: -e.vx * 0.4, vy: -e.vy * 0.3 - 40, life: 0.5, size: rand(3, 5), color: Math.random() < 0.5 ? e.accent : '#ffffff', add: true });
-      if (e.type === 'seraph' && Math.random() < 0.35) part({ x: cx + rand(-14, 14), y: cy + rand(-10, 10), vx: rand(-20, 20), vy: rand(-80, -30), life: 0.6, size: rand(2, 4), color: Math.random() < 0.5 ? '#ffb347' : '#fff6c4', add: true });
+      if (e.type === 'seraph' && Math.random() < 0.35) part({ x: cx + rand(-14, 14), y: cy + rand(-10, 10), vx: rand(-20, 20), vy: rand(-80, -30), life: 0.6, size: rand(2, 4), color: Math.random() < 0.5 ? (e.variant ? '#5fc8ff' : '#ffb347') : (e.variant ? '#e8fbff' : '#fff6c4'), add: true });
       break;
     }
     case 'ophan': {
@@ -239,12 +317,14 @@ export function updateEnemy(e, dt) {
       e.y = e.homeY + Math.sin(e.t * 1.6) * 6;
       if (aware) chase(e, dx, 0);
       if (aware && e.cd < 0 && d < 660) {
-        e.cd = rand(1.3, 1.8);
+        // a war wheel fires a wide fan of five, less often
+        const war = e.variant === 'warwheel', n = war ? 2 : 1;
+        e.cd = war ? rand(1.8, 2.3) : rand(1.3, 1.8);
         e.t2 = 0.25;
         const a0 = Math.atan2(dy, dx);
-        for (let i = -1; i <= 1; i++) {
-          const a = a0 + i * 0.16;
-          shoot({ x: cx + e.face * 10, y: cy, vx: Math.cos(a) * 430, vy: Math.sin(a) * 430, r: 7, dmg: shotDmg(e), color: '#fff2a8', kind: 'orb', life: 3, trail: '#ffe28a' });
+        for (let i = -n; i <= n; i++) {
+          const a = a0 + i * (war ? 0.2 : 0.16);
+          shoot({ x: cx + e.face * 10, y: cy, vx: Math.cos(a) * (war ? 390 : 430), vy: Math.sin(a) * (war ? 390 : 430), r: 7, dmg: shotDmg(e), color: war ? '#ff8a5a' : '#fff2a8', kind: 'orb', life: 3, trail: war ? '#ff4a2a' : '#ffe28a' });
         }
         sfx('shoot');
       }
@@ -326,6 +406,10 @@ export function drawEnemy(ctx, e, t) {
 // When a foe falls: its silhouette flares white and swells away, bits of it scatter and its
 // soul rises.
 function deathFx(e) {
+  // a gorger bursts: two gobs of bile fly out to either side
+  if (e.type === 'grub' && !G.player.dead) {
+    for (const dir of [-1, 1]) shoot({ x: e.x + e.w / 2, y: e.y + 4, vx: dir * rand(150, 190), vy: -420, g: 900, r: 6, dmg: 1, color: e.accent, kind: 'glob', trail: e.tint, life: 2 });
+  }
   const fx = e.x + e.w / 2, fy = e.y + e.h, cx = fx, cy = e.y + e.h / 2;
   const ghost = { ...e, flash: 1, dead: false };
   G.effects.push({

@@ -1,6 +1,6 @@
 // Drawing: parallax backgrounds, the tile world, objects, lighting and the HUD.
 import { G } from './state.js';
-import { T, CS, CPX, getChunk, chunkCanvas, chunkMini, BIOMES, BIOME_LIST, SITES, LANDMARKS, levelAt, HEAVEN_LVL, drawLiquids, GODS } from './world.js';
+import { T, CS, CPX, getChunk, chunkCanvas, chunkMini, BIOMES, BIOME_LIST, SITES, LANDMARKS, levelAt, drawLiquids, GODS, WARDENS, GOD_ORDER } from './world.js';
 import { part } from './fx.js';
 
 // Sparks and fumes thrown up by bubbles popping on lava and acid.
@@ -25,6 +25,7 @@ import { arms, slotArm, SLOTS, current, rarityOf, armById, weaponIcon, palOf, ha
 import { devLabel } from './dev.js';
 import { objective, sealCount, sigilCount, interactLabel } from './main.js';
 import { lightning, EMIT, drawEmissive } from './art.js';
+import { virgil, iris, charon, hermes, pedlar } from './npc_art.js';
 
 let lightCv = null, lctx = null;
 const blobCache = new Map();
@@ -75,7 +76,7 @@ export function render(ctx) {
   for (const e of G.enemies) {
     if (e.dead || e.x > v.x1 + 60 || e.x + e.w < v.x0 - 60 || e.y > v.y1 + 60 || e.y + e.h < v.y0 - 60) continue;
     drawEnemy(ctx, e, G.t);
-    if (e.type === 'wisp' || e.type === 'seraph' || e.type === 'ophan') lights.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, r: 110, c: e.type === 'seraph' ? '#ffb347' : e.accent, a: 0.5 });
+    if (e.type === 'wisp' || e.type === 'seraph' || e.type === 'ophan') lights.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, r: 110, c: e.type === 'seraph' ? (e.variant ? '#5fc8ff' : '#ffb347') : e.accent, a: 0.5 });
     else lights.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, r: 46 + e.w, c: e.accent, a: 0.3 });
   }
   drawBoss(ctx, G.t);
@@ -749,47 +750,9 @@ function drawShop(ctx, o, t, lights) {
       }
     }
     ctx.globalAlpha = 1;
-    const bob = Math.sin(t * 1.5) * 2;
-    if (oly) {
-      // Hermes, messenger of the gods: winged helmet and his snake-twined staff
-      ctx.fillStyle = '#f4f0e6';
-      ctx.beginPath(); ctx.moveTo(-20, -24); ctx.quadraticCurveTo(-20, -58 + bob, 0, -62 + bob); ctx.quadraticCurveTo(20, -58 + bob, 20, -24); ctx.fill();
-      ctx.fillStyle = '#c0392b';
-      ctx.beginPath(); ctx.moveTo(-16, -56 + bob); ctx.lineTo(14, -30 + bob); ctx.lineTo(18, -40 + bob); ctx.lineTo(-8, -60 + bob); ctx.fill();
-      ctx.fillStyle = '#f0d0b0';
-      ctx.beginPath(); ctx.ellipse(0, -70 + bob, 9, 10, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#d8b04a';
-      ctx.beginPath(); ctx.ellipse(0, -77 + bob, 11, 6, 0, Math.PI, TAU); ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sx * 12, -80 + bob, 8, 3, sx * -0.6 + Math.sin(t * 8) * 0.15, 0, TAU); ctx.fill(); }
-      ctx.fillStyle = '#2a1d3a';
-      ctx.beginPath(); ctx.arc(-3, -70 + bob, 1.4, 0, TAU); ctx.arc(4, -70 + bob, 1.4, 0, TAU); ctx.fill();
-      ctx.strokeStyle = '#d8b04a';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(32, -10); ctx.lineTo(40, -104); ctx.stroke();
-      ctx.fillStyle = '#ffffff';
-      for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(40 + sx * 8, -106, 7, 2.5, sx * -0.5, 0, TAU); ctx.fill(); }
-      ctx.strokeStyle = '#6aa84f';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      for (let k = 0; k <= 12; k++) { const y = -14 - k * 7, x = 32 + (k / 12) * 8 + Math.sin(k * 1.4) * 4; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-      ctx.stroke();
-    } else {
-      // Charon
-      ctx.fillStyle = '#0e0a14';
-      ctx.beginPath();
-      ctx.moveTo(-22, -24); ctx.quadraticCurveTo(-24, -70 + bob, 0, -76 + bob); ctx.quadraticCurveTo(24, -70 + bob, 22, -24); ctx.fill();
-      ctx.fillStyle = '#000';
-      ctx.beginPath(); ctx.ellipse(0, -60 + bob, 10, 11, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#8fe8ff';
-      ctx.beginPath(); ctx.arc(-4, -62 + bob, 1.8, 0, TAU); ctx.arc(4, -62 + bob, 1.8, 0, TAU); ctx.fill();
-      // oar
-      ctx.strokeStyle = '#6a4a30';
-      ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(30, -10); ctx.lineTo(44, -100); ctx.stroke();
-      ctx.fillStyle = '#6a4a30';
-      ctx.beginPath(); ctx.ellipse(46, -108, 6, 14, 0.15, 0, TAU); ctx.fill();
-    }
+    // the keeper: Hermes above, Charon below (see npc_art.js)
+    if (oly) hermes(ctx, t); else charon(ctx, t);
+    if (!oly) lights.push({ x: o.x + 50, y: o.y - 53, r: 120, c: '#5fe8ff', a: 0.6 });
     // counter
     ctx.fillStyle = '#5a3a22';
     ctx.fillRect(-96, -28, 192, 28);
@@ -836,14 +799,11 @@ function drawShop(ctx, o, t, lights) {
       ctx.fillStyle = i % 2 ? '#e8c26a' : '#3a6a8a';
       ctx.beginPath(); ctx.moveTo(-46 + i * 18.4, -90); ctx.lineTo(-27.6 + i * 18.4, -90); ctx.lineTo(-27.6 + i * 18.4, -76); ctx.quadraticCurveTo(-36.8 + i * 18.4, -70, -46 + i * 18.4, -76); ctx.fill();
     }
-    const bob = Math.sin(t * 1.6) * 1.5;
-    ctx.fillStyle = '#16101e';
-    ctx.beginPath(); ctx.moveTo(-14, -34); ctx.quadraticCurveTo(-14, -64 + bob, 0, -66 + bob); ctx.quadraticCurveTo(14, -64 + bob, 14, -34); ctx.fill();
-    ctx.fillStyle = '#ffd34a';
-    ctx.beginPath(); ctx.arc(-3, -54 + bob, 1.5, 0, TAU); ctx.arc(3, -54 + bob, 1.5, 0, TAU); ctx.fill();
+    pedlar(ctx, t);
+    // the cart's own lantern, on the far post
     ctx.fillStyle = '#ffcf6a';
-    ctx.beginPath(); ctx.ellipse(30, -70, 5, 7, 0, 0, TAU); ctx.fill();
-    lights.push({ x: o.x + 30, y: o.y - 70, r: 220, c: '#ffb347', a: 0.8 });
+    ctx.beginPath(); ctx.ellipse(-30, -70, 5, 7, 0, 0, TAU); ctx.fill();
+    lights.push({ x: o.x - 30, y: o.y - 70, r: 220, c: '#ffb347', a: 0.8 });
   }
   ctx.restore();
 }
@@ -854,32 +814,17 @@ function drawVirgil(ctx, o, t, lights) {
   ctx.translate(o.x, o.y);
   const face = G.player && G.player.x < o.x ? -1 : 1;
   ctx.scale(face, 1);
-  const g = ctx.createLinearGradient(0, -70, 0, 0);
-  g.addColorStop(0, '#d8d0e8');
-  g.addColorStop(1, '#8a80a8');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(-16, 0); ctx.quadraticCurveTo(-18, -50 + bob, -8, -58 + bob); ctx.lineTo(8, -58 + bob); ctx.quadraticCurveTo(18, -50 + bob, 16, 0);
-  ctx.fill();
-  ctx.fillStyle = '#c94a5a';
-  ctx.beginPath(); ctx.moveTo(-8, -56 + bob); ctx.lineTo(10, -30 + bob); ctx.lineTo(6, -56 + bob); ctx.fill();
-  ctx.fillStyle = '#f0d8c0';
-  ctx.beginPath(); ctx.ellipse(1, -66 + bob, 8, 9, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#4ea84e';
-  for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.ellipse(-7 + k * 3, -73 + bob + Math.abs(k - 2.5) * 0.8, 3, 1.6, k * 0.5, 0, TAU); ctx.fill(); }
-  ctx.fillStyle = '#2a1d3a';
-  ctx.fillRect(4, -68 + bob, 2, 2);
-  ctx.fillStyle = '#6a3a22';
-  ctx.fillRect(8, -36 + bob, 12, 15);
-  ctx.fillStyle = '#f3e3c3';
-  ctx.fillRect(9, -35 + bob, 10, 13);
+  virgil(ctx, t);
   ctx.restore();
-  lights.push({ x: o.x, y: o.y - 50, r: 160, c: '#fff4d0', a: 0.6 });
+  lights.push({ x: o.x, y: o.y - 50, r: 170, c: '#fff4d0', a: 0.6 });
+  lights.push({ x: o.x + face * 30, y: o.y - 82, r: 110, c: '#9fe8ff', a: 0.6 });
+  // motes of pale light rise from the mist at his feet
+  if (Math.random() < 0.12) part({ x: o.x + rand(-18, 18), y: o.y - rand(0, 10), vx: rand(-6, 6), vy: rand(-28, -12), life: 1.6, size: rand(1.2, 2.2), color: Math.random() < 0.5 ? '#cdbbff' : '#9fe8ff', add: true });
   if (!G.save.talked && Math.floor(t * 2) % 2) {
     ctx.fillStyle = '#ffe14a';
     ctx.font = '900 26px Nunito, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('!', o.x, o.y - 92 + bob);
+    ctx.fillText('!', o.x, o.y - 112 + bob);
   }
 }
 
@@ -944,60 +889,17 @@ function drawIris(ctx, o, t, lights) {
   ctx.translate(o.x, o.y - 6 + bob);
   const face = G.player && G.player.x < o.x ? -1 : 1;
   ctx.scale(face, 1);
-  // rainbow wings, gently beating
-  const flap = Math.sin(t * 2.4) * 0.12;
-  for (const side of [-1, 1]) {
-    ctx.save();
-    ctx.translate(-4, -54);
-    ctx.rotate(side * (0.25 + flap) - 0.2);
-    for (let k = 0; k < 7; k++) {
-      ctx.fillStyle = RAINBOW[k];
-      ctx.globalAlpha = side < 0 ? 0.55 : 0.85;
-      ctx.beginPath();
-      ctx.ellipse(-22 - k * 2, -6 - k * 5, 30 - k * 2, 6, -0.6 - k * 0.12, 0, TAU);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-  ctx.globalAlpha = 1;
-  // robe
-  const g = ctx.createLinearGradient(0, -64, 0, 0);
-  g.addColorStop(0, '#ffffff');
-  g.addColorStop(0.5, '#d8e8ff');
-  g.addColorStop(1, '#ffd1f0');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(-18, 0); ctx.quadraticCurveTo(-16, -40, -8, -58); ctx.lineTo(8, -58); ctx.quadraticCurveTo(16, -40, 18, 0);
-  ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(120,90,160,.4)';
-  ctx.lineWidth = 1;
-  for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(k * 6, -50); ctx.quadraticCurveTo(k * 8, -24, k * 10, -2); ctx.stroke(); }
-  ctx.fillStyle = '#ffd34a';
-  ctx.fillRect(-9, -40, 18, 3);
-  // head, hair and a rainbow halo
-  ctx.fillStyle = '#f6dcc6';
-  ctx.beginPath(); ctx.ellipse(1, -67, 8, 9, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#6a3a7a';
-  ctx.beginPath(); ctx.ellipse(-2, -71, 9, 7, -0.3, Math.PI, TAU); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-9, -70); ctx.quadraticCurveTo(-14, -56, -8, -48); ctx.lineTo(-5, -62); ctx.fill();
-  ctx.fillStyle = '#2a1d3a';
-  ctx.fillRect(4, -68, 2, 2);
-  for (let k = 0; k < 7; k++) {
-    ctx.strokeStyle = RAINBOW[k];
-    ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.arc(1, -70, 14 + k * 1.6, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
-  }
-  // a pitcher of rainbow water
-  ctx.fillStyle = '#e8c070';
-  ctx.beginPath(); ctx.ellipse(13, -32, 5, 7, 0, 0, TAU); ctx.fill();
+  iris(ctx, t);
   ctx.restore();
-  if (Math.random() < 0.3) part({ x: o.x + 14 + rand(-3, 3), y: o.y - 34 + bob, vx: rand(-10, 10), vy: rand(20, 60), life: 0.9, size: 2, color: RAINBOW[Math.floor(Math.random() * 7)], add: true });
-  lights.push({ x: o.x, y: o.y - 50, r: 180, c: '#ffe8ff', a: 0.7 });
+  if (Math.random() < 0.4) part({ x: o.x + face * 19 + rand(-2, 2), y: o.y - 32 + bob, vx: rand(-10, 10), vy: rand(20, 60), life: 0.9, size: 2, color: RAINBOW[Math.floor(Math.random() * 7)], add: true });
+  lights.push({ x: o.x, y: o.y - 50, r: 200, c: '#ffe8ff', a: 0.7 });
+  // and now and then a feather of light drifts down from her wings
+  if (Math.random() < 0.06) part({ x: o.x - face * rand(20, 50), y: o.y - rand(50, 90) + bob, vx: rand(-10, 10), vy: rand(10, 26), life: 2.2, size: rand(1.6, 2.6), color: RAINBOW[Math.floor(Math.random() * 7)], add: true });
   if (!G.save.irisTalked && Math.floor(t * 2) % 2) {
     ctx.fillStyle = '#ffe14a';
     ctx.font = '900 26px Nunito, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('!', o.x, o.y - 100 + bob);
+    ctx.fillText('!', o.x, o.y - 112 + bob);
   }
 }
 
@@ -1125,7 +1027,8 @@ function drawHUD(ctx) {
   ctx.font = '800 16px Nunito, sans-serif';
   hudText(ctx, '×' + save.potions + (G.touch ? '' : '  (H)'), 46, 105);
   // seals
-  (save.bosses.hades ? GODS : SITES.slice(0, 4)).forEach((s, i) => {
+  // in the order they are meant to be won
+  (save.bosses.hades ? GOD_ORDER : WARDENS).forEach((s, i) => {
     const x = 34 + i * 24, y = 132;
     ctx.beginPath(); ctx.arc(x, y, 8, 0, TAU);
     ctx.fillStyle = save.bosses[s.id] ? SEAL_COLS[s.id] : 'rgba(0,0,0,.45)';
@@ -1339,17 +1242,27 @@ function drawMinimap(ctx) {
     ctx.restore();
     ctx.font = '700 12px Nunito, sans-serif';
     ctx.textAlign = 'center';
-    hudTextSmall(ctx, obj.label + ' · ' + Math.round(d) + 'm', mx, my + R + 34, obj.color);
+    fitText(ctx, obj.label + ' · ' + Math.round(d) + 'm', mx, my + R + 34, obj.color);
   }
   const B = BIOMES[BIOME_LIST[G.biome]];
   ctx.font = '700 14px Cinzel, serif';
   ctx.textAlign = 'center';
-  const lv = B.heaven ? HEAVEN_LVL : levelAt(Math.round(ptx), Math.round(pty));
-  hudTextSmall(ctx, B.name + '  ·  Danger ' + lv, mx, my + R + 18, '#f3e7ff');
+  const lv = levelAt(Math.round(ptx), Math.round(pty));
+  fitText(ctx, B.name + '  ·  Danger ' + lv, mx, my + R + 18, '#f3e7ff');
   ctx.font = '700 11px Nunito, sans-serif';
   if (!G.touch) hudTextSmall(ctx, 'M — map', mx, my + R + 50, 'rgba(255,255,255,.5)');
 }
 
+// A centred label under the minimap, squeezed narrower if it would run off the edge of the screen.
+function fitText(ctx, text, x, y, col) {
+  const room = 2 * (G.W - x - 8), w = ctx.measureText(text).width;
+  if (w <= room) return hudTextSmall(ctx, text, x, y, col);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(room / w, 1);
+  hudTextSmall(ctx, text, 0, 0, col);
+  ctx.restore();
+}
 function hudTextSmall(ctx, text, x, y, col) {
   ctx.lineWidth = 3;
   ctx.strokeStyle = 'rgba(0,0,0,.7)';
@@ -1387,7 +1300,7 @@ export function drawMap(ctx) {
     ctx.fillStyle = '#120a18';
     ctx.font = '900 13px Nunito, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(done ? '✓' : '☠', x, y + 5);
+    ctx.fillText(done ? '✓' : s.n ? String(s.n) : '☠', x, y + 5);
     ctx.font = '700 13px Cinzel, serif';
     hudTextSmall(ctx, s.name, x, y - 18, done ? '#9a9aaa' : '#ffffff');
   });

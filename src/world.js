@@ -9,87 +9,95 @@ export const T = 32, CS = 16, CPX = T * CS;
 export const AIR = 0, ROCK = 1, PLAT = 2, HAZ = 3, BRICK = 4, CRYSTAL = 5, ORE = 6, HAZC = 7;
 export const isSolid = t => t === ROCK || t === BRICK || t === CRYSTAL || t === ORE;
 
+// The lands are meant to be taken in order, and each has creatures found nowhere else.
+// Below: Gluttony (west), then Lust (east), then Treachery (south), then Heresy (north).
+// Above: the White Citadel (north, around the plaza), then the Golden Fields (east), then the
+// Cloudlands (south), then the Silver Peaks (west).
+// `rank` is a land's place in that order and `lvl` the danger its creatures start at; see levelAt.
 export const BIOME_LIST = ['limbo', 'lust', 'gluttony', 'heresy', 'treachery', 'abyss', 'olympus', 'zeus', 'gold', 'silver', 'mist'];
 export const BIOMES = {
   limbo: {
     name: 'Limbo', sub: 'The First Circle', rock: ['#433c5e', '#5d5484', '#231e36'], top: '#b4a6ee',
     sky: ['#0d0a1c', '#2b2348'], far: '#251e3d', mid: '#1a152d', fog: '#6a58b0', dark: 0.6, accent: '#c9baff',
-    haz: 'spikes', part: 'mote', thr: 0.483, tint: '#8a6bd6', enemies: { imp: 3, spider: 3, bat: 2, wisp: 2, spitter: 1, brute: 1 },
+    haz: 'spikes', part: 'mote', thr: 0.483, tint: '#8a6bd6', lvl: 1, enemies: { imp: 3, bat: 3, spider: 1 },
   },
   lust: {
-    name: 'Lust', sub: 'The Circle of Endless Storms', rock: ['#4d2246', '#713063', '#26102a'], top: '#ff8ad8',
+    name: 'Lust', sub: 'The Second Seal · Circle of Endless Storms', rank: 2, lvl: 4, rock: ['#4d2246', '#713063', '#26102a'], top: '#ff8ad8',
     sky: ['#1c0620', '#5c1550'], far: '#3d0f3a', mid: '#280a27', fog: '#c0388f', dark: 0.55, accent: '#ff8ad8',
-    haz: 'thorns', part: 'petal', thr: 0.495, tint: '#e0479e', wind: 1, enemies: { bat: 4, wisp: 3, spider: 2, imp: 2, brute: 1 },
+    haz: 'thorns', part: 'petal', thr: 0.495, tint: '#e0479e', wind: 1, enemies: { harpy: 4, bat: 3 },
   },
   gluttony: {
-    name: 'Gluttony', sub: 'The Circle of Ceaseless Rain', rock: ['#34412b', '#4c5e38', '#182013'], top: '#a6e36b',
+    name: 'Gluttony', sub: 'The First Seal · Circle of Ceaseless Rain', rank: 1, lvl: 2, rock: ['#34412b', '#4c5e38', '#182013'], top: '#a6e36b',
     sky: ['#081008', '#213a1c'], far: '#18291a', mid: '#0f1b0f', fog: '#4f8a35', dark: 0.64, accent: '#b6ff6b',
-    haz: 'acid', part: 'rain', thr: 0.462, tint: '#6fae3a', enemies: { spider: 4, imp: 3, spitter: 3, brute: 2, bat: 1 },
+    haz: 'acid', part: 'rain', thr: 0.462, tint: '#6fae3a', enemies: { grub: 5, spitter: 3 },
   },
   heresy: {
-    name: 'Heresy', sub: 'The Circle of Burning Tombs', rock: ['#552517', '#7a3820', '#2a0f08'], top: '#ffae4a',
+    name: 'Heresy', sub: 'The Fourth Seal · Circle of Burning Tombs', rank: 4, lvl: 10, rock: ['#552517', '#7a3820', '#2a0f08'], top: '#ffae4a',
     sky: ['#1a0402', '#6a1a06'], far: '#3a0c05', mid: '#250703', fog: '#c2481a', dark: 0.48, accent: '#ffb347',
-    haz: 'lava', part: 'ember', thr: 0.524, tint: '#ff5a1f', enemies: { imp: 4, spitter: 3, wisp: 3, spider: 2, brute: 2 },
+    haz: 'lava', part: 'ember', thr: 0.524, tint: '#ff5a1f', enemies: { imp: 4, wisp: 4 },
   },
   treachery: {
-    name: 'Treachery', sub: 'The Frozen Lake of Cocytus', rock: ['#2c3e5c', '#47638c', '#141f35'], top: '#e6f8ff',
+    name: 'Treachery', sub: 'The Third Seal · Frozen Lake of Cocytus', rank: 3, lvl: 7, rock: ['#2c3e5c', '#47638c', '#141f35'], top: '#e6f8ff',
     sky: ['#050b18', '#1a3358'], far: '#132744', mid: '#0b182c', fog: '#5a86c0', dark: 0.58, accent: '#a8ecff',
-    haz: 'icicle', part: 'snow', thr: 0.47, tint: '#6fc6ff', ice: 1, enemies: { spider: 3, wisp: 3, brute: 3, bat: 2, imp: 1 },
+    haz: 'icicle', part: 'snow', thr: 0.47, tint: '#6fc6ff', ice: 1, enemies: { spider: 4, brute: 3 },
   },
   abyss: {
     name: 'The Throne of Hades', sub: 'Where the Rivers End', rock: ['#2c0c12', '#4a151c', '#12040a'], top: '#ff3b4a',
     sky: ['#050002', '#2a0408'], far: '#1a0306', mid: '#100204', fog: '#a0102a', dark: 0.5, accent: '#ff4a5a',
-    haz: 'lava', part: 'ember', thr: 0.5, tint: '#ff2a3a', enemies: {},
+    haz: 'lava', part: 'ember', thr: 0.5, tint: '#ff2a3a', lvl: 13, enemies: {},
   },
   olympus: {
-    name: 'The White Citadel', sub: 'Heart of Olympus', rock: ['#d3d9e8', '#ffffff', '#a4aec8'], top: '#ffe9a8',
+    name: 'The White Citadel', sub: 'The First Sigil · Heart of Olympus', rank: 1, lvl: 16, rock: ['#d3d9e8', '#ffffff', '#a4aec8'], top: '#ffe9a8',
     sky: ['#4f86d8', '#ffd9a8'], far: '#cfdcf5', mid: '#e6ecf9', fog: '#fff2d0', dark: 0.05, accent: '#ffe28a',
-    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, sun: 1, enemies: { angel: 3, cherub: 3, seraph: 2, ophan: 2 },
+    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, sun: 1, enemies: { angel: 3, ophan: 3 },
   },
   zeus: {
     name: 'The Summit of Olympus', sub: 'Throne of the Thunderer', rock: ['#9aa4c8', '#d2d9f0', '#5e668e'], top: '#fff27a',
     sky: ['#111633', '#463b7c'], far: '#272c56', mid: '#1b1f45', fog: '#8a9aff', dark: 0.2, accent: '#fff27a',
-    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffe14a', heaven: 1, cloud: 1, enemies: {},
+    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffe14a', heaven: 1, cloud: 1, lvl: 24, enemies: {},
   },
   // The outer realms of Olympus, each around one god's temple.
   gold: {
-    name: 'The Golden Fields', sub: 'Where the Sun Chariot Rests', rock: ['#d8ae4e', '#ffe592', '#9c7322'], top: '#fff6c0',
+    name: 'The Golden Fields', sub: 'The Second Sigil · Where the Sun Chariot Rests', rank: 2, lvl: 18, rock: ['#d8ae4e', '#ffe592', '#9c7322'], top: '#fff6c0',
     sky: ['#d9762a', '#ffe7a6'], far: '#f2c46e', mid: '#f8dc96', fog: '#ffe3a0', dark: 0.03, accent: '#fff09a',
     haz: 'none', part: 'glint', thr: 0.5, tint: '#ffb020', heaven: 1, cloud: 1, sun: 1.25,
     brick: ['#e6c062', '#fff0b8', '#b08832'], trim: '#fff7d0', pcol: ['#ffe36b', '#fff3b0', '#ffc531'],
-    enemies: { angel: 4, cherub: 2, seraph: 2, ophan: 2 },
+    enemies: { cherub: 4, seraph: 3 },
   },
   silver: {
-    name: 'The Silver Peaks', sub: 'Forge-Halls of War', rock: ['#a3aec4', '#f4f7fd', '#55617e'], top: '#eef4ff',
+    name: 'The Silver Peaks', sub: 'The Fourth Sigil · Forge-Halls of War', rank: 4, lvl: 22, rock: ['#a3aec4', '#f4f7fd', '#55617e'], top: '#eef4ff',
     sky: ['#0e1430', '#4a5a86'], far: '#3a4668', mid: '#55638a', fog: '#b8c6e6', dark: 0.2, moon: 1, accent: '#e8f0ff',
     haz: 'none', part: 'feather', thr: 0.5, tint: '#aebad4', heaven: 1, cloud: 1,
     brick: ['#aeb6c4', '#f0f3f8', '#767f92'], trim: '#dfe6f4', pcol: ['#e8eef8', '#c3cde0', '#ffffff'],
-    enemies: { angel: 3, ophan: 3, seraph: 2, cherub: 1 },
+    enemies: { spartan: 4, warwheel: 3 },
   },
   mist: {
-    name: 'The Cloudlands', sub: 'Mists of the Sea-King', rock: ['#9ea8b8', '#cdd6e2', '#6f7a8e'], top: '#d6e8f8',
+    name: 'The Cloudlands', sub: 'The Third Sigil · Mists of the Sea-King', rank: 3, lvl: 20, rock: ['#9ea8b8', '#cdd6e2', '#6f7a8e'], top: '#d6e8f8',
     sky: ['#77849a', '#c9d2dc'], far: '#a4aebd', mid: '#b6bfcc', fog: '#d8dee6', dark: 0.12, accent: '#c4e6ff',
     haz: 'none', part: 'mist', thr: 0.5, tint: '#88b0d4', heaven: 1, cloud: 1, mist: 1,
     brick: ['#bcc4d0', '#e8ecf1', '#87909f'], trim: '#cfe2f2', pcol: ['#e6eef6', '#cfe0ee', '#ffffff'],
-    enemies: { cherub: 3, seraph: 3, ophan: 2, angel: 2 },
+    enemies: { stormling: 4, nereid: 3 },
   },
 };
 
 export const SITES = [
-  { id: 'cerberus', name: 'Cerberus', title: 'The Great Worm of Gluttony', biome: 'gluttony', tx: -700, ty: 0, w: 76, h: 30, hp: 600 },
-  { id: 'storm', name: 'Semiramis', title: 'Queen of the Endless Storm', biome: 'lust', tx: 700, ty: 0, w: 76, h: 30, hp: 560 },
-  { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -700, w: 76, h: 30, hp: 650 },
-  { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 700, w: 76, h: 30, hp: 740 },
+  { id: 'cerberus', name: 'Cerberus', title: 'The Great Worm of Gluttony', biome: 'gluttony', tx: -700, ty: 0, w: 76, h: 30, hp: 600, n: 1, way: 'to the west' },
+  { id: 'storm', name: 'Semiramis', title: 'Queen of the Endless Storm', biome: 'lust', tx: 700, ty: 0, w: 76, h: 30, hp: 720, n: 2, way: 'to the east' },
+  { id: 'heretic', name: 'Farinata', title: 'The Burning Tomb', biome: 'heresy', tx: 0, ty: -700, w: 76, h: 30, hp: 1000, n: 4, way: 'far above' },
+  { id: 'titan', name: 'Ephialtes', title: 'The Giant in the Ice', biome: 'treachery', tx: 0, ty: 700, w: 76, h: 30, hp: 860, n: 3, way: 'far below' },
   { id: 'hades', name: 'Hades', title: 'Lord of the Dead', biome: 'abyss', tx: 0, ty: 3000, w: 84, h: 36, hp: 3000 },
   // Olympus: four gods guard the Sigils that open the way to Zeus.
-  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -760, ty: -3716, w: 76, h: 30, hp: 5600, god: 1 },
-  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 760, ty: -3716, w: 76, h: 30, hp: 5100, god: 1 },
-  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -4330, w: 76, h: 30, hp: 5500, god: 1 },
-  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -3110, w: 76, h: 30, hp: 6200, god: 1 },
+  { id: 'ares', name: 'Ares', title: 'God of War', biome: 'olympus', tx: -760, ty: -3716, w: 76, h: 30, hp: 6900, god: 1, n: 4, land: 'silver', way: 'to the west' },
+  { id: 'apollo', name: 'Apollo', title: 'Lord of the Sun', biome: 'olympus', tx: 760, ty: -3716, w: 76, h: 30, hp: 5600, god: 1, n: 2, land: 'gold', way: 'to the east' },
+  { id: 'athena', name: 'Athena', title: 'The Grey-Eyed Strategist', biome: 'olympus', tx: 0, ty: -4330, w: 76, h: 30, hp: 5000, god: 1, n: 1, land: 'olympus', way: 'above' },
+  { id: 'poseidon', name: 'Poseidon', title: 'Shaker of the Earth', biome: 'olympus', tx: 0, ty: -3110, w: 76, h: 30, hp: 6200, god: 1, n: 3, land: 'mist', way: 'below' },
   { id: 'zeus', name: 'Zeus', title: 'King of the Gods', biome: 'zeus', tx: 0, ty: -4760, w: 84, h: 36, hp: 20000 },
 ];
 const HS = SITES[4];
 export const GODS = SITES.slice(5, 9);
+// The Wardens and the gods in the order they are meant to be fought.
+export const WARDENS = SITES.slice(0, 4).sort((a, b) => a.n - b.n);
+export const GOD_ORDER = GODS.slice().sort((a, b) => a.n - b.n);
 export const ZS = SITES[9];
 // Olympus spans this rectangle of tiles, walled off by a shell of cloud-stone. It is a little
 // bigger than the stretch of underworld between its four bosses.
@@ -164,9 +172,17 @@ export function olyZone(tx, ty) {
   return 9;
 }
 
-export const levelAt = (tx, ty) => 1 + Math.floor(Math.hypot(tx, ty) / 90);
-// Everything in the heavens fights at this level: far stronger than the underworld's circles.
-export const HEAVEN_LVL = 18;
+// How dangerous a place is. Every land starts at its own level, the lands rising in the order
+// they are meant to be taken: Limbo 1, Gluttony 2, Lust 4, Treachery 7, Heresy 10, the Throne of
+// Hades 13; then the heavens, far above them all: the Citadel 16, the Golden Fields 18, the
+// Cloudlands 20, the Silver Peaks 22, the summit 24. In the four circles below, danger also
+// rises by one about halfway out to the Warden and by one more in the wilds beyond him.
+export function levelAt(tx, ty) {
+  const B = BIOMES[BIOME_LIST[biomeAt(tx, ty)]];
+  if (B.heaven || !B.rank) return B.lvl;
+  const d = Math.hypot(tx, ty);
+  return B.lvl + (d > 400 ? 1 : 0) + (d > 720 ? 1 : 0);
+}
 
 function arenaInner(s, dx, dy) {
   const hw = s.w / 2, hh = s.h / 2, ax = Math.abs(dx);
@@ -318,11 +334,11 @@ export const LANDMARKS = [
   { type: 'fountain', id: 'fountain', tx: -3, ty: 0 },
   { type: 'npc', id: 'virgil', tx: 8, ty: 0 },
   { type: 'shrine', id: 'town', tx: 18, ty: 0, name: 'Limbo Market' },
-  { type: 'sign', id: 'sign_s', tx: 27, ty: 0, text: 'Treachery  ↓' },
-  { type: 'sign', id: 'sign_e', tx: 44, ty: 0, text: 'Lust  →' },
+  { type: 'sign', id: 'sign_s', tx: 27, ty: 0, text: '3 · Treachery  ↓' },
+  { type: 'sign', id: 'sign_e', tx: 44, ty: 0, text: '2 · Lust  →' },
   { type: 'armourer', id: 'armourer', tx: 39, ty: 0, name: "Brontes' Smithy" },
-  { type: 'sign', id: 'sign_w', tx: -44, ty: 0, text: '←  Gluttony' },
-  { type: 'sign', id: 'sign_n', tx: -9, ty: 0, text: 'Heresy  ↑' },
+  { type: 'sign', id: 'sign_w', tx: -44, ty: 0, text: '←  1 · Gluttony' },
+  { type: 'sign', id: 'sign_n', tx: -9, ty: 0, text: '4 · Heresy  ↑' },
 ];
 for (const [dx, dy, b] of [[1, 0, 'lust'], [-1, 0, 'gluttony'], [0, -1, 'heresy'], [0, 1, 'treachery']]) {
   let tx, ty;
@@ -340,11 +356,11 @@ LANDMARKS.push(
   { type: 'npc', id: 'iris', tx: 2, ty: OLY.hub },
   { type: 'shrine', id: 'oly_hub', tx: 12, ty: OLY.hub, name: 'Gates of Olympus' },
   { type: 'gate', id: 'gate_zeus', tx: 28, ty: OLY.hub, oly: 1 },
-  { type: 'sign', id: 'sign_ow', tx: -40, ty: OLY.hub, text: '←  Ares' },
-  { type: 'sign', id: 'sign_oe', tx: 40, ty: OLY.hub, text: 'Apollo  →' },
+  { type: 'sign', id: 'sign_ow', tx: -40, ty: OLY.hub, text: '←  4 · Ares' },
+  { type: 'sign', id: 'sign_oe', tx: 40, ty: OLY.hub, text: '2 · Apollo  →' },
   { type: 'armourer', id: 'armourer_oly', tx: 47, ty: OLY.hub, name: 'The Celestial Forge', oly: 1 },
-  { type: 'sign', id: 'sign_ou', tx: 55, ty: OLY.hub, text: 'Athena  ↑' },
-  { type: 'sign', id: 'sign_od', tx: -56, ty: OLY.hub, text: 'Poseidon  ↓' },
+  { type: 'sign', id: 'sign_ou', tx: 55, ty: OLY.hub, text: '1 · Athena  ↑' },
+  { type: 'sign', id: 'sign_od', tx: -56, ty: OLY.hub, text: '3 · Poseidon  ↓' },
   // a shrine at the door of each temple
   ...GODS.map(s => ({ type: 'shrine', id: 'oly_' + s.id, tx: s.tx + (s.tx > 0 || s.id === 'poseidon' ? -1 : 1) * (s.w / 2 + 8), ty: s.ty + s.h / 2 + 1, name: 'Temple of ' + s.name })),
   ...WAYS.map(w => ({ type: 'shrine', id: w.id, tx: w.tx, ty: w.ty, name: w.name })),
@@ -388,6 +404,7 @@ export function setTile(tx, ty, t) {
 export const QUIET = 0.26, PACK = 0.75;
 export const foeDensity = (cx, cy) => vnoise(cx * 0.22, cy * 0.22, 501);
 
+const FLIERS = ['bat', 'wisp', 'harpy', 'cherub', 'seraph', 'ophan', 'stormling', 'nereid', 'warwheel'];
 function weightedPick(rng, weights) {
   let total = 0;
   for (const k in weights) total += weights[k];
@@ -445,7 +462,7 @@ function genChunk(cx, cy, k) {
     if (isSolid(get(i, j - 1)) && below === AIR && get(i, j + 2) === AIR) ceil.push([i, j]);
   }
   const bi = bio[8 * CS + 8], B = BIOMES[BIOME_LIST[bi]];
-  const tcx = cx * CS + 8, tcy = cy * CS + 8, dist = Math.hypot(tcx, tcy), lvl = B.heaven ? HEAVEN_LVL : levelAt(tcx, tcy);
+  const tcx = cx * CS + 8, tcy = cy * CS + 8, dist = Math.hypot(tcx, tcy), lvl = levelAt(tcx, tcy);
   const take = list => (list.length ? list.splice(Math.floor(rng() * list.length), 1)[0] : null);
   const place = (spot, o) => {
     o.x = (cx * CS + spot[0] + 0.5) * T;
@@ -468,7 +485,7 @@ function genChunk(cx, cy, k) {
         : B.heaven ? (r < 0.15 ? 0 : r < 0.7 ? 1 : 2) : (r < 0.28 ? 0 : r < 0.84 ? 1 : 2);
       for (let q = 0; q < n; q++) {
         const type = weightedPick(rng, B.enemies);
-        const fly = type === 'bat' || type === 'wisp' || type === 'cherub' || type === 'seraph' || type === 'ophan';
+        const fly = FLIERS.includes(type);
         const hang = type === 'spider' && ceil.length && rng() < 0.75;
         // foes that share a chunk stand well apart (six tiles or more) when there is room
         const list = hang ? ceil : fly ? (air.length ? air : floor) : floor;

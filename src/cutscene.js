@@ -248,7 +248,7 @@ function sparkle(x, y, n = 2, cols = RAINBOW, spread = 40) {
 const SCENES = {
   prelude: [
     {
-      dur: 6.5, music: 'prelude',
+      dur: 5, music: 'prelude',
       text: 'Long ago, on the golden heights of Olympus, a host of angels served the gods.',
       draw(ctx, k, t) {
         sky(ctx, [[0, '#4f86d8'], [0.55, '#a6c6f0'], [1, '#ffd9a8']]);
@@ -264,8 +264,8 @@ const SCENES = {
       },
     },
     {
-      dur: 6.5,
-      text: 'But one of them drank too deeply of the light, and grew brighter than the sun itself.',
+      dur: 5,
+      text: 'But one of them grew brighter than the sun itself.',
       draw(ctx, k, t) {
         const b = sm(k);
         sky(ctx, [[0, mix('#4f86d8', '#ffe9b0', b * 0.6)], [1, mix('#ffd9a8', '#ffffff', b * 0.5)]]);
@@ -285,7 +285,7 @@ const SCENES = {
       },
     },
     {
-      dur: 6, music: 'fall', sfx: 'roar',
+      dur: 4.5, music: 'fall', sfx: 'roar',
       text: 'Zeus, King of the Gods, grew afraid.',
       draw(ctx, k, t) {
         const s = sm(k * 1.5);
@@ -299,8 +299,8 @@ const SCENES = {
       },
     },
     {
-      dur: 5.5,
-      text: '"No creature shall outshine Olympus," he thundered, and he struck the angel down.',
+      dur: 4.5,
+      text: '"No creature shall outshine Olympus," he thundered, and struck the angel down.',
       draw(ctx, k, t) {
         stormSky(ctx, 1, t);
         const strike = k > 0.45;
@@ -321,8 +321,8 @@ const SCENES = {
       },
     },
     {
-      dur: 6.5,
-      text: 'Stripped of its light, it fell through the clouds, past the world of mortals, down into the dark...',
+      dur: 5,
+      text: 'Stripped of its light, it fell through the clouds, down into the dark...',
       draw(ctx, k, t) {
         const c1 = k < 0.5 ? mix('#2a2458', '#0a0818', k * 2) : mix('#0a0818', '#3a0608', (k - 0.5) * 2);
         const c2 = k < 0.5 ? mix('#6a5a8a', '#140c20', k * 2) : mix('#140c20', '#8a1a0a', (k - 0.5) * 2);
@@ -351,7 +351,7 @@ const SCENES = {
       },
     },
     {
-      dur: 6.5, music: 'limbo',
+      dur: 5, music: 'limbo',
       text: '...all the way down to the realm of Hades. To find the way home, you must first escape the underworld.',
       draw(ctx, k, t) {
         sky(ctx, [[0, '#0d0a1c'], [0.7, '#2b2348'], [1, '#5a1a2a']]);

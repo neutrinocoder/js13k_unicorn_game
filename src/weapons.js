@@ -21,17 +21,21 @@ export const REALMS = [
 ];
 
 // land: the land whose foes drop the set. A set with no land turns up anywhere in its realm.
+// The weapon sets, in the order their lands are meant to be taken. `k` scales the power of every
+// weapon in the set: a land that is harder to reach and to survive yields stronger weapons of each
+// rarity, by a modest step, so a rarer weapon from an easier land still beats a commoner one from
+// a harder land. The two sets found everywhere are the weakest of their realms.
 export const SETS = [
-  { id: 'shadow', realm: 'under', name: 'Everywhere below', theme: 'Shadow' },
-  { id: 'lust', realm: 'under', land: 'lust', name: 'Lust', theme: 'Storm' },
-  { id: 'gluttony', realm: 'under', land: 'gluttony', name: 'Gluttony', theme: 'Venom' },
-  { id: 'heresy', realm: 'under', land: 'heresy', name: 'Heresy', theme: 'Flame' },
-  { id: 'treachery', realm: 'under', land: 'treachery', name: 'Treachery', theme: 'Frost' },
-  { id: 'olympian', realm: 'heaven', name: 'Everywhere above', theme: 'The Gods' },
-  { id: 'citadel', realm: 'heaven', land: 'olympus', name: 'White Citadel', theme: 'Wisdom' },
-  { id: 'gold', realm: 'heaven', land: 'gold', name: 'Golden Fields', theme: 'Sun' },
-  { id: 'silver', realm: 'heaven', land: 'silver', name: 'Silver Peaks', theme: 'War' },
-  { id: 'mist', realm: 'heaven', land: 'mist', name: 'Cloudlands', theme: 'Sea' },
+  { id: 'shadow', realm: 'under', name: 'Everywhere below', theme: 'Shadow', k: 0.85 },
+  { id: 'gluttony', realm: 'under', land: 'gluttony', name: 'Gluttony', theme: 'Venom', n: 1, k: 0.9 },
+  { id: 'lust', realm: 'under', land: 'lust', name: 'Lust', theme: 'Storm', n: 2, k: 1 },
+  { id: 'treachery', realm: 'under', land: 'treachery', name: 'Treachery', theme: 'Frost', n: 3, k: 1.12 },
+  { id: 'heresy', realm: 'under', land: 'heresy', name: 'Heresy', theme: 'Flame', n: 4, k: 1.25 },
+  { id: 'olympian', realm: 'heaven', name: 'Everywhere above', theme: 'The Gods', k: 0.88 },
+  { id: 'citadel', realm: 'heaven', land: 'olympus', name: 'White Citadel', theme: 'Wisdom', n: 1, k: 0.92 },
+  { id: 'gold', realm: 'heaven', land: 'gold', name: 'Golden Fields', theme: 'Sun', n: 2, k: 1 },
+  { id: 'mist', realm: 'heaven', land: 'mist', name: 'Cloudlands', theme: 'Sea', n: 3, k: 1.1 },
+  { id: 'silver', realm: 'heaven', land: 'silver', name: 'Silver Peaks', theme: 'War', n: 4, k: 1.2 },
 ];
 const SET_BY_ID = {};
 for (const s of SETS) SET_BY_ID[s.id] = s;
@@ -230,10 +234,10 @@ export const ARMS = [
     text: 'A whole ocean poured through one point. Its beam drowns everything in its path. It uses energy while it fires.' },
 ];
 
-// Work out each weapon's damage from the power of its rarity and realm.
+// Work out each weapon's damage from the power of its rarity and realm, scaled by its set.
 const BY_ID = {};
 for (const w of ARMS) {
-  const realm = SET_BY_ID[w.set].realm, power = POWER[realm][w.rar];
+  const set = SET_BY_ID[w.set], realm = set.realm, power = POWER[realm][w.rar] * set.k;
   w.realm = realm;
   w.power = power;
   w.dmg = power * (w.k || 1) * w.cd / (w.hits || w.n || 1);
