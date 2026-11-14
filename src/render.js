@@ -1,6 +1,6 @@
 // Drawing: parallax backgrounds, the tile world, objects, lighting and the HUD.
 import { G } from './state.js';
-import { T, CS, CPX, getChunk, chunkCanvas, chunkMini, BIOMES, BIOME_LIST, SITES, LANDMARKS, levelAt, drawLiquids, GODS, WARDENS, GOD_ORDER } from './world.js';
+import { T, CS, CPX, getChunk, chunkCanvas, chunkMini, BIOMES, BIOME_LIST, SITES, LANDMARKS, levelAt, drawLiquids, GODS, WARDENS, GOD_ORDER, sealOf, wardEdges } from './world.js';
 import { part } from './fx.js';
 
 // Sparks and fumes thrown up by bubbles popping on lava and acid.
@@ -52,7 +52,7 @@ export function render(ctx) {
   // Tiles
   const c0x = Math.floor(v.x0 / CPX), c1x = Math.floor(v.x1 / CPX), c0y = Math.floor(v.y0 / CPX), c1y = Math.floor(v.y1 / CPX);
   let built = 0, ahead = null;
-  const objs = [], liquids = [];
+  const objs = [], liquids = [], wards = [];
   for (let cy = c0y - 1; cy <= c1y + 1; cy++) for (let cx = c0x - 1; cx <= c1x + 1; cx++) {
     const c = getChunk(cx, cy);
     for (const o of c.objects) objs.push(o);
@@ -60,6 +60,8 @@ export function render(ctx) {
     if (cx < c0x || cx > c1x || cy < c0y || cy > c1y) { if (!ahead && !c.canvas) ahead = c; continue; }
     if (!c.canvas || c.dirty) { if (built >= 3 && !c.canvas) continue; built++; }
     ctx.drawImage(chunkCanvas(c), cx * CPX, cy * CPX, CPX + 0.6, CPX + 0.6);
+    const edges = wardEdges(c);
+    if (edges.length) wards.push(edges);
     for (const l of c.lights) lights.push(l);
     if (c.liquids.length) liquids.push(...c.liquids);
   }
@@ -70,6 +72,7 @@ export function render(ctx) {
 
   // Objects behind actors
   for (const o of objs) drawObject(ctx, o, G.t, lights);
+  drawSeals(ctx, wards, G.t);
   drawPickups(ctx);
   // a dropped weapon glows in the dark, in the colour of its rarity
   for (const g of G.pickups) if (g.kind === 'weapon') lights.push({ x: g.x, y: g.y - 14, r: 130, c: rarityOf(armById(g.wid)).col, a: 0.75 });
@@ -561,6 +564,7 @@ function drawObject(ctx, o, t, lights) {
     case 'armourer': drawArmourer(ctx, o, t, lights); break;
     case 'npc': if (o.id === 'iris') drawIris(ctx, o, t, lights); else drawVirgil(ctx, o, t, lights); break;
     case 'gate': drawGate(ctx, o, t, lights); break;
+    case 'ward': drawWardGate(ctx, o, t, lights); break;
     case 'fountain': drawFountain(ctx, o, t, lights); break;
     case 'sign': {
       ctx.fillStyle = '#4a3326';
@@ -826,6 +830,110 @@ function drawVirgil(ctx, o, t, lights) {
     ctx.textAlign = 'center';
     ctx.fillText('!', o.x, o.y - 112 + bob);
   }
+}
+
+// The seal on a land: a wall of light, one tile thick, along the whole edge of every land that
+// is still sealed, in the colour of the Seal or Sigil that will open it. It is drawn in the world
+// and again as points of light over the darkness, so it shows in the blackest cave.
+function drawSeals(ctx, wards, t) {
+  if (!wards.length) return;
+  const need = {}, m = ctx.getTransform(), k = Math.hypot(m.a, m.b);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const e of wards) {
+    for (let i = 0; i < e.length; i += 3) {
+      const b = e[i + 2];
+      if (need[b] === undefined) need[b] = sealOf(b);
+      if (!need[b]) continue;
+      const tx = e[i], ty = e[i + 1], x = tx * T, y = ty * T, sky = BIOMES[BIOME_LIST[b]].heaven;
+      // light shows on the dark of the underworld; against the bright sky it must be a deep colour
+      const col = sky ? mix(SEAL_COLS[need[b].id], '#2a2f8a', 0.6) : SEAL_COLS[need[b].id];
+      const wave = 0.5 + 0.5 * Math.sin(t * 2.6 + (tx + ty) * 0.55);
+      ctx.globalCompositeOperation = sky ? 'source-over' : 'lighter';
+      ctx.fillStyle = rgba(col, sky ? 0.22 + wave * 0.14 : 0.1 + wave * 0.12);
+      ctx.fillRect(x, y, T, T);
+      // a bright rune-mark in the middle of each tile, turning slowly
+      ctx.fillStyle = rgba(col, sky ? 0.6 + wave * 0.35 : 0.35 + wave * 0.4);
+      ctx.save();
+      ctx.translate(x + T / 2, y + T / 2);
+      ctx.rotate(t * 0.8 + (tx * 7 + ty * 13) % 6);
+      ctx.fillRect(-1.2, -7, 2.4, 14);
+      ctx.fillRect(-7, -1.2, 14, 2.4);
+      ctx.restore();
+      if (!sky && (tx + ty) % 2 === 0 && EMIT.list.length < 1000) EMIT.list.push(m.a * (x + 16) + m.c * (y + 16) + m.e, m.b * (x + 16) + m.d * (y + 16) + m.f, (18 + wave * 8) * k, col);
+    }
+  }
+  ctx.restore();
+}
+
+// The gate where a road out of Limbo crosses into its circle: iron bars across the way while
+// the land is sealed, drawn back once it is open, with the mark of whoever must fall first.
+function drawWardGate(ctx, o, t, lights) {
+  const need = sealOf(o.biome), B = BIOMES[BIOME_LIST[o.biome]], shut = !!need;
+  const col = shut ? SEAL_COLS[need.id] : '#8a8296', pulse = 0.5 + 0.5 * Math.sin(t * 2.6);
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  // a flat gate lies across a shaft six tiles wide; turn the drawing so one picture serves both
+  const span = o.flat ? 6 * T : 5 * T;
+  if (o.flat) { ctx.translate(T * 2.5, T / 2); ctx.rotate(-Math.PI / 2); }
+  // from here the way through runs along x, and the opening is from y = -span up to y = 0
+  const stone = ctx.createLinearGradient(-22, 0, 22, 0);
+  stone.addColorStop(0, '#3a3350');
+  stone.addColorStop(0.5, '#5d5484');
+  stone.addColorStop(1, '#2a2438');
+  // the two ends of the frame
+  for (const y of [-span - 16, 0]) {
+    ctx.fillStyle = stone;
+    ctx.fillRect(-24, y, 48, 16);
+    ctx.strokeStyle = 'rgba(0,0,0,.6)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-24, y, 48, 16);
+  }
+  // the bars: all the way across when shut, drawn up into the frame when open
+  const reach = shut ? span : 26;
+  for (let i = -2; i <= 2; i++) {
+    const x = i * 8;
+    ctx.fillStyle = '#1c1826';
+    ctx.fillRect(x - 2.6, -span, 5.2, reach);
+    ctx.fillStyle = '#6e6a82';
+    ctx.fillRect(x - 1.2, -span, 1.6, reach);
+    ctx.fillStyle = '#1c1826';
+    ctx.beginPath(); ctx.moveTo(x - 2.6, -span + reach); ctx.lineTo(x, -span + reach + 7); ctx.lineTo(x + 2.6, -span + reach); ctx.fill();
+  }
+  ctx.fillStyle = '#2a2636';
+  for (let y = -span + 14; y < -span + reach - 4; y += 38) ctx.fillRect(-20, y, 40, 4.5);
+  // the mark in the middle: the number of the one who must fall, burning in the colour of his Seal
+  const my = shut ? -span / 2 : -span - 8;
+  if (shut) {
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(0, my, 0, 0, my, 46);
+    g.addColorStop(0, rgba(col, 0.45 + pulse * 0.2));
+    g.addColorStop(1, rgba(col, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(-46, my - 46, 92, 92);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.fillStyle = '#14101e';
+  ctx.strokeStyle = col;
+  ctx.lineWidth = shut ? 3 : 2;
+  ctx.beginPath(); ctx.arc(0, my, shut ? 15 : 7, 0, TAU); ctx.fill(); ctx.stroke();
+  if (shut) {
+    ctx.save();
+    ctx.translate(0, my);
+    if (o.flat) ctx.rotate(Math.PI / 2);
+    ctx.fillStyle = col;
+    ctx.font = '900 17px Cinzel, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(need.n), 0, 6);
+    ctx.restore();
+  }
+  ctx.restore();
+  // a plate saying what it is, upright whichever way the gate lies
+  const px = o.flat ? o.x - T * 0.5 : o.x, py = o.flat ? o.y - 12 : o.y - span - 26;
+  ctx.font = '700 12px Cinzel, serif';
+  ctx.textAlign = 'center';
+  hudTextSmall(ctx, shut ? `Sealed · defeat ${need.name}` : B.name, px, py, shut ? col : '#d8d0e8');
+  if (shut) lights.push({ x: o.flat ? o.x - T * 0.5 : o.x, y: o.flat ? o.y + T / 2 : o.y - span / 2, r: 170, c: col, a: 0.7 });
 }
 
 const SEAL_COLS = { cerberus: '#b6ff6b', storm: '#ff8ad8', heretic: '#ffb347', titan: '#a8ecff', ares: '#ff5a3a', apollo: '#ffd34a', athena: '#9fd0ff', poseidon: '#3ad8ff', zeus: '#fff27a' };

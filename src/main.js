@@ -1,6 +1,6 @@
 // Game loop, world streaming, interactions, saving and screens.
 import { G, SAVE_KEY, newSave } from './state.js';
-import { T, CS, CPX, getChunk, biomeAt, BIOMES, BIOME_LIST, SITES, LANDMARKS, GODS, WARDENS, GOD_ORDER, ZS, OLY } from './world.js';
+import { T, CS, CPX, getChunk, biomeAt, BIOMES, BIOME_LIST, SITES, LANDMARKS, GODS, WARDENS, GOD_ORDER, ZS, OLY, sealOf } from './world.js';
 import { playCutscene, cutsceneKey, drawCutscene } from './cutscene.js';
 import { initInput, endFrame, tapped, held, mouse, keys, swallow } from './input.js';
 import { initAudio, sfx, setTheme, setMuted, muted, setHeat, hush } from './audio.js';
@@ -102,6 +102,7 @@ function startGame(save) {
   G.player.hp = clamp(save.hp || 5, 1, stats().maxHp);
   G.player.armour = stats().armour;
   save.armours = save.armours || {};
+  ward.ok = ward.inside = false;
   G.cam.x = G.player.x - G.W / G.scale / 2;
   G.cam.y = G.player.y - G.H / G.scale / 2;
   G.biome = biomeAt(Math.floor(G.player.x / T), Math.floor(G.player.y / T));
@@ -189,7 +190,7 @@ function virgilLines() {
   if (!s.talked) {
     return [
       'A fallen angel, wings burnt black. So that thunder was Zeus casting you down. I am Virgil, and I will guide you.',
-      'Four Wardens hold the Seals of the Gate to Hades. Take them in order, for each circle is deadlier than the last: Gluttony to the west, Lust to the east, Treachery far below, then Heresy far above.',
+      'Four Wardens hold the Seals of the Gate to Hades. Each circle is sealed until the Warden before it falls: first Gluttony to the west, then Lust to the east, Treachery far below, and Heresy far above.',
       'You have only the fire in your fist: click, and it will blast. The first foe you fell will leave you a weapon. Go well, little star.',
     ];
   }
@@ -211,7 +212,7 @@ function irisLines() {
   if (!s.irisTalked) {
     return [
       'Welcome home, little star. I am Iris. Zeus hides behind the Gate of the Thunderer, and four gods hold the Sigils that open it.',
-      'Take them in order, for each is mightier than the last: Athena in the Citadel above, Apollo in the Golden Fields to the east, Poseidon in the Cloudlands below, then Ares in the Silver Peaks to the west.',
+      'Each realm is sealed until the god before it falls: first Athena in the Citadel above, then Apollo in the Golden Fields to the east, Poseidon in the Cloudlands below, and Ares in the Silver Peaks to the west.',
     ];
   }
   if (s.bosses.zeus) return ['Olympus has a new light now, and it is yours.'];
@@ -299,8 +300,12 @@ function interact(o) {
   }
 }
 
+// Where the player last stood outside every sealed land (see update).
+const ward = { x: 0, y: 0, ok: false, inside: false, hit: -9, said: -9 };
+
 export function teleport(x, y) {
   const p = G.player;
+  ward.ok = ward.inside = false;
   burst(p.x + p.w / 2, p.y + p.h / 2, 30, RAINBOW, 300, { add: true });
   G.fade = 1.2;
   p.x = x - p.w / 2;
@@ -371,6 +376,9 @@ function rewardCard(id, then) {
   const arm = ARMOURS.find(a => a.boss === id);
   if (arm) lines.push(`The armourers can now forge the ${arm.icon} ${arm.name}: ${arm.pips} armour. ${arm.perk}`);
   if (r.loot) lines.push(r.loot);
+  // the seal on the next land breaks
+  const order = WARDENS.some(x => x.id === id) ? WARDENS : GOD_ORDER, at = order.findIndex(x => x.id === id), opened = at >= 0 && order[at + 1];
+  if (opened) lines.push(`The seal on ${landOf(opened)} is broken. ${opened.name} waits there, ${opened.way}.`);
   if (r.up === 'fly' && G.player) G.player.wing = stats().flyMax;
   saveGame();
   const show = () => {
@@ -467,8 +475,34 @@ function update(dt) {
 
   const ptx = Math.floor((p.x + p.w / 2) / T), pty = Math.floor((p.y + p.h / 2) / T);
 
+  // Sealed lands. Walking (or falling, or flying) into a land whose seal still holds throws you
+  // back the way you came, wherever along its edge you try. Someone who is already inside one,
+  // having woken there or been carried there, may stay until they leave.
+  const b0 = biomeAt(ptx, pty), need = G.boss ? null : sealOf(b0);
+  let turned = false;
+  if (!need) { ward.x = p.x; ward.y = p.y; ward.ok = true; ward.inside = false; }
+  else if (ward.ok && !ward.inside) {
+    turned = true;
+    const hx = p.x + p.w / 2, hy = p.y + p.h / 2, v = Math.hypot(p.vx, p.vy) || 1, col = SEAL_COL[need.id];
+    p.x = ward.x; p.y = ward.y;
+    [p.vx, p.vy] = [(-p.vx / v) * 340, (-p.vy / v) * 420 - 60];
+    p.dashT = 0;
+    if (G.t - ward.hit > 0.3) {
+      ward.hit = G.t;
+      ring(hx, hy, 50, col, 0.35, 4);
+      burst(hx, hy, 14, [col, '#ffffff'], 240, { add: true });
+      sfx('clang');
+      shake(4);
+    }
+    if (G.t - ward.said > 3.5) {
+      ward.said = G.t;
+      const name = BIOMES[BIOME_LIST[b0]].name;
+      toast(`${name} ${/s$/.test(name) ? 'are' : 'is'} sealed. Defeat ${need.name}, ${whereIs(need)}, to open the way.`, 4200);
+    }
+  } else ward.inside = true;
+
   // Region changes
-  const b = biomeAt(ptx, pty);
+  const b = turned ? G.biome : b0;
   if (b !== G.biome) {
     G.biome = b;
     if (b !== lastBiome && G.t - lastBiomeT > 4) {
@@ -477,7 +511,7 @@ function update(dt) {
       lastBiomeT = G.t;
       // a land further along than the one whose Warden or god still stands: say which comes first
       const next = B.rank && nextOf(B.heaven ? GOD_ORDER : WARDENS);
-      if (next && B.rank > next.n && !G.boss) toast(`${B.name} is far too dangerous yet. First comes ${next.name}, ${whereIs(next)}.`, 5200);
+      if (next && B.rank > next.n && !G.boss) toast(`${B.name} ${/s$/.test(B.name) ? 'are' : 'is'} far too dangerous yet. First comes ${next.name}, ${whereIs(next)}.`, 5200);
     }
     lastBiome = b;
     if (!G.boss) setTheme(BIOME_LIST[b]);

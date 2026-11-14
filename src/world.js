@@ -98,6 +98,15 @@ export const GODS = SITES.slice(5, 9);
 // The Wardens and the gods in the order they are meant to be fought.
 export const WARDENS = SITES.slice(0, 4).sort((a, b) => a.n - b.n);
 export const GOD_ORDER = GODS.slice().sort((a, b) => a.n - b.n);
+// A land is sealed until the Warden or god of the land before it has fallen. (One whose own has
+// already fallen, in a game saved before there were seals, stays open.) Returns the one who must
+// be beaten to open land number b, or null if it is open.
+export function sealOf(b) {
+  const B = BIOMES[BIOME_LIST[b]];
+  if (!B.rank || B.rank < 2 || !G.save) return null;
+  const order = B.heaven ? GOD_ORDER : WARDENS, prev = order[B.rank - 2], own = order[B.rank - 1], won = G.save.bosses;
+  return won[prev.id] || won[own.id] ? null : prev;
+}
 export const ZS = SITES[9];
 // Olympus spans this rectangle of tiles, walled off by a shell of cloud-stone. It is a little
 // bigger than the stretch of underworld between its four bosses.
@@ -348,6 +357,18 @@ for (const [dx, dy, b] of [[1, 0, 'lust'], [-1, 0, 'gluttony'], [0, -1, 'heresy'
   LANDMARKS.push({ type: 'shrine', id: 'out_' + b, tx: sx, ty: dx ? roadH(sx) + 3 : ty, name });
   LANDMARKS.push({ type: 'shop', id: 'shop_' + b, tx: mx, ty: dx ? roadH(mx) + 3 : ty, name: 'Wandering Merchant' });
 }
+// A gate stands where each road out of Limbo crosses into its circle. It is the visible part of
+// the seal: the whole edge of a sealed land is walled with the same force (see wardEdges).
+for (const [dx, dy, b] of [[1, 0, 'lust'], [-1, 0, 'gluttony'], [0, -1, 'heresy'], [0, 1, 'treachery']]) {
+  const bi = BIOME_LIST.indexOf(b);
+  for (let d = 60; d < ROAD_END; d++) {
+    const tx = dx ? dx * d : roadV(dy * d), ty = dx ? roadH(dx * d) : dy * d;
+    if (biomeAt(tx, ty) !== bi) continue;
+    // across a road that runs sideways it stands on the road's floor; across a shaft it lies flat
+    LANDMARKS.push({ type: 'ward', id: 'ward_' + b, biome: bi, tx, ty: dx ? ty + 3 : ty, flat: !dx, hidden: 1 });
+    break;
+  }
+}
 LANDMARKS.push({ type: 'portal', id: 'portal_home', tx: HS.tx, ty: HS.ty + HS.h / 2 + 1, hidden: 1 });
 LANDMARKS.push(
   { type: 'portal', id: 'portal_down', tx: -36, ty: OLY.hub, oly: 1 },
@@ -378,6 +399,20 @@ export function getChunk(cx, cy) {
   lastKey = k;
   lastChunk = c;
   return c;
+}
+// The tiles of a chunk that lie on the edge of a land with a place in the order: tiles of that
+// land that touch another. Worked out once for each chunk, as a flat list of tx, ty, land.
+// The seal on a land is drawn along these, and it is here that a sealed land turns you back.
+export function wardEdges(c) {
+  if (c.edges) return c.edges;
+  const out = [], x0 = c.cx * CS, y0 = c.cy * CS, bio = c.bio;
+  const at = (i, j) => (i >= 0 && i < CS && j >= 0 && j < CS ? bio[j * CS + i] : biomeAt(x0 + i, y0 + j));
+  for (let j = 0; j < CS; j++) for (let i = 0; i < CS; i++) {
+    const b = bio[j * CS + i];
+    if (!BIOMES[BIOME_LIST[b]].rank) continue;
+    if (at(i - 1, j) !== b || at(i + 1, j) !== b || at(i, j - 1) !== b || at(i, j + 1) !== b) out.push(x0 + i, y0 + j, b);
+  }
+  return (c.edges = out);
 }
 export function tileAt(tx, ty) {
   const cx = Math.floor(tx / CS), cy = Math.floor(ty / CS);
