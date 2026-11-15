@@ -571,7 +571,7 @@ function motif(ctx, kind, x, y, col, dark) {
 }
 
 // A stroke that tapers from w0 to w1 along a polyline.
-function taper(ctx, pts, w0, w1, color) {
+export function taper(ctx, pts, w0, w1, color) {
   ctx.strokeStyle = color;
   for (let i = 1; i < pts.length; i++) {
     const k = (i - 1) / Math.max(1, pts.length - 2);
@@ -703,7 +703,7 @@ function pose(p, t) {
   return { run, air, bob, lean, sh, hand };
 }
 
-function limb2(ctx, pts, w, col) {
+export function limb2(ctx, pts, w, col) {
   ctx.strokeStyle = OUT;
   ctx.lineWidth = w + 2.2;
   ctx.beginPath();
@@ -769,13 +769,16 @@ function halo(ctx, x, y, t) {
 
 // A great feathered wing, black shading to violet. Its arm runs along -x from the root and its
 // feathers hang towards +y, sweeping back towards the tip; `ang` turns the whole wing.
-function angelWing(ctx, x, y, ang, len, spread, near, t) {
+// `C` is the set of colours (the angel's own unless given); with `C.tips`, each feather ends in
+// its own colour from that list instead of the one edge colour.
+export function angelWing(ctx, x, y, ang, len, spread, near, t, C = HC) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);
   const fold = 1 - spread, n = 9;
   const armY = u => -Math.sin(u * Math.PI) * len * 0.16;
-  const dark = near ? HC.wDark : HC.wDarkF, mid = near ? HC.wMid : HC.wMidF, edge = near ? HC.wEdge : HC.wEdgeF;
+  const dark = near ? C.wDark : C.wDarkF, mid = near ? C.wMid : C.wMidF, edge = near ? C.wEdge : C.wEdgeF;
+  const tips = C.tips && (near ? C.tips : C.tipsF || C.tips);
   // primaries and secondaries, drawn tip first so the inner ones lie on top
   for (let k = n - 1; k >= 0; k--) {
     const u = k / (n - 1), bx = -len * (0.12 + u * 0.88), by = armY(0.12 + u * 0.88);
@@ -785,8 +788,8 @@ function angelWing(ctx, x, y, ang, len, spread, near, t) {
     const ex = bx + Math.cos(d) * fl, ey = by + Math.sin(d) * fl, nx = -Math.sin(d) * fw, ny = Math.cos(d) * fw;
     const g = ctx.createLinearGradient(bx, by, ex, ey);
     g.addColorStop(0, dark);
-    g.addColorStop(0.7, mid);
-    g.addColorStop(1, edge);
+    g.addColorStop(tips ? 0.42 : 0.7, mid);
+    g.addColorStop(1, tips ? tips[Math.min(tips.length - 1, Math.floor(u * tips.length))] : edge);
     ctx.fillStyle = g;
     ctx.strokeStyle = OUT;
     ctx.lineWidth = 1;
@@ -798,7 +801,7 @@ function angelWing(ctx, x, y, ang, len, spread, near, t) {
     ctx.fill();
     ctx.stroke();
     // a quill down the middle
-    ctx.strokeStyle = HC.quill;
+    ctx.strokeStyle = C.quill;
     ctx.lineWidth = 0.6;
     ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + (ex - bx) * 0.85, by + (ey - by) * 0.85); ctx.stroke();
   }
@@ -815,14 +818,14 @@ function angelWing(ctx, x, y, ang, len, spread, near, t) {
   ctx.lineWidth = 1.6;
   ctx.stroke(cov);
   const cg = ctx.createLinearGradient(0, -6, -len, 6);
-  cg.addColorStop(0, near ? HC.cov : HC.covF);
+  cg.addColorStop(0, near ? C.cov : C.covF);
   cg.addColorStop(1, dark);
   ctx.fillStyle = cg;
   ctx.fill(cov);
   // a violet gleam along the leading edge
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = near ? HC.gleam : HC.gleamF;
+  ctx.strokeStyle = near ? C.gleam : C.gleamF;
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   for (let s = 0; s <= 10; s++) { const u = s / 10; if (s) ctx.lineTo(-len * u, armY(u) - 1.6); else ctx.moveTo(0, -1.6); }

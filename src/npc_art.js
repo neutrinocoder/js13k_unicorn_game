@@ -4,6 +4,7 @@
 // guides move a little as they wait; the three who keep shop stand quite still.
 import { flame, eye, glow, limb } from './art.js';
 import { RAINBOW, mix, rgba, TAU } from './util.js';
+import { angelWing, taper, limb2 } from './player.js';
 
 const OUT = 'rgba(20,14,40,.6)';
 
@@ -156,243 +157,223 @@ function feather(ctx, len, w, fill, ink) {
 }
 
 // ---------- Iris: the rainbow that runs between the worlds ----------
-// She hovers, toes pointed. Great white wings whose feather tips run through the colours of the
-// rainbow; long hair the colours of a sunset, streaming back; a white gown with gold at the neck,
-// waist and arm; a rainbow sash flying from her waist; and the gold pitcher she pours the rainbow
-// from. She stands in bright sky, so everything is outlined in violet ink rather than lit by glow.
-const IRIS_INK = 'rgba(78,54,150,.6)';
-const WING = [[1, 150, 44], [1, 136, 56], [0.95, 124, 66], [0.88, 114, 70], [0.8, 107, 68], [0.66, 102, 60], [0.52, 99, 50], [0.38, 96, 40], [0.24, 94, 31], [0.1, 92, 22]];
+// She is one of the angels of Olympus, and is drawn as they are in the prelude: the same wings,
+// the same sharp face in profile, the same long locks streaming back, a circlet, a halo, the
+// same dark outline. What sets her apart is the rainbow. Their wings are edged with gold, hers
+// with every colour in turn; their hair is gold, hers runs from indigo to gold lock by lock;
+// their halo is a gold ring, hers a rainbow one, turning. They wear a soldier's coat, breastplate
+// and boots; she wears a white gown and goes barefoot, hovering, and pours the rainbow from a
+// gold pitcher while a rainbow sash flies from her waist. She smiles, which they do not.
+// Drawn in the angel's own measure (its head is 45 above its feet) and then enlarged.
+const INK = '#33264d';
+const soft = c => mix('#ffffff', c, 0.88);
+const IRIS_C = {
+  wDark: '#d6cfe8', wDarkF: '#b4accb', wMid: '#ffffff', wMidF: '#e4def0', wEdge: '#ffffff', wEdgeF: '#e4def0',
+  cov: '#f6f2fc', covF: '#cfc7df', quill: 'rgba(150,120,210,.35)', gleam: 'rgba(255,246,255,.6)', gleamF: 'rgba(230,220,250,.35)',
+  tips: RAINBOW.map(soft), tipsF: RAINBOW.map(c => mix('#d8d0e8', c, 0.7)),
+};
+const IRIS_HAIR = ['#4a34b8', '#7a3fd6', '#b048e0', '#ff5fa8', '#ff8a5a', '#ffc04a'];
 export function iris(ctx, t) {
-  const flap = Math.sin(t * 2.4) * 0.09, sway = Math.sin(t * 1.3);
+  const flap = Math.sin(t * 2.4) * 0.07, sway = Math.sin(t * 1.3);
+  ctx.save();
+  ctx.scale(1.6, 1.6);
+  ctx.translate(0, -2);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  glow(ctx, 0, -52, 60, '#fff2fb', 0.2);
-  // A wing rises from the shoulder to a peak behind the head, and its long feathers sweep down
-  // and back from there. Each feather is white at the root and one soft colour at the tip.
-  const bone = u => [-4 * 2 * u * (1 - u) - 22 * u * u, -30 * 2 * u * (1 - u) - 42 * u * u];
-  const wing = (rot, alpha, size) => {
-    ctx.save();
-    ctx.translate(-5, -52);
-    ctx.rotate(rot);
-    ctx.scale(size, size);
-    ctx.globalAlpha = alpha;
-    WING.forEach(([u, a, len], k) => {
-      const [x, y] = bone(u), tip = mix('#ffffff', RAINBOW[Math.min(6, Math.floor(k * 0.7))], 0.62);
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(a * Math.PI / 180 + Math.sin(t * 2.4 - k * 0.3) * 0.02);
-      const g = ctx.createLinearGradient(0, 0, len, 0);
-      g.addColorStop(0, '#ffffff');
-      g.addColorStop(0.5, '#ffffff');
-      g.addColorStop(1, tip);
-      feather(ctx, len, 8.5, g, IRIS_INK);
-      ctx.restore();
-    });
-    // a row of small white feathers over their roots, and the arm of the wing along the top
-    for (let k = 8; k >= 0; k--) {
-      const [x, y] = bone(k / 8);
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate((100 + k * 4) * Math.PI / 180);
-      feather(ctx, 15 + k, 7, '#ffffff', 'rgba(78,54,150,.4)');
-      ctx.restore();
-    }
-    ctx.strokeStyle = IRIS_INK;
-    ctx.lineWidth = 4.6;
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-4, -30, -22, -42); ctx.stroke();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3.2;
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-4, -30, -22, -42); ctx.stroke();
-    ctx.restore();
-  };
-  wing(-0.34 + flap, 0.6, 0.9);
-  // the rainbow sash, flying back from her waist: seven bands side by side
-  ctx.lineWidth = 2;
-  for (let j = 0; j < 7; j++) {
-    ctx.strokeStyle = RAINBOW[j];
-    ctx.beginPath();
-    for (let k = 0; k <= 11; k++) {
-      const x = -5 - k * 5.6, y = -40 + k * 2.3 + Math.sin(t * 2.6 - k * 0.55) * (0.4 + k * 0.42) + (j - 3) * (1.6 - k * 0.07);
-      if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-    }
-    ctx.stroke();
+  glow(ctx, 0, -30, 40, '#fff0fa', 0.2);
+  const sh = [0.5, -37], hc = [sh[0] + 1.6, -45.2], spread = 0.55;
+  // the far wing
+  angelWing(ctx, sh[0] - 5, sh[1] + 1.5, 1.27 - spread * 0.12 - flap * 0.8, 20 + spread * 16, spread, false, t, IRIS_C);
+  // the rainbow sash flying back from her waist: seven ribbons side by side, as the angel's lash is
+  for (let c = 0; c < 7; c++) {
+    const line = [];
+    for (let k = 0; k <= 9; k++) line.push([-3 - k * 3.6, -22.5 + k * 1.5 + Math.sin(t * 2.6 - k * 0.6) * (0.3 + k * 0.3) + (c - 3) * (1.05 - k * 0.06)]);
+    taper(ctx, line, 1.5, 0.5, RAINBOW[c]);
   }
   // the far arm, under the pitcher
-  limb(ctx, [[3, -54], [6, -45], [10, -39]], 3.2, '#e9c4ae', IRIS_INK);
-  // her feet, toes pointed at the ground she does not touch
-  ctx.fillStyle = '#f8dcc6';
-  ctx.strokeStyle = IRIS_INK;
-  ctx.lineWidth = 0.9;
-  for (const [x, y] of [[2.6, -3.4], [6.4, -5.6]]) { ctx.beginPath(); ctx.ellipse(x, y, 1.7, 4, -0.3, 0, TAU); ctx.fill(); ctx.stroke(); }
-  // the gown: narrow at the waist, the skirt flowing down and away behind her
-  const g = ctx.createLinearGradient(0, -58, -6, 4);
-  g.addColorStop(0, '#ffffff');
-  g.addColorStop(0.5, '#eaf4ff');
-  g.addColorStop(0.85, '#cfe0ff');
-  g.addColorStop(1, '#d8c2ff');
-  ctx.fillStyle = g;
-  ctx.strokeStyle = IRIS_INK;
-  ctx.lineWidth = 1;
+  limb2(ctx, [[sh[0] - 1, sh[1] + 1], [1.5, -30], [4, -25.5]], 2.6, '#e2c0ae');
+  // bare feet, toes pointed at the ground she does not touch
+  ctx.fillStyle = '#f4dccb';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.1;
+  for (const [x, y] of [[0.6, -1.6], [3.2, -2.8]]) { ctx.beginPath(); ctx.ellipse(x, y, 1.3, 2.8, -0.3, 0, TAU); ctx.fill(); ctx.stroke(); }
+  // the skirt of the gown, flowing down and away behind her as the angel's coat does
+  const sg = ctx.createLinearGradient(0, -22, -8, 2);
+  sg.addColorStop(0, '#ffffff');
+  sg.addColorStop(0.6, '#e6eeff');
+  sg.addColorStop(1, '#d6c4ff');
+  ctx.fillStyle = sg;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.moveTo(-6.5, -58);
-  ctx.quadraticCurveTo(-8.5, -50, -5.5, -42);
-  ctx.quadraticCurveTo(-11, -30, -13, -16);
-  ctx.quadraticCurveTo(-15, -4, -25 - sway * 3, 5);
-  ctx.quadraticCurveTo(-10, 1, -1, -6);
-  ctx.quadraticCurveTo(7, -9, 10, -12);
-  ctx.quadraticCurveTo(11, -30, 6, -42);
-  ctx.quadraticCurveTo(9, -50, 6.5, -58);
+  ctx.moveTo(-4.6, -21);
+  ctx.quadraticCurveTo(-8, -12, -10, -5);
+  ctx.quadraticCurveTo(-11.5, -1, -16 - sway * 2, 2.5 + Math.sin(t * 2.6) * 0.8);
+  ctx.quadraticCurveTo(-6, 0.5, -0.5, -3.4);
+  ctx.quadraticCurveTo(3.4, -5.4, 5.6, -7);
+  ctx.quadraticCurveTo(6.4, -15, 4.4, -21);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(78,54,150,.3)';
-  for (const k of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(k * 3, -38); ctx.quadraticCurveTo(k * 5 - 2, -22, k * 6 - 7 - sway, -5); ctx.stroke(); }
-  // gold at the neck and the waist, and a gold hem
-  ctx.fillStyle = '#ffcf3f';
-  ctx.strokeStyle = 'rgba(140,90,10,.7)';
-  ctx.lineWidth = 0.7;
-  ctx.beginPath(); ctx.moveTo(-6.5, -58); ctx.lineTo(6.5, -58); ctx.lineTo(0.5, -51); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-6.4, -44); ctx.lineTo(6.6, -44); ctx.lineTo(6.2, -40.6); ctx.lineTo(-6, -40.6); ctx.closePath(); ctx.fill(); ctx.stroke();
-  gem(ctx, 0.3, -42.3, 2.3, '#ff5fb0');
-  ctx.strokeStyle = '#ffcf3f';
-  ctx.lineWidth = 1.3;
-  ctx.beginPath(); ctx.moveTo(-23 - sway * 3, 4); ctx.quadraticCurveTo(-10, 0.4, -1, -6.4); ctx.quadraticCurveTo(6, -9.2, 9.6, -12); ctx.stroke();
-  // the near wing, over her back
-  wing(0.02 + flap * 1.2, 1, 1);
-  // Her head, drawn a little large. Long hair blows back from it in one soft mass that ends in
-  // four curling locks: indigo at the crown, through violet and rose to gold at the tips.
-  ctx.save();
-  ctx.translate(2, -60);
-  ctx.scale(1.14, 1.14);
-  ctx.translate(-2, 60);
-  const w1 = Math.sin(t * 2.2) * 0.3, wv = k => Math.sin(t * 2.2 - k * 0.8) * 2;
-  const hg = ctx.createLinearGradient(2, -76, -32, -44);
-  hg.addColorStop(0, '#4a34b8');
-  hg.addColorStop(0.32, '#a348e0');
-  hg.addColorStop(0.7, '#ff6aa6');
-  hg.addColorStop(1, '#ffc258');
-  ctx.fillStyle = hg;
-  ctx.strokeStyle = 'rgba(50,30,110,.6)';
+  ctx.strokeStyle = 'rgba(51,38,77,.28)';
   ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(3, -78.4);
-  ctx.bezierCurveTo(-8, -82, -17, -78, -25, -71 + wv(0));
-  ctx.quadraticCurveTo(-30, -67 + wv(0), -34, -66 + wv(1));
-  ctx.quadraticCurveTo(-29, -63 + wv(1), -26, -59 + wv(1));
-  ctx.quadraticCurveTo(-31, -56 + wv(2), -33, -52 + wv(2));
-  ctx.quadraticCurveTo(-27, -52 + wv(2), -23, -49 + wv(2));
-  ctx.quadraticCurveTo(-26, -45 + wv(3), -27, -40 + wv(3));
-  ctx.quadraticCurveTo(-21, -43 + wv(3), -17, -45 + wv(3));
-  ctx.quadraticCurveTo(-17, -40, -18, -36 + wv(4));
-  ctx.quadraticCurveTo(-11, -44, -4, -60);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,.38)';
-  ctx.lineWidth = 0.8;
-  for (const [k, x, y] of [[0, -29, -65], [1, -28, -54], [2, -23, -43], [3, -15, -40]]) { ctx.beginPath(); ctx.moveTo(-4, -75 + k * 4.5); ctx.quadraticCurveTo(-15, -77 + k * 6.5, x, y + wv(k + 1)); ctx.stroke(); }
-  // neck and head
-  ctx.fillStyle = '#f8dcc6';
-  ctx.strokeStyle = IRIS_INK;
+  for (const k of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(k * 2.4, -19); ctx.quadraticCurveTo(k * 3.4 - 1.6, -11, k * 4 - 4.6 - sway * 0.6, -3); ctx.stroke(); }
+  ctx.strokeStyle = '#f4c24a';
   ctx.lineWidth = 1;
-  ctx.fillRect(-1.6, -62, 5, 6);
-  ctx.beginPath();
-  ctx.moveTo(-4.6, -71);
-  ctx.quadraticCurveTo(-4, -78, 3, -77.6);
-  ctx.quadraticCurveTo(9.6, -77, 9.8, -69.5);
-  ctx.quadraticCurveTo(10.6, -66.4, 9, -63.4);
-  ctx.quadraticCurveTo(6.4, -59, 2.4, -59.6);
-  ctx.quadraticCurveTo(-3.6, -61, -4.6, -71);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // two bright eyes under long lashes, a brow, a small nose, a smile, a blush
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); ctx.ellipse(3.6, -68.2, 1.9, 2.1, 0, 0, TAU); ctx.ellipse(8.2, -68.4, 1.1, 1.9, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#7a3fe0';
-  ctx.beginPath(); ctx.ellipse(4.1, -68, 1.3, 1.7, 0, 0, TAU); ctx.ellipse(8.5, -68.2, 0.8, 1.5, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#2a1650';
-  ctx.beginPath(); ctx.arc(4.3, -67.9, 0.7, 0, TAU); ctx.arc(8.6, -68.1, 0.5, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); ctx.arc(3.7, -68.8, 0.5, 0, TAU); ctx.fill();
-  ctx.strokeStyle = '#2a1650';
-  ctx.lineWidth = 0.75;
-  ctx.beginPath();
-  ctx.moveTo(1.3, -69.2); ctx.quadraticCurveTo(3.6, -70.9, 5.7, -69.5);
-  ctx.moveTo(7.2, -69.8); ctx.quadraticCurveTo(8.4, -70.7, 9.4, -69.7);
-  ctx.moveTo(1.3, -69.2); ctx.lineTo(0.5, -70);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(74,52,184,.8)';
-  ctx.lineWidth = 0.6;
-  ctx.beginPath(); ctx.moveTo(1.4, -71.9); ctx.quadraticCurveTo(3.8, -73.5, 6, -72.2); ctx.moveTo(7.5, -72.4); ctx.quadraticCurveTo(8.5, -73.2, 9.5, -72.3); ctx.stroke();
-  ctx.strokeStyle = 'rgba(170,100,90,.7)';
-  ctx.beginPath(); ctx.moveTo(6.8, -66.6); ctx.lineTo(7.5, -65.2); ctx.stroke();
-  ctx.strokeStyle = '#d04a78';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(4.4, -62.9); ctx.quadraticCurveTo(6.2, -61.5, 8.2, -63.2); ctx.stroke();
-  ctx.fillStyle = 'rgba(255,110,150,.4)';
-  ctx.beginPath(); ctx.arc(2.6, -65, 1.9, 0, TAU); ctx.fill();
-  // the hair over her brow, and a lock falling in front of the ear
-  const fg = ctx.createLinearGradient(8, -76, -5, -60);
-  fg.addColorStop(0, '#5a3fca');
-  fg.addColorStop(1, '#b04ae0');
-  ctx.fillStyle = fg;
-  ctx.strokeStyle = 'rgba(50,30,110,.6)';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(10, -72.2);
-  ctx.quadraticCurveTo(8, -80, 1, -79.4);
-  ctx.quadraticCurveTo(-6.4, -78.6, -5.4, -69);
-  ctx.quadraticCurveTo(-5.6, -63, -3.4, -58.6 + w1 * 0.3);
-  ctx.quadraticCurveTo(-1.6, -64, -1.2, -69.6);
-  ctx.quadraticCurveTo(0, -74.6, 5, -74.6);
-  ctx.quadraticCurveTo(8, -74.4, 10, -72.2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // a gold circlet with a bright stone, and a small wing at the temple
-  ctx.strokeStyle = 'rgba(140,90,10,.7)';
+  ctx.beginPath(); ctx.moveTo(-14.6 - sway * 2, 1.6); ctx.quadraticCurveTo(-6, -0.4, -0.5, -4.2); ctx.quadraticCurveTo(3.2, -6, 5.2, -7.4); ctx.stroke();
+  // the bodice, on the angel's own frame but slighter
+  const torso = new Path2D();
+  torso.moveTo(-4.6, -20);
+  torso.bezierCurveTo(-5, -25, -5.8, -33, -4.6, -38.5);
+  torso.lineTo(5, -38.8);
+  torso.bezierCurveTo(6.4, -33, 5, -25, 4.4, -20);
+  torso.closePath();
+  ctx.strokeStyle = INK;
   ctx.lineWidth = 2.6;
-  ctx.beginPath(); ctx.moveTo(-5.2, -74.6); ctx.quadraticCurveTo(2, -78.8, 9.7, -75.8); ctx.stroke();
-  ctx.strokeStyle = '#ffcf3f';
-  ctx.lineWidth = 1.7;
-  ctx.beginPath(); ctx.moveTo(-5.2, -74.6); ctx.quadraticCurveTo(2, -78.8, 9.7, -75.8); ctx.stroke();
-  gem(ctx, 8, -76.6, 2, '#7fe8ff');
-  for (let k = 2; k >= 0; k--) {
-    ctx.save();
-    ctx.translate(-3.6, -76.6);
-    ctx.rotate((205 + k * 22) * Math.PI / 180 + flap);
-    feather(ctx, 10 - k * 1.6, 3.4, '#ffffff', 'rgba(78,54,150,.5)');
-    ctx.restore();
-  }
+  ctx.stroke(torso);
+  const bg = ctx.createLinearGradient(-5, -38, 5, -20);
+  bg.addColorStop(0, '#ffffff');
+  bg.addColorStop(1, '#e4e0f4');
+  ctx.fillStyle = bg;
+  ctx.fill(torso);
+  // gold at the neck where the angels wear a breastplate, and a gold belt with a stone
+  ctx.fillStyle = '#f4c24a';
+  ctx.strokeStyle = 'rgba(120,76,10,.8)';
+  ctx.lineWidth = 0.7;
+  ctx.beginPath(); ctx.moveTo(-4, -38); ctx.lineTo(4.8, -38); ctx.quadraticCurveTo(3.4, -33.4, 0.8, -32); ctx.quadraticCurveTo(-2.6, -33.4, -4, -38); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#c89a3a';
+  ctx.fillRect(-5, -22.9, 9.8, 2.4);
+  gem(ctx, 0.4, -21.7, 1.7, '#ff5fb0');
+  // the near wing, over the back; theirs lies over their hair, but her hair streams over hers
+  angelWing(ctx, sh[0] - 3, sh[1] + 2, 1.12 - spread * 0.12 - flap, 22 + spread * 17, spread, true, t, IRIS_C);
+  // neck and head: the angel's own, in a warmer skin
+  ctx.fillStyle = '#ecd2c2';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.moveTo(sh[0] - 1, sh[1] - 1); ctx.lineTo(hc[0] - 1, hc[1] + 3); ctx.lineTo(hc[0] + 2, hc[1] + 3); ctx.lineTo(sh[0] + 3, sh[1] - 1); ctx.closePath(); ctx.stroke(); ctx.fill();
+  // the halo: the angels' ring, but in every colour, turning slowly
+  ctx.save();
+  ctx.translate(hc[0] - 2.5, hc[1] - 8.5);
+  ctx.rotate(-0.28);
+  ctx.scale(1, 0.32);
+  glow(ctx, 0, 0, 18, '#fff0fa', 0.45);
+  ctx.strokeStyle = 'rgba(51,38,77,.75)';
+  ctx.lineWidth = 3.4;
+  ctx.beginPath(); ctx.arc(0, 0, 8.5, 0, TAU); ctx.stroke();
+  ctx.lineCap = 'butt';
+  ctx.lineWidth = 2;
+  for (let c = 0; c < 7; c++) { ctx.strokeStyle = RAINBOW[c]; ctx.beginPath(); ctx.arc(0, 0, 8.5, t * 0.8 + c * TAU / 7, t * 0.8 + (c + 1) * TAU / 7 + 0.03); ctx.stroke(); }
+  ctx.lineCap = 'round';
   ctx.restore();
-  // the rainbow pours from the pitcher's lip in a falling arc
-  ctx.lineWidth = 1.5;
-  for (let j = 0; j < 7; j++) {
-    const o = (j - 3) * 1.25, pg = ctx.createLinearGradient(0, -32, 0, -2);
-    pg.addColorStop(0, RAINBOW[j]);
-    pg.addColorStop(0.6, RAINBOW[j]);
-    pg.addColorStop(1, rgba(RAINBOW[j], 0));
-    ctx.strokeStyle = pg;
-    ctx.beginPath(); ctx.moveTo(28.6 + o * 0.3, -32.6); ctx.quadraticCurveTo(34.5 - o * 0.5, -29 + o * 0.5, 33 - o, -2); ctx.stroke();
+  // long locks streaming back, as theirs do: indigo at the crown, down through rose to gold
+  const locks = [];
+  for (let i = 0; i < 6; i++) {
+    const k = i / 5, rx = hc[0] - 1 - k * 2.5, ry = hc[1] - 4.5 + k * 6.5, len = 21 + (i % 2) * 4 - k * 4, pts = [];
+    for (let q = 0; q <= 6; q++) { const u = q / 6; pts.push([rx - u * len * 0.9, ry + u * len * 0.42 + Math.sin(t * 2.6 + i * 1.1 - u * 4) * u * 2]); }
+    locks.push(pts);
   }
+  locks.forEach(l => taper(ctx, l, 6.2, 2.2, 'rgba(51,38,77,.7)'));
+  locks.forEach((l, i) => taper(ctx, l, 4.6, 1, IRIS_HAIR[i]));
+  ctx.globalCompositeOperation = 'lighter';
+  locks.forEach(l => taper(ctx, l.slice(4), 1.4, 0.5, 'rgba(255,226,138,.4)'));
+  ctx.globalCompositeOperation = 'source-over';
+  // the face: the angel's profile
+  const face = new Path2D();
+  face.moveTo(hc[0] - 4.6, hc[1] - 1);
+  face.bezierCurveTo(hc[0] - 4.8, hc[1] - 6.4, hc[0] + 3.4, hc[1] - 7, hc[0] + 4.8, hc[1] - 2.2);
+  face.lineTo(hc[0] + 5.6, hc[1] + 0.4);
+  face.lineTo(hc[0] + 4.6, hc[1] + 1.2);
+  face.bezierCurveTo(hc[0] + 4.4, hc[1] + 3.6, hc[0] + 2.2, hc[1] + 5.4, hc[0] + 0.6, hc[1] + 5.2);
+  face.bezierCurveTo(hc[0] - 2.6, hc[1] + 4.6, hc[0] - 4.4, hc[1] + 2.6, hc[0] - 4.6, hc[1] - 1);
+  face.closePath();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2.2;
+  ctx.stroke(face);
+  const sk = ctx.createLinearGradient(hc[0] - 4, hc[1] - 6, hc[0] + 4, hc[1] + 5);
+  sk.addColorStop(0, '#fff2e8');
+  sk.addColorStop(1, '#e6c2b0');
+  ctx.fillStyle = sk;
+  ctx.fill(face);
+  // the fringe over the brow
+  ctx.fillStyle = IRIS_HAIR[0];
+  ctx.strokeStyle = 'rgba(51,38,77,.6)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(hc[0] - 5, hc[1] - 0.5);
+  ctx.bezierCurveTo(hc[0] - 5.4, hc[1] - 7.4, hc[0] + 3.6, hc[1] - 8.4, hc[0] + 5.2, hc[1] - 2.6);
+  ctx.lineTo(hc[0] + 2.2, hc[1] - 3.6);
+  ctx.lineTo(hc[0] + 1, hc[1] - 1.8);
+  ctx.lineTo(hc[0] - 0.6, hc[1] - 3.8);
+  ctx.lineTo(hc[0] - 2.6, hc[1] + 0.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // a gold circlet with its stone
+  ctx.strokeStyle = '#f4c24a';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(hc[0] - 4.8, hc[1] - 2.2); ctx.quadraticCurveTo(hc[0], hc[1] - 5.6, hc[0] + 4.6, hc[1] - 3.4); ctx.stroke();
+  ctx.fillStyle = '#7fe8ff';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(hc[0] + 2.6, hc[1] - 6.2); ctx.lineTo(hc[0] + 3.6, hc[1] - 4.4); ctx.lineTo(hc[0] + 2.6, hc[1] - 3.2); ctx.lineTo(hc[0] + 1.6, hc[1] - 4.4); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // where they have a stern brow and a burning eye, she has a long lash, a violet eye and a smile
+  if (t % 4.7 < 0.12) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(hc[0] + 1.2, hc[1] - 0.1); ctx.quadraticCurveTo(hc[0] + 2.6, hc[1] + 0.7, hc[0] + 3.9, hc[1] + 0.1); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(hc[0] + 2.6, hc[1] - 0.1, 1.6, 1.3, 0.1, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#8a48e6';
+    ctx.beginPath(); ctx.arc(hc[0] + 2.9, hc[1] - 0.1, 1.05, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2a1650';
+    ctx.beginPath(); ctx.arc(hc[0] + 3.05, hc[1] - 0.1, 0.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(hc[0] + 2.5, hc[1] - 0.55, 0.38, 0, TAU); ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.moveTo(hc[0] + 0.3, hc[1] - 1.5); ctx.lineTo(hc[0] + 1, hc[1] - 0.9); ctx.quadraticCurveTo(hc[0] + 2.6, hc[1] - 1.9, hc[0] + 4.3, hc[1] - 0.6); ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,110,150,.4)';
+  ctx.beginPath(); ctx.arc(hc[0] + 1, hc[1] + 2, 1.3, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#c0486e';
+  ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.moveTo(hc[0] + 1.7, hc[1] + 3); ctx.quadraticCurveTo(hc[0] + 2.8, hc[1] + 4.1, hc[0] + 4, hc[1] + 2.8); ctx.stroke();
+  // a gold clasp on the shoulder where they wear a pauldron
+  ctx.fillStyle = '#f4c24a';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.arc(sh[0] - 0.4, sh[1] + 1.4, 2.5, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff6c4';
+  ctx.beginPath(); ctx.arc(sh[0] - 1, sh[1] + 0.8, 0.9, 0, TAU); ctx.fill();
+  // the rainbow pours from the pitcher's lip in a falling arc
+  for (let c = 0; c < 7; c++) {
+    const o = (c - 3) * 0.72, line = [];
+    for (let k = 0; k <= 8; k++) { const u = k / 8; line.push([15.6 + o * 0.3 + u * (2 - u) * 1.9 - o * u, -20.4 + u * u * 17.5 + u * 1.5]); }
+    ctx.globalAlpha = 0.95;
+    taper(ctx, line.slice(0, 7), 1.05, 0.9, RAINBOW[c]);
+    ctx.globalAlpha = 0.45;
+    taper(ctx, line.slice(6), 0.9, 0.5, RAINBOW[c]);
+  }
+  ctx.globalAlpha = 1;
   // the gold pitcher, tipped right over: a handle, a flared lip, a round belly and a foot
   ctx.save();
-  ctx.translate(18, -36.5);
+  ctx.translate(9, -23);
   ctx.rotate(1.85);
-  ctx.strokeStyle = 'rgba(100,60,6,.8)';
-  ctx.lineWidth = 3;
+  ctx.scale(0.62, 0.62);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 4;
   ctx.beginPath(); ctx.moveTo(-2.4, -8.8); ctx.quadraticCurveTo(-11, -8.6, -6, 0.6); ctx.stroke();
-  ctx.strokeStyle = '#e8b83a';
-  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#f4c24a';
+  ctx.lineWidth = 1.8;
   ctx.beginPath(); ctx.moveTo(-2.4, -8.8); ctx.quadraticCurveTo(-11, -8.6, -6, 0.6); ctx.stroke();
   const jg = ctx.createLinearGradient(-7, 0, 7, 0);
-  jg.addColorStop(0, '#fff3b8');
-  jg.addColorStop(0.45, '#f0c040');
-  jg.addColorStop(1, '#a8761c');
+  jg.addColorStop(0, '#fff6c4');
+  jg.addColorStop(0.5, '#f4c24a');
+  jg.addColorStop(1, '#9c6414');
   ctx.fillStyle = jg;
-  ctx.strokeStyle = 'rgba(100,60,6,.8)';
-  ctx.lineWidth = 0.9;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.8;
   ctx.beginPath();
   ctx.moveTo(-4, -11.5); ctx.lineTo(4, -11.5);
   ctx.quadraticCurveTo(1.6, -9.5, 2, -6.5);
@@ -403,22 +384,21 @@ export function iris(ctx, t) {
   ctx.quadraticCurveTo(-7.2, -4, -2, -6.5);
   ctx.quadraticCurveTo(-1.6, -9.5, -4, -11.5);
   ctx.closePath();
-  ctx.fill();
   ctx.stroke();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,76,10,.8)';
+  ctx.lineWidth = 0.9;
   ctx.beginPath(); ctx.moveTo(-6.3, 0.4); ctx.lineTo(6.3, 0.4); ctx.moveTo(-2, -6.5); ctx.lineTo(2, -6.5); ctx.stroke();
   ctx.restore();
-  // the near arm reaching out to its handle, with a gold band above the elbow
-  limb(ctx, [[5, -55], [14, -49.5], [23, -43.6]], 3.4, '#f8dcc6', IRIS_INK);
-  ctx.strokeStyle = 'rgba(140,90,10,.7)';
-  ctx.lineWidth = 3.2;
-  ctx.beginPath(); ctx.moveTo(8.2, -51.2); ctx.lineTo(9.6, -54.4); ctx.stroke();
-  ctx.strokeStyle = '#ffcf3f';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(8.2, -51.2); ctx.lineTo(9.6, -54.4); ctx.stroke();
-  ctx.fillStyle = '#f8dcc6';
-  ctx.strokeStyle = IRIS_INK;
-  ctx.lineWidth = 0.8;
-  ctx.beginPath(); ctx.arc(23.6, -43.2, 2.4, 0, TAU); ctx.fill(); ctx.stroke();
+  // the near arm reaching out to its handle, bare, with a gold band where they wear a vambrace
+  const el = [5.6, -30.4], hand = [12.6, -27.2];
+  limb2(ctx, [[sh[0], sh[1] + 1], el, hand], 3, '#f4dccb');
+  limb2(ctx, [[8, -29.4], [10.2, -28.4]], 3, '#f4c24a');
+  ctx.fillStyle = '#f4dccb';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.arc(hand[0], hand[1], 2.1, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.restore();
 }
 
 // ---------- Charon: the ferryman of the dead, who keeps the shop below ----------
