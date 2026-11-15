@@ -755,7 +755,7 @@ function drawShop(ctx, o, t, lights) {
     }
     ctx.globalAlpha = 1;
     // the keeper: Hermes above, Charon below (see npc_art.js)
-    if (oly) hermes(ctx, t); else charon(ctx, t);
+    if (oly) hermes(ctx); else charon(ctx);
     if (!oly) lights.push({ x: o.x + 50, y: o.y - 53, r: 120, c: '#5fe8ff', a: 0.6 });
     // counter
     ctx.fillStyle = '#5a3a22';
@@ -803,7 +803,7 @@ function drawShop(ctx, o, t, lights) {
       ctx.fillStyle = i % 2 ? '#e8c26a' : '#3a6a8a';
       ctx.beginPath(); ctx.moveTo(-46 + i * 18.4, -90); ctx.lineTo(-27.6 + i * 18.4, -90); ctx.lineTo(-27.6 + i * 18.4, -76); ctx.quadraticCurveTo(-36.8 + i * 18.4, -70, -46 + i * 18.4, -76); ctx.fill();
     }
-    pedlar(ctx, t);
+    pedlar(ctx);
     // the cart's own lantern, on the far post
     ctx.fillStyle = '#ffcf6a';
     ctx.beginPath(); ctx.ellipse(-30, -70, 5, 7, 0, 0, TAU); ctx.fill();
@@ -999,7 +999,7 @@ function drawIris(ctx, o, t, lights) {
   ctx.scale(face, 1);
   iris(ctx, t);
   ctx.restore();
-  if (Math.random() < 0.4) part({ x: o.x + face * 19 + rand(-2, 2), y: o.y - 32 + bob, vx: rand(-10, 10), vy: rand(20, 60), life: 0.9, size: 2, color: RAINBOW[Math.floor(Math.random() * 7)], add: true });
+  if (Math.random() < 0.4) part({ x: o.x + face * 31 + rand(-3, 3), y: o.y - 12 + bob, vx: rand(-10, 10), vy: rand(20, 60), life: 0.9, size: 2, color: RAINBOW[Math.floor(Math.random() * 7)], add: true });
   lights.push({ x: o.x, y: o.y - 50, r: 200, c: '#ffe8ff', a: 0.7 });
   // and now and then a feather of light drifts down from her wings
   if (Math.random() < 0.06) part({ x: o.x - face * rand(20, 50), y: o.y - rand(50, 90) + bob, vx: rand(-10, 10), vy: rand(10, 26), life: 2.2, size: rand(1.6, 2.6), color: RAINBOW[Math.floor(Math.random() * 7)], add: true });
