@@ -14,6 +14,11 @@ export const isSolid = t => t === ROCK || t === BRICK || t === CRYSTAL || t === 
 // Above: the White Citadel (north, around the plaza), then the Golden Fields (east), then the
 // Cloudlands (south), then the Silver Peaks (west).
 // `rank` is a land's place in that order and `lvl` the danger its creatures start at; see levelAt.
+// `enemies` is who lives there and how common each is. Every land has creatures of its `own`,
+// which make up most of what you meet, and beside them the staple creatures found everywhere
+// (imps, bats, spiders, spitters, brutes and wisps below; angels, cherubs, seraphs and wheels
+// above). A staple away from home is rank and file: `staple` is [toughness ×, damage +] against
+// what its danger would make it, set so that the same creature is stronger in each harder land.
 export const BIOME_LIST = ['limbo', 'lust', 'gluttony', 'heresy', 'treachery', 'abyss', 'olympus', 'zeus', 'gold', 'silver', 'mist'];
 export const BIOMES = {
   limbo: {
@@ -24,22 +29,26 @@ export const BIOMES = {
   lust: {
     name: 'Lust', sub: 'The Second Seal · Circle of Endless Storms', rank: 2, lvl: 4, rock: ['#4d2246', '#713063', '#26102a'], top: '#ff8ad8',
     sky: ['#1c0620', '#5c1550'], far: '#3d0f3a', mid: '#280a27', fog: '#c0388f', dark: 0.55, accent: '#ff8ad8',
-    haz: 'thorns', part: 'petal', thr: 0.495, tint: '#e0479e', wind: 1, enemies: { harpy: 4, bat: 3 },
+    haz: 'thorns', part: 'petal', thr: 0.495, tint: '#e0479e', wind: 1,
+    own: ['harpy', 'bat'], staple: [0.8, -1], enemies: { harpy: 5, bat: 3, imp: 2, wisp: 2, spider: 1, spitter: 1, brute: 1 },
   },
   gluttony: {
     name: 'Gluttony', sub: 'The First Seal · Circle of Ceaseless Rain', rank: 1, lvl: 2, rock: ['#34412b', '#4c5e38', '#182013'], top: '#a6e36b',
     sky: ['#081008', '#213a1c'], far: '#18291a', mid: '#0f1b0f', fog: '#4f8a35', dark: 0.64, accent: '#b6ff6b',
-    haz: 'acid', part: 'rain', thr: 0.462, tint: '#6fae3a', enemies: { grub: 5, spitter: 3 },
+    haz: 'acid', part: 'rain', thr: 0.462, tint: '#6fae3a',
+    own: ['grub', 'spitter'], staple: [0.75, -1], enemies: { grub: 5, spitter: 3, imp: 2, bat: 2, spider: 1, wisp: 1, brute: 1 },
   },
   heresy: {
     name: 'Heresy', sub: 'The Fourth Seal · Circle of Burning Tombs', rank: 4, lvl: 10, rock: ['#552517', '#7a3820', '#2a0f08'], top: '#ffae4a',
     sky: ['#1a0402', '#6a1a06'], far: '#3a0c05', mid: '#250703', fog: '#c2481a', dark: 0.48, accent: '#ffb347',
-    haz: 'lava', part: 'ember', thr: 0.524, tint: '#ff5a1f', enemies: { imp: 4, wisp: 4 },
+    haz: 'lava', part: 'ember', thr: 0.524, tint: '#ff5a1f',
+    own: ['imp', 'wisp'], staple: [0.9, 0], enemies: { imp: 4, wisp: 4, bat: 2, spider: 2, spitter: 2, brute: 2 },
   },
   treachery: {
     name: 'Treachery', sub: 'The Third Seal · Frozen Lake of Cocytus', rank: 3, lvl: 7, rock: ['#2c3e5c', '#47638c', '#141f35'], top: '#e6f8ff',
     sky: ['#050b18', '#1a3358'], far: '#132744', mid: '#0b182c', fog: '#5a86c0', dark: 0.58, accent: '#a8ecff',
-    haz: 'icicle', part: 'snow', thr: 0.47, tint: '#6fc6ff', ice: 1, enemies: { spider: 4, brute: 3 },
+    haz: 'icicle', part: 'snow', thr: 0.47, tint: '#6fc6ff', ice: 1,
+    own: ['spider', 'brute'], staple: [0.85, 0], enemies: { spider: 4, brute: 3, imp: 2, bat: 2, spitter: 2, wisp: 1 },
   },
   abyss: {
     name: 'The Throne of Hades', sub: 'Where the Rivers End', rock: ['#2c0c12', '#4a151c', '#12040a'], top: '#ff3b4a',
@@ -49,7 +58,8 @@ export const BIOMES = {
   olympus: {
     name: 'The White Citadel', sub: 'The First Sigil · Heart of Olympus', rank: 1, lvl: 16, rock: ['#d3d9e8', '#ffffff', '#a4aec8'], top: '#ffe9a8',
     sky: ['#4f86d8', '#ffd9a8'], far: '#cfdcf5', mid: '#e6ecf9', fog: '#fff2d0', dark: 0.05, accent: '#ffe28a',
-    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, sun: 1, enemies: { angel: 3, ophan: 3 },
+    haz: 'none', part: 'feather', thr: 0.5, tint: '#ffd34a', heaven: 1, cloud: 1, sun: 1,
+    own: ['angel', 'ophan'], staple: [0.85, 0], enemies: { angel: 3, ophan: 3, cherub: 2, seraph: 2 },
   },
   zeus: {
     name: 'The Summit of Olympus', sub: 'Throne of the Thunderer', rock: ['#9aa4c8', '#d2d9f0', '#5e668e'], top: '#fff27a',
@@ -62,21 +72,21 @@ export const BIOMES = {
     sky: ['#d9762a', '#ffe7a6'], far: '#f2c46e', mid: '#f8dc96', fog: '#ffe3a0', dark: 0.03, accent: '#fff09a',
     haz: 'none', part: 'glint', thr: 0.5, tint: '#ffb020', heaven: 1, cloud: 1, sun: 1.25,
     brick: ['#e6c062', '#fff0b8', '#b08832'], trim: '#fff7d0', pcol: ['#ffe36b', '#fff3b0', '#ffc531'],
-    enemies: { cherub: 4, seraph: 3 },
+    own: ['cherub', 'seraph'], staple: [0.92, 0], enemies: { cherub: 4, seraph: 3, angel: 2, ophan: 2 },
   },
   silver: {
     name: 'The Silver Peaks', sub: 'The Fourth Sigil · Forge-Halls of War', rank: 4, lvl: 22, rock: ['#a3aec4', '#f4f7fd', '#55617e'], top: '#eef4ff',
     sky: ['#0e1430', '#4a5a86'], far: '#3a4668', mid: '#55638a', fog: '#b8c6e6', dark: 0.2, moon: 1, accent: '#e8f0ff',
     haz: 'none', part: 'feather', thr: 0.5, tint: '#aebad4', heaven: 1, cloud: 1,
     brick: ['#aeb6c4', '#f0f3f8', '#767f92'], trim: '#dfe6f4', pcol: ['#e8eef8', '#c3cde0', '#ffffff'],
-    enemies: { spartan: 4, warwheel: 3 },
+    own: ['spartan', 'warwheel'], staple: [1, 0], enemies: { spartan: 4, warwheel: 3, cherub: 2, seraph: 2, angel: 1, ophan: 1 },
   },
   mist: {
     name: 'The Cloudlands', sub: 'The Third Sigil · Mists of the Sea-King', rank: 3, lvl: 20, rock: ['#9ea8b8', '#cdd6e2', '#6f7a8e'], top: '#d6e8f8',
     sky: ['#77849a', '#c9d2dc'], far: '#a4aebd', mid: '#b6bfcc', fog: '#d8dee6', dark: 0.12, accent: '#c4e6ff',
     haz: 'none', part: 'mist', thr: 0.5, tint: '#88b0d4', heaven: 1, cloud: 1, mist: 1,
     brick: ['#bcc4d0', '#e8ecf1', '#87909f'], trim: '#cfe2f2', pcol: ['#e6eef6', '#cfe0ee', '#ffffff'],
-    enemies: { stormling: 4, nereid: 3 },
+    own: ['stormling', 'nereid'], staple: [0.95, 0], enemies: { stormling: 4, nereid: 3, angel: 2, ophan: 2, cherub: 1, seraph: 1 },
   },
 };
 
@@ -531,7 +541,7 @@ function genChunk(cx, cy, k) {
         }
         // no room to stand apart: this chunk is too cramped for another foe
         if (!s) continue;
-        c.spawns.push({ type, x: (cx * CS + s[0] + 0.5) * T, y: (cy * CS + s[1] + (hang ? 0 : 1)) * T, hang: !!hang, level: lvl, biome: bi, ent: null, deadAt: -999 });
+        c.spawns.push({ type, x: (cx * CS + s[0] + 0.5) * T, y: (cy * CS + s[1] + (hang ? 0 : 1)) * T, hang: !!hang, level: lvl, biome: bi, guest: !!B.own && !B.own.includes(type), ent: null, deadAt: -999 });
       }
     }
     deadEnds(c, get, lvl);

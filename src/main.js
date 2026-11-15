@@ -585,7 +585,7 @@ function update(dt) {
       posts.sort((a, b) => a[0] - b[0]);
       for (const [, sp] of posts) {
         if (G.enemies.length >= 32) break;
-        const e = makeEnemy(sp.type, sp.x, sp.y, sp.level, sp.biome, sp.hang);
+        const e = makeEnemy(sp.type, sp.x, sp.y, sp.level, sp.biome, sp.hang, sp.guest);
         e.spawn = sp;
         sp.ent = e;
         G.enemies.push(e);

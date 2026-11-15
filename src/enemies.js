@@ -38,14 +38,16 @@ export const ETYPES = {
   warwheel: { like: 'ophan', hp: 12, gem: 7 },
 };
 
-export function makeEnemy(type, x, y, level, biome, hang = false) {
-  // foes grow tougher with danger, and a quarter faster in the underworld than in heaven
+export function makeEnemy(type, x, y, level, biome, hang = false, guest = false) {
+  // foes grow tougher with danger, and a quarter faster in the underworld than in heaven; a
+  // staple creature in a land that is not its own (`guest`) is then adjusted for that land
   const own = ETYPES[type], variant = own.like ? type : null;
   if (variant) type = own.like;
   const d = { ...ETYPES[type], ...own }, B = BIOMES[BIOME_LIST[biome]], m = 1 + (type === 'spider' ? 0.45 : 0.3) * (B.heaven ? 1 : 1.25) * (level - 1);
+  const [gk, gd] = (guest && B.staple) || [1, 0], hp = d.hp * m * gk;
   const e = {
-    type, x: x - d.w / 2, y: y - d.h, w: d.w, h: d.h, vx: 0, vy: 0, hp: d.hp * m, max: d.hp * m,
-    dmg: d.dmg + Math.floor((level - 1) / (type === 'spider' ? 4 : 7)), level, gem: d.gem, fly: d.fly, ghost: d.ghost,
+    type, x: x - d.w / 2, y: y - d.h, w: d.w, h: d.h, vx: 0, vy: 0, hp, max: hp,
+    dmg: Math.max(1, d.dmg + Math.floor((level - 1) / (type === 'spider' ? 4 : 7)) + gd), level, gem: d.gem, fly: d.fly, ghost: d.ghost,
     variant, tint: B.tint, accent: B.accent, face: 1, t: rand(0, 10), cd: rand(0.5, 2), t2: 0, flash: 0, trap: 0, state: 'idle', ground: false, biome,
   };
   if (type === 'ophan') { e.homeY = e.y - 40; e.y = e.homeY; }
